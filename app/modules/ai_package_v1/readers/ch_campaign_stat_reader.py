@@ -25,7 +25,7 @@ class ChCampaignStatReader:
 
     async def fetch_rows(
         self,
-        shop_id: int,
+        shop_id: str,
         adv_ids: Sequence[int],
         period: ExportPeriod,
     ) -> list[CampaignStatRow]:
@@ -33,7 +33,7 @@ class ChCampaignStatReader:
         Загружает строки campaign stat за период.
 
         Args:
-            shop_id: Manifest shop id (на всех строках payload).
+            shop_id: Authoritative ``WBCabinet.shop_id`` (str), штамп на строках; SQL выбирает по adv_id.
             adv_ids: Scoped adv_id (auto и search раздельно).
             period: Границы периода export.
 
@@ -52,7 +52,7 @@ class ChCampaignStatReader:
         self,
         client: Any,
         *,
-        shop_id: int,
+        shop_id: str,
         adv_ids: Sequence[int],
         period: ExportPeriod,
     ) -> list[CampaignStatRow]:
@@ -61,7 +61,7 @@ class ChCampaignStatReader:
 
         Args:
             client: Async ClickHouse client с ``query(sql, parameters=...)``.
-            shop_id: Manifest shop id.
+            shop_id: Authoritative shop id (str), не фильтр SQL.
             adv_ids: Scoped adv_id.
             period: Период export.
 

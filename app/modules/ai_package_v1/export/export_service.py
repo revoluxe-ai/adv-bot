@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from app.modules.ai_package_v1.domain.campaign_stat import (
     assert_no_synthetic_merge,
+    assert_observed_ids_are_physical,
     rows_for_shop,
 )
 from app.modules.ai_package_v1.domain.cards import (
@@ -40,7 +41,6 @@ from app.modules.ai_package_v1.export.payload_encode import (
     encode_campaign_stat_csv,
     encode_funnel_stat_csv,
 )
-from app.utils.db.session_maker import get_async_session_maker
 from app.modules.ai_package_v1.export.scope_collect import (
     collect_main_nmids,
     collect_scoped_adv_ids,
@@ -48,6 +48,9 @@ from app.modules.ai_package_v1.export.scope_collect import (
 from app.modules.ai_package_v1.keyword_performance.export.keyword_assembler import (
     KeywordAssemblerProtocol,
     KeywordPerformanceAssembler,
+)
+from app.modules.ai_package_v1.keyword_performance.readers.pg_session_adapter import (
+    default_pg_session_factory,
 )
 from app.modules.ai_package_v1.readers.ch_campaign_stat_reader import ChCampaignStatReader
 from app.modules.ai_package_v1.readers.ch_funnel_reader import ChFunnelReader
@@ -63,7 +66,7 @@ from app.modules.ai_package_v1.scope.pg_export_shop_scope_reader import (
 class ExportResult:
     """Результат export без ZIP-транспорта (domain manifest + payloads).
 
-    ``manifest.shop_id`` — int (manifest v1); входной PG ``shop_id`` — str.
+    ``manifest.shop_id`` совпадает с входным PG ``WBCabinet.shop_id`` (str).
     """
 
     manifest: ExportManifest
@@ -88,6 +91,12 @@ class ExportService:
         settings_assembler: CampaignSettingsAssembler | None = None,
         keyword_assembler: KeywordAssemblerProtocol | None = None,
     ) -> None:
+        """Собирает read-only зависимости export.
+
+        Settings inventory по умолчанию получает ``default_pg_session_factory``.
+        Reader открывает сессию как ``session_maker(read_only=True)()``, поэтому
+        фабрика возвращает ``async_sessionmaker``.
+        """
         self._scope_reader = scope_reader or PgExportShopScopeReader()
         self._campaign_reader = campaign_reader or ChCampaignStatReader()
         self._funnel_reader = funnel_reader or ChFunnelReader()
@@ -99,7 +108,7 @@ class ExportService:
             self._settings_assembler = settings_assembler
         else:
             self._settings_assembler = CampaignSettingsAssembler(
-                session_maker=get_async_session_maker,
+                session_maker=default_pg_session_factory,
             )
         if keyword_assembler is not None:
             self._keyword_assembler = keyword_assembler
@@ -125,7 +134,7 @@ class ExportService:
             ``ExportResult`` с карточками датасетов и CSV payloads.
 
         Raises:
-            ValueError: при нарушении grain Auto/Search, невалидном shop_id или period.
+            ValueError: при synthetic campaign_id, невалидном shop_id или period.
         """
         manifest_id = validate_export_inputs(shop_id, period)
         scope = await self._scope_reader.load_scope(shop_id)
@@ -170,7 +179,7 @@ class ExportService:
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         scope: list[ExportScopeAdv],
         generated_at: str | None,
@@ -182,15 +191,19 @@ class ExportService:
             manifest_shop_id, adv_ids, period
         )
         campaign_rows = rows_for_shop(campaign_rows, manifest_shop_id)
+        assert_observed_ids_are_physical(
+            {row.campaign_id for row in campaign_rows},
+            set(adv_ids),
+        )
         for item in scope:
             if item.search_adv_id is not None and item.search_adv_id != item.auto_adv_id:
-                scoped_rows = [
-                    r
-                    for r in campaign_rows
-                    if r.campaign_id in (item.auto_adv_id, item.search_adv_id)
+                leg_rows = [
+                    row
+                    for row in campaign_rows
+                    if row.campaign_id in (item.auto_adv_id, item.search_adv_id)
                 ]
                 assert_no_synthetic_merge(
-                    scoped_rows, item.auto_adv_id, item.search_adv_id
+                    leg_rows, item.auto_adv_id, item.search_adv_id
                 )
 
         funnel_rows = await self._funnel_reader.fetch_rows(
@@ -212,9 +225,11 @@ class ExportService:
         settings_payload_content = serialize_campaign_settings_payload(
             settings_snapshot
         )
+        observed_adv_ids = sorted({row.campaign_id for row in campaign_rows})
         campaign_card = build_campaign_full_stat_card(
             period,
             scoped_adv_ids=adv_ids,
+            observed_adv_ids=observed_adv_ids,
             row_count=len(campaign_rows),
             freshness=campaign_freshness,
         )

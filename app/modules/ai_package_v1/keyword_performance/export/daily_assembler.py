@@ -30,7 +30,7 @@ from app.modules.ai_package_v1.keyword_performance.scope.dto import KeywordExpor
 def assemble_daily_rows(
     raw_rows: list[RawDailySnapshotRow],
     *,
-    manifest_shop_id: int,
+    manifest_shop_id: str,
     scope: KeywordExportScope,
 ) -> list[KeywordDailyRowV1]:
     """Transform raw CH rows into canonical daily facts."""

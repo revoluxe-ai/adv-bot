@@ -4,17 +4,27 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date
-from unittest.mock import AsyncMock
+from collections.abc import Callable
+from datetime import date, datetime
+from typing import cast
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.modules.ai_package_v1.domain.campaign_settings_snapshot_v1 import SCHEMA_VERSION
 from app.modules.ai_package_v1.domain.enums import Coverage, DatasetId, PrimarySource
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
+from app.modules.ai_package_v1.export.campaign_settings_assembler import (
+    CampaignSettingsAssembler,
+    SettingsReaderProtocol,
+)
 from app.modules.ai_package_v1.export.dataset_cards import CAMPAIGN_SETTINGS_JSON_LOGICAL
 from app.modules.ai_package_v1.export.export_service import ExportService
 from app.modules.ai_package_v1.export.manifest_cards import payload_sha256
+from app.modules.ai_package_v1.scope.pg_adv_setting_inventory_reader import (
+    SessionMakerProtocol,
+)
+from app.utils.db.session_maker import read_only_session_maker
 from app.modules.ai_package_v1.scope.dto import ExportScopeAdv
 from app.modules.ai_package_v1.validator.package_validator import (
     PackageValidationError,
@@ -149,7 +159,10 @@ async def test_export_zip_deterministic_settings_hash(
     zip_a = encode_package(first.manifest, first.payloads)
     zip_b = encode_package(second.manifest, second.payloads)
     validate_zip_package(zip_a)
-    assert hashlib.sha256(zip_a).hexdigest() == hashlib.sha256(zip_b).hexdigest()
+    validate_zip_package(zip_b)
+    hashes_a = {p.logical_name: hashlib.sha256(p.content).hexdigest() for p in first.payloads}
+    hashes_b = {p.logical_name: hashlib.sha256(p.content).hexdigest() for p in second.payloads}
+    assert hashes_a == hashes_b
 
 
 @pytest.mark.asyncio
@@ -176,7 +189,7 @@ async def test_other_dataset_cards_unchanged_with_detailed_settings(
     assert funnel.provenance.primary_source == PrimarySource.CLICKHOUSE_WB_COMMON_STAT
     assert funnel.row_file == "datasets/complex_adv_funnel.csv"
     assert shop_orders.provenance.primary_source == PrimarySource.SOURCE_NOT_ASSIGNED
-    assert shop_orders.row_count in (None, 0)
+    assert shop_orders.row_count is None
 
 
 @pytest.mark.asyncio
@@ -251,3 +264,50 @@ async def test_manifest_payload_hash_matches_domain_contract(
         p for p in result.payloads if p.logical_name == CAMPAIGN_SETTINGS_JSON_LOGICAL
     )
     assert hashlib.sha256(settings_payload.content).hexdigest() == digest
+
+
+@pytest.mark.asyncio
+async def test_default_settings_wiring_opens_sessionmaker_not_context_decorator() -> None:
+    """Default ExportService must pass a sessionmaker factory into the inventory reader.
+
+    ``PgAdvSettingInventoryReader.load_inventory`` calls
+    ``session_maker(read_only=True)()``. An ``@asynccontextmanager`` factory
+    (``get_async_session_maker``) returns an ``AsyncContextDecorator``; calling
+    that object raises ``TypeError: AsyncContextDecorator.__call__() missing 1
+    required positional argument: 'func'`` before any query runs.
+    """
+    captured: dict[str, object] = {}
+    real_init = CampaignSettingsAssembler.__init__
+
+    def _spy_init(
+        self: CampaignSettingsAssembler,
+        reader: SettingsReaderProtocol | None = None,
+        *,
+        session_maker: object | None = None,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
+        """Запоминает фабрику, которую ExportService передаёт в assembler."""
+        captured["session_maker"] = session_maker
+        real_init(self, reader, session_maker=session_maker, clock=clock)
+
+    with patch.object(CampaignSettingsAssembler, "__init__", _spy_init):
+        _ = ExportService(
+            scope_reader=AsyncMock(),
+            campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
+            funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
+            freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+            keyword_assembler=AsyncMock(),  # type: ignore[arg-type]
+        )
+    raw_maker = captured.get("session_maker")
+    assert raw_maker is not None
+    session_maker = cast(SessionMakerProtocol, raw_maker)
+    session_factory = session_maker(read_only=True)
+    try:
+        opened = session_factory()
+    except TypeError as exc:
+        raise AssertionError(
+            "inventory reader calls session_maker(read_only=True)(); "
+            "a context-manager factory raises AsyncContextDecorator TypeError"
+        ) from exc
+    await opened.close()
+    assert session_factory is read_only_session_maker

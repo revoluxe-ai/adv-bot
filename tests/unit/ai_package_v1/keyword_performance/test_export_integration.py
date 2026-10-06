@@ -106,7 +106,7 @@ async def test_contract_default_keyword_cards(fake_deps: FakeKeywordDeps) -> Non
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=GENERATED_AT,
     )
@@ -118,10 +118,10 @@ async def test_contract_default_keyword_cards(fake_deps: FakeKeywordDeps) -> Non
 async def test_keyword_manifest_deterministic(fake_deps: FakeKeywordDeps) -> None:
     assembler = build_fake_assembler(fake_deps)
     first = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     second = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     h1 = hashlib.sha256(first.payloads[0].content).hexdigest()
     h2 = hashlib.sha256(second.payloads[0].content).hexdigest()
@@ -159,7 +159,7 @@ async def test_keyword_dates_ignore_period_end(fake_deps: FakeKeywordDeps) -> No
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=GENERATED_AT,
     )

@@ -170,6 +170,30 @@ async def test_stub_contract_pg_overlap_reader_read_only_session() -> None:
 
 
 @pytest.mark.asyncio
+async def test_pg_overlap_reader_null_adv_id_row_is_excluded() -> None:
+    """NULL adv_id is omitted, not zero-filled; sibling identities stay."""
+    rows: list[tuple[object, object, object, object]] = [
+        ("shop-null", 10, None, None),
+        ("shop-real", 11, 111, None),
+        ("shop-search", 12, None, 222),
+    ]
+    result = MagicMock()
+    result.all = MagicMock(return_value=rows)
+    session = MagicMock()
+    session.execute = AsyncMock(return_value=result)
+    reader = PgAdvIdOverlapReader(fake_pg_session_maker)
+    overlap = await reader.load_overlap(
+        frozenset({111, 222, 0}),
+        session=cast(Any, session),
+    )
+    assert 0 not in overlap
+    assert overlap == {
+        111: [("shop-real", 11)],
+        222: [("shop-search", 12)],
+    }
+
+
+@pytest.mark.asyncio
 async def test_stub_contract_daily_reader_coherent_nullable_tuple_shape() -> None:
     """Daily reader parses coherent vs ambiguous tuple rows from fake client."""
     client = AsyncMock()

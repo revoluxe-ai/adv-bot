@@ -101,7 +101,7 @@ def test_bid_cpm_distinct() -> None:
 
     rows = [
         KeywordDailyRowV1(
-            shop_id=1,
+            shop_id="1",
             adv_id=111,
             leg_role=KeywordLegRole.AUTO,
             nmid=500,
@@ -123,7 +123,7 @@ def test_mv_not_campaign_current_state() -> None:
 
     rows = [
         KeywordDailyRowV1(
-            shop_id=1,
+            shop_id="1",
             adv_id=999,
             leg_role=KeywordLegRole.REBOUND_AUTO,
             nmid=500,
@@ -189,7 +189,7 @@ async def test_cutoff_future_bounds_excluded_from_export_metadata() -> None:
     )
     result = await build_fake_assembler(deps).assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=cutoff_generated_at,
     )
@@ -242,7 +242,7 @@ async def test_bid_decision_exported_in_current_state() -> None:
     assembler = build_fake_assembler(deps)
     result = await assembler.assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=GENERATED_AT,
     )

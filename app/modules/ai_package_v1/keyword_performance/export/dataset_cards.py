@@ -63,7 +63,7 @@ def build_keyword_daily_card(period: ExportPeriod, *, row_count: int) -> Dataset
         row_count=row_count,
         row_file=KEYWORD_DAILY_LOGICAL,
         source=PrimarySource.CLICKHOUSE_CLUSTERS_ADV_STATS,
-        grain="adv_id × nmid × norm_query × date",
+        grain="shop_id × adv_setting_id × adv_id × leg_role × nmid × norm_query × date",
     )
 
 
@@ -74,7 +74,7 @@ def build_keyword_windows_card(period: ExportPeriod, *, row_count: int) -> Datas
         row_count=row_count,
         row_file=KEYWORD_WINDOWS_LOGICAL,
         source=PrimarySource.DERIVED_KEYWORD_DAILY,
-        grain="identity × window_id",
+        grain="shop_id × adv_setting_id × adv_id × leg_role × nmid × norm_query × window_id",
     )
 
 

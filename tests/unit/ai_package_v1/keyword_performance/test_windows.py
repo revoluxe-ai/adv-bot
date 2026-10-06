@@ -28,7 +28,7 @@ GENERATED_AT_OCT5 = "2026-10-05T15:00:00Z"
 
 def _daily_row(
     *,
-    shop_id: int = 1,
+    shop_id: str = "1",
     adv_setting_id: int | None = 101,
     adv_id: int = 111,
     leg_role: KeywordLegRole = KeywordLegRole.AUTO,

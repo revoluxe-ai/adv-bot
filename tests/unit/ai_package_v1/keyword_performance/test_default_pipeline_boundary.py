@@ -97,7 +97,7 @@ async def test_default_keyword_assembler_no_wb_at_boundary() -> None:
         assembler = KeywordPerformanceAssembler()
         _ = await assembler.assemble(
             shop_id=SHOP_ID,
-            manifest_shop_id=1,
+            manifest_shop_id="1",
             period=PERIOD,
             generated_at=GENERATED_AT,
         )
@@ -111,7 +111,7 @@ async def test_default_keyword_assembler_no_store_writes_at_boundary() -> None:
         assembler = KeywordPerformanceAssembler()
         result = await assembler.assemble(
             shop_id=SHOP_ID,
-            manifest_shop_id=1,
+            manifest_shop_id="1",
             period=PERIOD,
             generated_at=GENERATED_AT,
         )

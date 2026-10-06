@@ -122,10 +122,10 @@ class KeywordAssemblerProtocol(Protocol):
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         generated_at: str,
-    ) -> "KeywordAssemblyResult":
+    ) -> KeywordAssemblyResult:
         ...
 
 
@@ -181,7 +181,7 @@ class KeywordPerformanceAssembler:
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         generated_at: str,
     ) -> KeywordAssemblyResult:

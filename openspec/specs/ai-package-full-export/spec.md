@@ -1,7 +1,9 @@
 # ai-package-full-export Specification
 
 ## Purpose
-TBD - created by archiving change ai-package-full-export. Update Purpose after archive.
+
+Read-only operator surface: one shop, one ZIP, explicit gaps for dataset
+families not yet in v1 export.
 ## Requirements
 ### Requirement: PackageZipAssembler is the ZIP authority
 

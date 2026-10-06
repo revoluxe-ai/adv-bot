@@ -14,6 +14,7 @@ from app.modules.ai_package_v1.domain.enums import (
     CollectionOutcome,
     Coverage,
     DatasetId,
+    FamilyStatus,
     FreshnessStatus,
     PrimarySource,
     ReasonCode,
@@ -67,8 +68,17 @@ class DatasetCard(BaseModel):
     def to_manifest_dict(self) -> dict[str, Any]:
         """Сериализуемое представление для manifest (стабильные ключи)."""
         self.validate_semantics()
-        return {
+        from app.modules.ai_package_v1.export.family_status import (
+            derive_family_status_from_card,
+        )
+
+        family_status = derive_family_status_from_card(self)
+        row_count = self.row_count
+        if family_status == FamilyStatus.GAP and row_count == 0:
+            row_count = None
+        payload: dict[str, Any] = {
             "dataset_id": str(self.dataset_id),
+            "family_status": str(family_status),
             "provenance": {
                 "primary_source": str(self.provenance.primary_source),
                 "grain": self.provenance.grain,
@@ -80,5 +90,7 @@ class DatasetCard(BaseModel):
             "reason_codes": [str(c) for c in self.reason_codes],
             "freshness": str(self.freshness),
             "row_file": self.row_file,
-            "row_count": self.row_count,
         }
+        if row_count is not None:
+            payload["row_count"] = row_count
+        return payload

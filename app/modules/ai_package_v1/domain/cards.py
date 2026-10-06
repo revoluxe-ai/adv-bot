@@ -33,7 +33,7 @@ def build_shop_product_orders_sales_card(period: ExportPeriod) -> DatasetCard:
         reason_codes=[ReasonCode.SOURCE_NOT_ASSIGNED, ReasonCode.UNKNOWN],
         freshness=FreshnessStatus.UNKNOWN,
         row_file=None,
-        row_count=0,
+        row_count=None,
     )
 
 
