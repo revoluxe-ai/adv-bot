@@ -13,7 +13,7 @@
   "PLAN_EVIDENCE_ID": "SCPV1-56cb1ebe559693c3",
   "SCENARIO_PLAN_FRESH": true,
   "PRODUCER_COMMAND": "poetry run pytest -m unit tests/unit/ai_package_v1/analysis/test_multi_window_scenarios.py",
-  "HEAD": "977fc3df85224f97cbffe519bbfb6464a13249ed",
+  "HEAD": "19f2da863",
   "EXECUTED_AT": "2026-10-06T23:20:00Z",
   "NOTES": "Post-rebase onto origin/stage@6a01885b; supersedes pre-rebase certification bound to e55d94c."
 }
