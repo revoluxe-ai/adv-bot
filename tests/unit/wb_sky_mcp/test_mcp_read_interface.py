@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import json
 import logging
@@ -35,9 +36,15 @@ from app.modules.ai_package_v1.keyword_performance.export.keyword_assembler impo
 from app.modules.ai_package_v1.domain.manifest import DomainPayload
 from app.modules.ai_package_v1.scope.dto import ExportScopeAdv
 from app.modules.wb_sky_mcp.access_token import issue_access_token
-from app.modules.wb_sky_mcp.bot_handlers import mcp_txn_id_from_start, present_mcp_start
+from app.modules.wb_sky_mcp.bot_handlers import (
+    cancel_mcp,
+    mcp_txn_id_from_start,
+    present_mcp_start,
+)
 from app.modules.wb_sky_mcp.bot_ui import (
+    CANCEL_PREFIX,
     callback_confirm,
+    cancel_text,
     connections_keyboard,
     connections_text,
     consent_text,
@@ -468,7 +475,89 @@ async def test_cancel_error_redirect_includes_exact_issuer() -> None:
     assert query["error"] == ["access_denied"]
     assert query["iss"] == [ISSUER]
     assert query["state"] == ["state-1"]
+    assert "code" not in query
     assert urlsplit(redirected.location).netloc == "chatgpt.com"
+    stored_raw = cast(object, await world.redis.get(f"mcp:txn:{started.txn_id}"))
+    assert isinstance(stored_raw, str)
+    payload_obj = json.loads(stored_raw)
+    assert payload_obj["status"] == "cancelled"
+    assert payload_obj["state"] == "state-1"
+    assert payload_obj["resource"] == RESOURCE
+    assert payload_obj["redirect_uri"] == REDIRECT
+    assert await world.redis.keys("mcp:code:*") == []
+    assert world.connections.rows == {}
+    with pytest.raises(McpError):
+        await world.broker.cancel(started.txn_id)
+    with pytest.raises(McpError):
+        await world.broker.cancel("missing-transaction")
+
+
+@pytest.mark.asyncio
+async def test_telegram_cancel_uses_completion_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Явная отмена в боте отдаёт уже собранный OAuth error URL."""
+    from aiogram.types import CallbackQuery, Chat, Message, User
+    from aiogram.types import InlineKeyboardMarkup
+
+    world = _World()
+    started = await _authorize(world)
+    set_mcp_broker(world.broker)
+    sent: list[tuple[str, object]] = []
+
+    async def _answer(
+        self: Message, text: str, reply_markup: object = None
+    ) -> Message:
+        sent.append((text, reply_markup))
+        return self
+
+    async def _ack(self: CallbackQuery, *args: object, **kwargs: object) -> None:
+        _ = (self, args, kwargs)
+
+    monkeypatch.setattr(Message, "answer", _answer)
+    monkeypatch.setattr(CallbackQuery, "answer", _ack)
+    message = Message.model_construct(
+        message_id=1,
+        date=datetime.datetime.now(datetime.timezone.utc),
+        chat=Chat.model_construct(id=1, type="private"),
+    )
+    query = CallbackQuery.model_construct(
+        id="1",
+        from_user=User.model_construct(id=9, is_bot=False, first_name="t"),
+        chat_instance="c",
+        data=f"{CANCEL_PREFIX}{started.txn_id}",
+        message=message,
+    )
+    try:
+        await cancel_mcp(query)
+    finally:
+        set_mcp_broker(None)
+    assert sent[0][0] == cancel_text()
+    markup = sent[0][1]
+    assert isinstance(markup, InlineKeyboardMarkup)
+    button_url = markup.inline_keyboard[0][0].url
+    assert button_url is not None
+    redirected = await world.broker.complete(button_url.split("ticket=", 1)[1])
+    parsed = parse_qs(urlsplit(redirected.location).query)
+    assert parsed["error"] == ["access_denied"]
+    assert parsed["state"] == ["state-1"]
+    assert parsed["iss"] == [ISSUER]
+    assert "code" not in parsed
+    assert await world.redis.keys("mcp:code:*") == []
+    expired = CallbackQuery.model_construct(
+        id="2",
+        from_user=User.model_construct(id=9, is_bot=False, first_name="t"),
+        chat_instance="c",
+        data=f"{CANCEL_PREFIX}missing-transaction",
+        message=message,
+    )
+    set_mcp_broker(world.broker)
+    try:
+        await cancel_mcp(expired)
+    finally:
+        set_mcp_broker(None)
+    assert sent[-1][0] == expired_text()
+    assert sent[-1][1] is None
 
 
 @pytest.mark.asyncio
@@ -516,6 +605,111 @@ async def test_refresh_rotation_and_reuse_revokes_connection() -> None:
     assert state.authorization_version == 2
     with pytest.raises(McpError):
         await world.broker.authenticate(rotated.access_token)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_refresh_permits_at_most_one_success() -> None:
+    """Два одновременных обмена одного refresh дают не больше одного успеха."""
+    world = _World()
+    code, _empty = await _issue(world)
+    first = await _exchange(world, code)
+    assert first.refresh_token is not None
+    presented = first.refresh_token
+
+    async def _once() -> Any:
+        return await world.broker.exchange_token(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": presented,
+                "client_id": CLIENT_ID,
+                "resource": RESOURCE,
+            },
+            client_ip="203.0.113.9",
+        )
+
+    results = await asyncio.gather(_once(), _once(), return_exceptions=True)
+    successes = [item for item in results if not isinstance(item, Exception)]
+    failures = [item for item in results if isinstance(item, Exception)]
+    assert len(successes) == 1
+    assert len(failures) == 1
+    assert isinstance(failures[0], McpError)
+    with pytest.raises(McpError):
+        await _once()
+
+
+@pytest.mark.asyncio
+async def test_revoked_version_refresh_fails_and_lifetime_stays() -> None:
+    """Отзыв и поднятая версия не ротируют refresh; TTL остаётся из конфига."""
+    world = _World()
+    code, _empty = await _issue(world)
+    first = await _exchange(world, code)
+    assert first.refresh_token is not None
+    assert first.expires_in == world.broker.config.access_token_ttl_seconds
+    before = datetime.datetime.now(datetime.timezone.utc)
+    rotated = await world.broker.exchange_token(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": first.refresh_token,
+            "client_id": CLIENT_ID,
+            "resource": RESOURCE,
+        },
+        client_ip="203.0.113.5",
+    )
+    after = datetime.datetime.now(datetime.timezone.utc)
+    assert rotated.expires_in == world.broker.config.access_token_ttl_seconds
+    assert rotated.refresh_token is not None
+    state = next(iter(world.connections.rows.values()))
+    assert state.refresh_token_expires_at is not None
+    ttl = datetime.timedelta(seconds=world.broker.config.refresh_token_ttl_seconds)
+    assert before + ttl <= state.refresh_token_expires_at <= after + ttl
+    kept_hash = state.refresh_token_hash
+    state.revoked_at = after
+    state.authorization_version += 1
+    await world.connections.save(state)
+    with pytest.raises(McpError):
+        await world.broker.exchange_token(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": rotated.refresh_token,
+                "client_id": CLIENT_ID,
+                "resource": RESOURCE,
+            },
+            client_ip="203.0.113.5",
+        )
+    assert world.connections.rows[state.public_id].refresh_token_hash == kept_hash
+
+
+@pytest.mark.asyncio
+async def test_sql_refresh_rotation_selects_for_update() -> None:
+    """PostgreSQL-адаптер берёт строку refresh через FOR UPDATE."""
+    from sqlalchemy.dialects import postgresql
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from sqlalchemy.sql.elements import ClauseElement
+
+    from app.modules.wb_sky_mcp.connection_repository import SqlConnectionRepository
+
+    class _Result:
+        def scalar_one_or_none(self) -> None:
+            return None
+
+    class _Session:
+        def __init__(self) -> None:
+            self.statement: object | None = None
+
+        async def execute(self, statement: object) -> _Result:
+            self.statement = statement
+            return _Result()
+
+        async def commit(self) -> None:
+            return None
+
+    session = _Session()
+    repo = SqlConnectionRepository(cast(AsyncSession, session))
+    missing = await repo.apply_refresh_rotation("ab" * 32, lambda _state: "nope")
+    assert missing is None
+    assert isinstance(session.statement, ClauseElement)
+    compiled = str(session.statement.compile(dialect=postgresql.dialect()))
+    assert "FOR UPDATE" in compiled
 
 
 @pytest.mark.asyncio

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from typing import Any, cast
 from urllib.parse import urlsplit
 
@@ -19,6 +20,7 @@ from app.modules.wb_sky_mcp.broker import McpBroker, READ_TOOLS
 from app.modules.wb_sky_mcp.runtime import get_mcp_broker
 from app.modules.wb_sky_mcp.cimd import default_resolver
 from app.modules.wb_sky_mcp.config import McpConfig, load_mcp_config
+from app.modules.wb_sky_mcp.connection_logic import McpConnectionState
 from app.modules.wb_sky_mcp.connection_repository import (
     ConnectionRepository,
     SqlConnectionRepository,
@@ -57,15 +59,23 @@ class _PgConnections:
     async def find_by_refresh_hash(self, token_hash: str) -> Any:
         return await self._run(True, "find_by_refresh_hash", token_hash)
 
-    async def _run(self, read_only: bool, method: str, arg: Any) -> Any:
+    async def apply_refresh_rotation(
+        self,
+        token_hash: str,
+        apply: Callable[[McpConnectionState], str],
+    ) -> tuple[McpConnectionState, str] | None:
+        """Ротация refresh в одной read-write сессии с блокировкой строки."""
+        return await self._run(False, "apply_refresh_rotation", token_hash, apply)
+
+    async def _run(self, read_only: bool, method: str, *args: Any) -> Any:
         from app.utils.db.session_maker import get_async_session_maker
 
         try:
             async with get_async_session_maker(read_only=read_only) as session:
                 repo = SqlConnectionRepository(session)
                 fn = getattr(repo, method)
-                return await fn(arg)
-        except McpStorageError:
+                return await fn(*args)
+        except McpError:
             raise
         except Exception as exc:
             raise McpStorageError("postgresql unavailable") from exc

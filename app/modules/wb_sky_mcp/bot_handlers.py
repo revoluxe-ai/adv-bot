@@ -125,19 +125,25 @@ async def confirm_mcp(query: CallbackQuery) -> None:
 
 @router.callback_query(_CallbackPrefix(CANCEL_PREFIX))
 async def cancel_mcp(query: CallbackQuery) -> None:
-    """Кнопка отмены. Код авторизации не выпускается."""
+    """Кнопка отмены. Код не выпускается; клиент получает error URL.
+
+    Ссылка — уже собранный broker completion с ``error=access_denied``.
+    Текст отмены не заменяет эту ссылку.
+    """
     if query.data is None or not isinstance(query.message, Message):
         return
     txn_id = query.data[len(CANCEL_PREFIX) :]
     try:
-        _url = await get_mcp_broker().cancel(txn_id)
+        complete_url = await get_mcp_broker().cancel(txn_id)
     except McpError:
         logger.info("mcp cancel rejected")
         _ = await query.answer()
         _ = await query.message.answer(expired_text())
         return
     _ = await query.answer()
-    _ = await query.message.answer(cancel_text())
+    _ = await query.message.answer(
+        cancel_text(), reply_markup=return_keyboard(complete_url)
+    )
 
 
 @router.message(Command("chatgpt"))

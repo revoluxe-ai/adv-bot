@@ -456,41 +456,55 @@ class McpBroker:
         )
 
     async def _exchange_refresh(self, form: dict[str, str]) -> TokenBundle:
-        """Обменять refresh. Клиент — только allowlist CIMD URL, без fetch чужого хоста."""
+        """Обменять refresh под блокировкой строки. Клиент — allowlist CIMD URL.
+
+        Повтор того же refresh, отзыв и несовпадение версии не выпускают
+        второй токен. Срок access и refresh берётся из текущего конфига.
+        """
         presented = form.get("refresh_token")
         client_id = form.get("client_id")
         if not presented or not client_id:
             raise McpError("INVALID_ARGUMENT", "refresh token rejected")
         _ = validate_metadata_url(client_id)
-        state = await self._connections.find_by_refresh_hash(
-            hash_refresh_token(presented)
-        )
-        if state is None:
+        presented_hash = hash_refresh_token(presented)
+        preview = await self._connections.find_by_refresh_hash(presented_hash)
+        if preview is None:
             raise McpError("UNAUTHENTICATED", "refresh token rejected")
         await self._limiter.hit(
             "token",
-            f"{client_id}|{state.user_id}",
+            f"{client_id}|{preview.user_id}",
             limit=self.config.token_limit_per_hour,
             window_seconds=3600,
         )
-        try:
-            fresh = rotate_refresh(
+
+        def _apply(state: McpConnectionState) -> str:
+            if state.revoked_at is not None:
+                raise McpError("UNAUTHENTICATED", "connection revoked")
+            if state.authorization_version < 1:
+                raise McpError("UNAUTHENTICATED", "stale authorization_version")
+            return rotate_refresh(
                 state,
                 presented,
                 now=self._now(),
                 ttl_seconds=self.config.refresh_token_ttl_seconds,
             )
+
+        try:
+            rotated = await self._connections.apply_refresh_rotation(
+                presented_hash, _apply
+            )
         except McpError:
-            await self._connections.save(state)
             _audit(
                 decision="deny",
-                principal_id=state.user_id,
-                authorization_version=state.authorization_version,
+                principal_id=preview.user_id,
+                authorization_version=preview.authorization_version,
                 error_code="UNAUTHENTICATED",
                 correlation_id=str(uuid.uuid4()),
             )
             raise
-        await self._connections.save(state)
+        if rotated is None:
+            raise McpError("UNAUTHENTICATED", "refresh token rejected")
+        state, fresh = rotated
         access = issue_access_token(
             self.config,
             principal_id=state.user_id,
@@ -646,4 +660,3 @@ class McpBroker:
         if txn is None:
             raise McpError("INVALID_ARGUMENT", "oauth transaction expired")
         return txn
-

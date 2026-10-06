@@ -1,16 +1,26 @@
-"""Репозиторий подключения MCP: память для тестов и PostgreSQL для процесса."""
+"""Репозиторий подключения MCP: память для тестов и PostgreSQL для процесса.
+
+Ротация refresh выполняется в одной критической секции: в PostgreSQL это
+``SELECT … FOR UPDATE`` и запись в той же транзакции, в памяти — общий lock.
+Сырой refresh token сюда не передаётся, только хеш и уже посчитанное состояние.
+"""
 
 from __future__ import annotations
 
+import asyncio
 import datetime
+from collections.abc import Callable
 from typing import Protocol
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from app.modules.wb_sky_mcp.connection_logic import McpConnectionState
-from app.modules.wb_sky_mcp.errors import McpStorageError
+from app.modules.wb_sky_mcp.errors import McpError, McpStorageError
 from app.modules.wb_sky_mcp.models import McpConnection
+
+RefreshRotation = Callable[[McpConnectionState], str]
 
 
 class ConnectionRepository(Protocol):
@@ -26,12 +36,30 @@ class ConnectionRepository(Protocol):
 
     async def find_by_refresh_hash(self, token_hash: str) -> McpConnectionState | None: ...
 
+    async def apply_refresh_rotation(
+        self,
+        token_hash: str,
+        apply: RefreshRotation,
+    ) -> tuple[McpConnectionState, str] | None:
+        """Под блокировкой строки применить ротацию и зафиксировать её.
+
+        ``apply`` видит строку уже после захвата блокировки. Если ротация
+        отказывает после изменения состояния (повтор refresh), это изменение
+        тоже фиксируется. ``None`` — строки с таким хешем нет.
+        """
+        ...
+
 
 class MemoryConnectionRepository:
-    """In-memory репозиторий с той же семантикой, что и PostgreSQL-адаптер."""
+    """In-memory репозиторий с той же семантикой, что и PostgreSQL-адаптер.
+
+    Ротация сериализуется одним lock, чтобы два одновременных обмена одного
+    refresh не прошли оба.
+    """
 
     def __init__(self) -> None:
         self.rows: dict[str, McpConnectionState] = {}
+        self._rotation_lock = asyncio.Lock()
 
     async def add(self, state: McpConnectionState) -> None:
         self.rows[state.public_id] = state
@@ -55,6 +83,24 @@ class MemoryConnectionRepository:
             ):
                 return row
         return None
+
+    async def apply_refresh_rotation(
+        self,
+        token_hash: str,
+        apply: RefreshRotation,
+    ) -> tuple[McpConnectionState, str] | None:
+        """Сериализовать ротацию и сохранить её результат, включая отзыв."""
+        async with self._rotation_lock:
+            state = await self.find_by_refresh_hash(token_hash)
+            if state is None:
+                return None
+            try:
+                fresh = apply(state)
+            except McpError:
+                await self.save(state)
+                raise
+            await self.save(state)
+            return state, fresh
 
 
 def _as_utc(value: datetime.datetime | None) -> datetime.datetime | None:
@@ -126,13 +172,7 @@ class SqlConnectionRepository:
             row = result.scalar_one_or_none()
             if row is None:
                 raise McpStorageError("connection missing")
-            row.updated_at = state.updated_at
-            row.revoked_at = state.revoked_at
-            row.authorization_version = state.authorization_version
-            row.refresh_token_hash = state.refresh_token_hash
-            row.refresh_token_expires_at = state.refresh_token_expires_at
-            row.refresh_rotated_at = state.refresh_rotated_at
-            row.previous_refresh_token_hash = state.previous_refresh_token_hash
+            _assign_row(row, state)
             await self._session.commit()
         except McpStorageError:
             raise
@@ -151,12 +191,7 @@ class SqlConnectionRepository:
     async def find_by_refresh_hash(self, token_hash: str) -> McpConnectionState | None:
         """Найти подключение по текущему или предыдущему хешу refresh."""
         try:
-            stmt = select(McpConnection).where(
-                or_(
-                    McpConnection.refresh_token_hash == token_hash,
-                    McpConnection.previous_refresh_token_hash == token_hash,
-                )
-            )
+            stmt = _refresh_hash_select(token_hash)
             result = await self._session.execute(stmt)
             row = result.scalar_one_or_none()
         except Exception as exc:
@@ -164,3 +199,55 @@ class SqlConnectionRepository:
         if row is None:
             return None
         return _row_to_state(row)
+
+    async def apply_refresh_rotation(
+        self,
+        token_hash: str,
+        apply: RefreshRotation,
+    ) -> tuple[McpConnectionState, str] | None:
+        """Заблокировать строку, ротировать refresh и зафиксировать транзакцию.
+
+        Второй одновременный обмен ждёт ``FOR UPDATE``, затем видит уже
+        сменённый хеш и не получает второй успешный токен.
+        """
+        try:
+            stmt = _refresh_hash_select(token_hash).with_for_update()
+            result = await self._session.execute(stmt)
+            row = result.scalar_one_or_none()
+            if row is None:
+                return None
+            state = _row_to_state(row)
+            try:
+                fresh = apply(state)
+            except McpError:
+                _assign_row(row, state)
+                await self._session.commit()
+                raise
+            _assign_row(row, state)
+            await self._session.commit()
+            return state, fresh
+        except McpError:
+            raise
+        except Exception as exc:
+            raise McpStorageError("postgresql unavailable") from exc
+
+
+def _refresh_hash_select(token_hash: str) -> Select[tuple[McpConnection]]:
+    """Выборка подключения по текущему или предыдущему хешу refresh."""
+    return select(McpConnection).where(
+        or_(
+            McpConnection.refresh_token_hash == token_hash,
+            McpConnection.previous_refresh_token_hash == token_hash,
+        )
+    )
+
+
+def _assign_row(row: McpConnection, state: McpConnectionState) -> None:
+    """Перенести изменяемые поля подключения в загруженную строку."""
+    row.updated_at = state.updated_at
+    row.revoked_at = state.revoked_at
+    row.authorization_version = state.authorization_version
+    row.refresh_token_hash = state.refresh_token_hash
+    row.refresh_token_expires_at = state.refresh_token_expires_at
+    row.refresh_rotated_at = state.refresh_rotated_at
+    row.previous_refresh_token_hash = state.previous_refresh_token_hash
