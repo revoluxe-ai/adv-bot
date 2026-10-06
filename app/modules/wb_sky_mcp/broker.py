@@ -37,7 +37,11 @@ from app.modules.wb_sky_mcp.connection_logic import (
     store_refresh,
 )
 from app.modules.wb_sky_mcp.connection_repository import ConnectionRepository
-from app.modules.wb_sky_mcp.errors import McpError, McpStorageError
+from app.modules.wb_sky_mcp.errors import (
+    AuthorizationRedirectError,
+    McpError,
+    McpStorageError,
+)
 from app.modules.wb_sky_mcp.grants import ShopGrantReader, require_shop
 from app.modules.wb_sky_mcp.oauth_pkce import (
     grants_refresh,
@@ -183,6 +187,28 @@ class McpBroker:
     def _now(self) -> datetime.datetime:
         return self._clock.now()
 
+    def _authorization_redirect(
+        self,
+        redirect_uri: str,
+        state: str | None,
+        exc: McpError,
+    ) -> AuthorizationRedirectError:
+        """Собрать OAuth error redirect на уже проверенный адрес клиента."""
+        if exc.code == "FORBIDDEN_SCOPE":
+            error = "invalid_scope"
+        elif exc.code == "RATE_LIMITED":
+            error = "temporarily_unavailable"
+        else:
+            error = "invalid_request"
+        params = {
+            "error": error,
+            "error_description": exc.message,
+            "iss": self.config.issuer,
+        }
+        if state:
+            params["state"] = state
+        return AuthorizationRedirectError(_redirect(redirect_uri, params))
+
     async def authorize(
         self,
         *,
@@ -197,29 +223,40 @@ class McpBroker:
     ) -> AuthorizeRedirect:
         """Создать Redis-транзакцию и вернуть только deep link бота.
 
+        Ошибки до проверки CIMD остаются ``McpError`` и не редиректятся.
+        После доверенных ``client_id`` и ``redirect_uri`` ошибки запроса
+        становятся ``AuthorizationRedirectError`` с ``error``, ``state`` и
+        точным ``iss``. Код авторизации при этом не выдаётся.
+
         Raises:
-            McpError: клиент, PKCE, scope, resource или лимит не прошли.
+            McpError: клиент или redirect ещё не доверены.
+            AuthorizationRedirectError: клиент доверен, но запрос некорректен.
             McpStorageError: Redis недоступен (транзакция не создаётся).
         """
-        if not state:
-            raise McpError("INVALID_ARGUMENT", "state is required")
-        if resource != self.config.resource:
-            raise McpError("INVALID_ARGUMENT", "resource is not accepted")
-        challenge = require_s256_challenge(code_challenge_method, code_challenge)
-        scopes = parse_scopes(scope)
         redirect = await validate_cimd_client(
             client_id,
             redirect_uri,
             fetcher=self._fetcher,
             resolver=self._resolver,
         )
-        identity = f"{client_id}|{client_ip}"
-        await self._limiter.hit(
-            "authorize",
-            identity,
-            limit=self.config.authorize_limit_per_hour,
-            window_seconds=3600,
-        )
+        try:
+            if not state:
+                raise McpError("INVALID_ARGUMENT", "state is required")
+            if resource != self.config.resource:
+                raise McpError("INVALID_ARGUMENT", "resource is not accepted")
+            challenge = require_s256_challenge(code_challenge_method, code_challenge)
+            scopes = parse_scopes(scope)
+            identity = f"{client_id}|{client_ip}"
+            await self._limiter.hit(
+                "authorize",
+                identity,
+                limit=self.config.authorize_limit_per_hour,
+                window_seconds=3600,
+            )
+        except McpStorageError:
+            raise
+        except McpError as exc:
+            raise self._authorization_redirect(redirect, state, exc) from exc
         txn_id = new_opaque_id()
         txn = OAuthTransaction(
             txn_id=txn_id,
@@ -497,22 +534,23 @@ class McpBroker:
             state = await self._connections.get(claims.connection_id)
         except McpStorageError:
             raise
-        if (
-            state is None
-            or state.revoked_at is not None
-            or state.user_id != claims.principal_id
-            or state.authorization_version != claims.authorization_version
-        ):
-            _audit(
-                decision="deny",
-                tool="authenticate",
-                principal_id=claims.principal_id,
-                authorization_version=claims.authorization_version,
-                error_code="UNAUTHENTICATED",
-                correlation_id=str(uuid.uuid4()),
-            )
-            raise McpError("UNAUTHENTICATED", "connection rejected")
-        return claims, state
+        if state is None or state.user_id != claims.principal_id:
+            reason = "connection rejected"
+        elif state.revoked_at is not None:
+            reason = "connection revoked"
+        elif state.authorization_version != claims.authorization_version:
+            reason = "stale authorization_version"
+        else:
+            return claims, state
+        _audit(
+            decision="deny",
+            tool="authenticate",
+            principal_id=claims.principal_id,
+            authorization_version=claims.authorization_version,
+            error_code="UNAUTHENTICATED",
+            correlation_id=str(uuid.uuid4()),
+        )
+        raise McpError("UNAUTHENTICATED", reason)
 
     async def call_tool(
         self,

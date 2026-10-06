@@ -2,7 +2,8 @@
 
 Сервер скачивает документ только после того, как URL прошёл allowlist хоста
 OpenAI/ChatGPT и резолв в публичные адреса. Произвольный URL пользователя
-не запрашивается.
+не запрашивается. Метод token endpoint выбирается пересечением с методами
+сервера (сейчас только ``none``), а не равенством единственного legacy-поля.
 """
 
 from __future__ import annotations
@@ -17,6 +18,8 @@ from urllib.parse import urlsplit
 from app.modules.wb_sky_mcp.errors import McpError
 
 ALLOWED_CLIENT_HOSTS = frozenset({"chatgpt.com", "chat.openai.com"})
+# Публичный PKCE-клиент. ``private_key_jwt`` в этом ремонте не реализуется.
+SERVER_TOKEN_ENDPOINT_AUTH_METHODS = frozenset({"none"})
 Fetcher = Callable[[str], Awaitable[bytes]]
 Resolver = Callable[[str], list[str]]
 
@@ -122,11 +125,51 @@ def _validate_redirect(uri: str) -> str:
     return uri
 
 
-def parse_client_metadata(document: bytes, client_id: str, redirect_uri: str) -> None:
-    """Проверить JSON CIMD: личность, redirect и метод token endpoint.
+def select_token_endpoint_auth_method(payload: dict[str, object]) -> str:
+    """Выбрать метод token endpoint из пересечения с сервером.
+
+    Плюральное поле клиента — множество методов, которые он умеет.
+    Если его нет, совместимое единственное поле считается всем множеством.
+    Единственное поле при наличии плюрального — только предпочтение, и
+    только когда оно само входит в пересечение. Иначе берётся
+    детерминированный метод пересечения (лексикографически первый).
+
+    Returns:
+        Выбранный метод. Сейчас это всегда ``none``, если пересечение непусто.
 
     Raises:
-        McpError: документ не описывает ожидаемого публичного клиента ChatGPT.
+        McpError: пересечение пусто или поля имеют неверный тип.
+    """
+    legacy = payload.get("token_endpoint_auth_method")
+    plural = payload.get("token_endpoint_auth_methods_supported")
+    client_methods: set[str] = set()
+    if plural is None:
+        if not isinstance(legacy, str) or not legacy.strip():
+            raise _reject("token endpoint auth method is not supported")
+        client_methods.add(legacy)
+    else:
+        if not isinstance(plural, list) or not plural:
+            raise _reject("token endpoint auth method is not supported")
+        for item in cast(list[object], plural):
+            if not isinstance(item, str) or not item.strip():
+                raise _reject("token endpoint auth method is not supported")
+            client_methods.add(item)
+    intersection = client_methods & SERVER_TOKEN_ENDPOINT_AUTH_METHODS
+    if not intersection:
+        raise _reject("token endpoint auth method is not supported")
+    if isinstance(legacy, str) and legacy in intersection:
+        return legacy
+    return sorted(intersection)[0]
+
+
+def parse_client_metadata(document: bytes, client_id: str, redirect_uri: str) -> str:
+    """Проверить JSON CIMD: личность, redirect и метод token endpoint.
+
+    Returns:
+        Выбранный метод token endpoint. Для текущего сервера это ``none``.
+
+    Raises:
+        McpError: документ не описывает совместимого публичного клиента ChatGPT.
     """
     try:
         payload_obj = json.loads(document.decode("utf-8"))
@@ -151,11 +194,13 @@ def parse_client_metadata(document: bytes, client_id: str, redirect_uri: str) ->
             raise _reject("redirect_uri is not allowed")
         _ = _validate_redirect(item)
     _ = _validate_redirect(redirect_uri)
-    if payload.get("token_endpoint_auth_method") != "none":
+    selected = select_token_endpoint_auth_method(payload)
+    if selected not in SERVER_TOKEN_ENDPOINT_AUTH_METHODS:
         raise _reject("token endpoint auth method is not supported")
     grants = payload.get("grant_types")
     if not isinstance(grants, list) or "authorization_code" not in grants:
         raise _reject("client metadata document is invalid")
+    return selected
 
 
 async def validate_cimd_client(
@@ -188,5 +233,5 @@ async def validate_cimd_client(
         raise _reject("client metadata document is unavailable") from exc
     if len(body) > 65536:
         raise _reject("client metadata document is invalid")
-    parse_client_metadata(body, safe_url, redirect_uri)
+    _ = parse_client_metadata(body, safe_url, redirect_uri)
     return redirect_uri

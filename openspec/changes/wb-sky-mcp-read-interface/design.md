@@ -59,6 +59,14 @@ PR #449 (ChangeSet, не влит) и PR #450 (ремонт Full AI Package) э�
 change идёт по тому GO: CIMD, resource indicator, `offline_access` как
 технический refresh, точный `iss`, флаг `MCP_ENABLED` по умолчанию false.
 
+Протокольный ремонт той же ветки не меняет границу чтения. Сервер заявляет
+только MCP `2025-03-26` (`SUPPORTED_PROTOCOL_VERSIONS`). Метод token endpoint
+выбирается пересечением CIMD с `{"none"}`; единственное поле клиента — лишь
+предпочтение, если оно входит в пересечение. Ошибки authorize после
+проверенных client/redirect уходят редиректом с `error`, `state` и точным
+`iss`. До проверки redirect отказ локальный. Недействительный bearer на
+`/mcp` — HTTP 401 и `WWW-Authenticate`, не успешный tool result.
+
 ## Ownership & Placement
 
 | Зона | Владелец | Запрещено |

@@ -44,10 +44,16 @@ from app.modules.wb_sky_mcp.bot_ui import (
     expired_text,
 )
 from app.modules.wb_sky_mcp.broker import McpBroker
+from app.modules.wb_sky_mcp.cimd import parse_client_metadata
 from app.modules.wb_sky_mcp.config import McpConfig, load_mcp_config
 from app.modules.wb_sky_mcp.connection_logic import McpConnectionState
 from app.modules.wb_sky_mcp.connection_repository import MemoryConnectionRepository
-from app.modules.wb_sky_mcp.errors import McpError, McpStorageError
+from app.modules.wb_sky_mcp.errors import (
+    AuthorizationRedirectError,
+    McpError,
+    McpStorageError,
+)
+from app.modules.wb_sky_mcp.protocol import SUPPORTED_PROTOCOL_VERSIONS
 from app.modules.wb_sky_mcp.grants import MemoryShopGrantReader, ShopGrant
 from app.modules.wb_sky_mcp.http import mount_wb_sky_mcp
 from app.modules.wb_sky_mcp.runtime import set_mcp_broker
@@ -234,8 +240,16 @@ def _metadata() -> bytes:
 
 
 class _World:
-    def __init__(self, *, huge: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        huge: bool = False,
+        document: bytes | None = None,
+        client_id: str = CLIENT_ID,
+    ) -> None:
         self.fetched: list[str] = []
+        self.client_id = client_id
+        self._document = document if document is not None else _metadata()
         self.redis = FakeRedis(decode_responses=True)
         self.clock = _Clock()
         self.connections = MemoryConnectionRepository()
@@ -269,9 +283,9 @@ class _World:
 
     async def fetch(self, url: str) -> bytes:
         self.fetched.append(url)
-        if url != CLIENT_ID:
+        if url != self.client_id:
             raise McpError("INVALID_ARGUMENT", "unexpected fetch")
-        return _metadata()
+        return self._document
 
     async def bind(self, telegram_user_id: int, username: str | None) -> int:
         _ = username
@@ -323,16 +337,27 @@ async def test_authorize_pkce_creates_redis_deep_link_without_password() -> None
 async def test_authorize_rejects_weak_scope_redirect_and_unknown_client() -> None:
     world = _World()
     before = await world.redis.dbsize()
-    with pytest.raises(McpError):
+    with pytest.raises(AuthorizationRedirectError) as pkce_error:
         await _authorize(world, code_challenge_method="plain")
-    with pytest.raises(McpError):
+    pkce_query = parse_qs(urlsplit(pkce_error.value.location).query)
+    assert pkce_query["error"] == ["invalid_request"]
+    assert pkce_query["state"] == ["state-1"]
+    assert pkce_query["iss"] == [ISSUER]
+    assert urlsplit(pkce_error.value.location).netloc == "chatgpt.com"
+    with pytest.raises(AuthorizationRedirectError) as scope_error:
         await _authorize(world, scope="write")
+    scope_query = parse_qs(urlsplit(scope_error.value.location).query)
+    assert scope_query["error"] == ["invalid_scope"]
+    assert scope_query["iss"] == [ISSUER]
+    fresh = _World()
     with pytest.raises(McpError):
-        await _authorize(world, client_id="https://evil.example/steal")
-    assert world.fetched == []
+        await _authorize(fresh, client_id="https://evil.example/steal")
+    assert fresh.fetched == []
     with pytest.raises(McpError):
-        await _authorize(world, redirect_uri=REDIRECT + "/")
+        await _authorize(fresh, redirect_uri=REDIRECT + "/")
+    assert "evil.example" not in fresh.fetched
     assert await world.redis.dbsize() == before
+    assert await fresh.redis.dbsize() == 0
 
 
 @pytest.mark.asyncio
@@ -449,9 +474,13 @@ async def test_cancel_error_redirect_includes_exact_issuer() -> None:
 @pytest.mark.asyncio
 async def test_missing_or_wrong_resource_fails_closed() -> None:
     world = _World()
-    with pytest.raises(McpError):
+    with pytest.raises(AuthorizationRedirectError) as missing:
         await _authorize(world, resource=None)
-    with pytest.raises(McpError):
+    query = parse_qs(urlsplit(missing.value.location).query)
+    assert query["error"] == ["invalid_request"]
+    assert query["iss"] == [ISSUER]
+    assert query["state"] == ["state-1"]
+    with pytest.raises(AuthorizationRedirectError):
         await _authorize(world, resource=RESOURCE + "/")
     assert await world.redis.dbsize() == 0
 
@@ -824,7 +853,7 @@ async def test_tools_list_is_exactly_four_read_only_tools() -> None:
     async with AsyncClient(transport=transport, base_url="https://mcp.skyline.ru") as client:
         listed = await client.post(
             "/mcp",
-            headers={"Authorization": f"Bearer {access}"},
+            headers=_mcp_headers(access),
             json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
         )
     set_mcp_broker(None)
@@ -837,6 +866,10 @@ async def test_tools_list_is_exactly_four_read_only_tools() -> None:
     ]
     assert all(tool["annotations"]["readOnlyHint"] is True for tool in tools)
     assert all(tool["annotations"]["destructiveHint"] is False for tool in tools)
+    assert all(
+        tool["securitySchemes"] == [{"type": "oauth2", "scopes": ["wbsky:read"]}]
+        for tool in tools
+    )
 
 
 def test_feature_flag_defaults_off(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -963,3 +996,367 @@ async def test_disabled_start_does_not_mint_and_explain_has_no_token(
     assert message.sent
     assert "токен" not in message.sent[0].lower() or "выключено" in message.sent[0]
     assert "abc" not in message.sent[0]
+
+
+LIVE_CLIENT_ID = "https://chatgpt.com/oauth/client.json"
+LIVE_REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect"
+METADATA_URL = "https://mcp.skyline.ru/.well-known/oauth-protected-resource"
+
+
+def _live_chatgpt_cimd() -> bytes:
+    """Форма боевого CIMD ChatGPT: singular preference не равен none."""
+    return json.dumps(
+        {
+            "client_id": LIVE_CLIENT_ID,
+            "client_name": "ChatGPT",
+            "redirect_uris": [LIVE_REDIRECT],
+            "token_endpoint_auth_method": "private_key_jwt",
+            "token_endpoint_auth_methods_supported": ["none", "private_key_jwt"],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+        }
+    ).encode()
+
+
+def _mcp_headers(token: str, **extra: str) -> dict[str, str]:
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json, text/event-stream",
+    }
+    headers.update(extra)
+    return headers
+
+
+def _initialize_body(version: str | int | None = "2025-03-26") -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "capabilities": {},
+        "clientInfo": {"name": "chatgpt", "version": "1"},
+    }
+    if version is not None:
+        params["protocolVersion"] = version
+    return {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": params}
+
+
+def _mount(world: _World) -> FastAPI:
+    set_mcp_broker(world.broker)
+    app = FastAPI()
+    app.include_router(
+        __import__("app.modules.wb_sky_mcp.http", fromlist=["router"]).router
+    )
+    return app
+
+
+def test_live_chatgpt_cimd_selects_none_from_intersection() -> None:
+    selected = parse_client_metadata(
+        _live_chatgpt_cimd(), LIVE_CLIENT_ID, LIVE_REDIRECT
+    )
+    assert selected == "none"
+    singular_only = parse_client_metadata(_metadata(), CLIENT_ID, REDIRECT)
+    assert singular_only == "none"
+    rejected = json.dumps(
+        {
+            "client_id": LIVE_CLIENT_ID,
+            "client_name": "ChatGPT",
+            "redirect_uris": [LIVE_REDIRECT],
+            "token_endpoint_auth_method": "private_key_jwt",
+            "token_endpoint_auth_methods_supported": ["private_key_jwt"],
+            "grant_types": ["authorization_code"],
+        }
+    ).encode()
+    with pytest.raises(McpError):
+        parse_client_metadata(rejected, LIVE_CLIENT_ID, LIVE_REDIRECT)
+
+
+@pytest.mark.asyncio
+async def test_live_chatgpt_cimd_authorize_continues() -> None:
+    world = _World(document=_live_chatgpt_cimd(), client_id=LIVE_CLIENT_ID)
+    result = await world.broker.authorize(
+        client_id=LIVE_CLIENT_ID,
+        redirect_uri=LIVE_REDIRECT,
+        state="state-1",
+        scope="wbsky:read",
+        code_challenge=s256_challenge(VERIFIER),
+        code_challenge_method="S256",
+        resource=RESOURCE,
+        client_ip="203.0.113.5",
+    )
+    assert result.location.startswith("https://t.me/wb_adv_master_bot?start=mcp_")
+    assert world.fetched == [LIVE_CLIENT_ID]
+
+
+@pytest.mark.asyncio
+async def test_authorize_error_redirect_has_iss_and_untrusted_redirect_stays_local() -> None:
+    world = _World()
+    app = _mount(world)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="https://mcp.skyline.ru") as client:
+        safe = await client.get(
+            "/oauth/authorize",
+            params={
+                "client_id": CLIENT_ID,
+                "redirect_uri": REDIRECT,
+                "state": "state-1",
+                "scope": "write",
+                "code_challenge": s256_challenge(VERIFIER),
+                "code_challenge_method": "S256",
+                "resource": RESOURCE,
+            },
+            follow_redirects=False,
+        )
+        assert safe.status_code == 302
+        query = parse_qs(urlsplit(safe.headers["location"]).query)
+        assert query["error"] == ["invalid_scope"]
+        assert query["state"] == ["state-1"]
+        assert query["iss"] == [ISSUER]
+        assert urlsplit(safe.headers["location"]).netloc == "chatgpt.com"
+        unsafe = await client.get(
+            "/oauth/authorize",
+            params={
+                "client_id": "https://evil.example/steal",
+                "redirect_uri": "https://evil.example/cb",
+                "state": "state-1",
+                "scope": "wbsky:read",
+                "code_challenge": s256_challenge(VERIFIER),
+                "code_challenge_method": "S256",
+                "resource": RESOURCE,
+            },
+            follow_redirects=False,
+        )
+        assert unsafe.status_code == 400
+        assert "location" not in {key.lower() for key in unsafe.headers}
+        assert "https://evil.example/cb" not in unsafe.text
+    set_mcp_broker(None)
+
+
+@pytest.mark.asyncio
+async def test_mcp_lifecycle_negotiation_and_notifications() -> None:
+    world = _World()
+    _code, access = await _tokens(world)
+    app = _mount(world)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="https://mcp.skyline.ru") as client:
+        supported = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json=_initialize_body(SUPPORTED_PROTOCOL_VERSIONS[0]),
+        )
+        assert supported.status_code == 200
+        assert supported.headers["content-type"].startswith("application/json")
+        assert (
+            supported.json()["result"]["protocolVersion"]
+            == SUPPORTED_PROTOCOL_VERSIONS[0]
+        )
+        newer = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json=_initialize_body("2026-07-28"),
+        )
+        assert newer.json()["result"]["protocolVersion"] == "2025-03-26"
+        assert newer.json()["result"]["protocolVersion"] != "2026-07-28"
+        missing = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={"jsonrpc": "2.0", "id": 3, "method": "initialize"},
+        )
+        assert missing.json()["error"]["code"] == -32602
+        invalid = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json=_initialize_body(2025),
+        )
+        assert invalid.json()["error"]["code"] == -32602
+        note = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+        )
+        assert note.status_code == 202
+        assert note.content == b""
+        generic = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={"jsonrpc": "2.0", "method": "notifications/cancelled"},
+        )
+        assert generic.status_code == 202
+        assert generic.content == b""
+        assert b"id" not in generic.content
+        batched = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json=[{"jsonrpc": "2.0", "method": "notifications/initialized"}],
+        )
+        assert batched.status_code == 202
+        assert batched.content == b""
+        listed = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={"jsonrpc": "2.0", "id": 4, "method": "tools/list"},
+        )
+        assert listed.status_code == 200
+        assert [tool["name"] for tool in listed.json()["result"]["tools"]] == [
+            "get_profile",
+            "list_shops",
+            "get_capabilities",
+            "get_ai_package",
+        ]
+        ping = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={"jsonrpc": "2.0", "id": 5, "method": "ping"},
+        )
+        assert ping.json()["result"] == {}
+        unknown = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={"jsonrpc": "2.0", "id": 6, "method": "resources/list"},
+        )
+        assert unknown.json()["error"]["code"] == -32601
+        bad_params = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {}},
+        )
+        assert bad_params.json()["error"]["code"] == -32602
+        stale_header = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access, **{"MCP-Protocol-Version": "2026-07-28"}),
+            json={"jsonrpc": "2.0", "id": 8, "method": "tools/list"},
+        )
+        assert stale_header.status_code == 400
+        listening = await client.get("/mcp")
+        assert listening.status_code == 405
+    set_mcp_broker(None)
+
+
+@pytest.mark.asyncio
+async def test_bad_bearer_is_http_401_with_www_authenticate() -> None:
+    world = _World()
+    _code, access = await _tokens(world)
+    state = next(iter(world.connections.rows.values()))
+    expired = issue_access_token(
+        world.broker.config,
+        principal_id=7,
+        connection_id=state.public_id,
+        scope="wbsky:read",
+        authorization_version=state.authorization_version,
+        now=1,
+    )
+    app = _mount(world)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="https://mcp.skyline.ru") as client:
+        missing_response = await client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 9, "method": "tools/call"},
+        )
+        malformed = await client.post(
+            "/mcp",
+            headers=_mcp_headers("not-a-jwt"),
+            json={
+                "jsonrpc": "2.0",
+                "id": 9,
+                "method": "tools/call",
+                "params": {"name": "get_profile", "arguments": {}},
+            },
+        )
+        expired_response = await client.post(
+            "/mcp",
+            headers=_mcp_headers(expired),
+            json={
+                "jsonrpc": "2.0",
+                "id": 9,
+                "method": "tools/call",
+                "params": {"name": "get_profile", "arguments": {}},
+            },
+        )
+        await world.broker.disconnect(user_id=7, connection_id=state.public_id)
+        revoked = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={
+                "jsonrpc": "2.0",
+                "id": 9,
+                "method": "tools/call",
+                "params": {"name": "get_profile", "arguments": {}},
+            },
+        )
+    assert missing_response.status_code == 401
+    assert METADATA_URL in missing_response.headers["www-authenticate"]
+    assert 'error="invalid_request"' in missing_response.headers["www-authenticate"]
+    for response, secret in (
+        (malformed, "not-a-jwt"),
+        (expired_response, expired),
+        (revoked, access),
+    ):
+        assert response.status_code == 401
+        challenge = response.headers["www-authenticate"]
+        assert METADATA_URL in challenge
+        assert 'error="invalid_token"' in challenge
+        assert secret not in challenge
+        assert secret not in response.text
+        meta = response.json()["result"]["_meta"]["mcp/www_authenticate"]
+        assert meta == [challenge]
+        assert response.json()["result"]["isError"] is True
+    assert "connection revoked" in revoked.headers["www-authenticate"]
+
+    fresh = _World()
+    _code2, fresh_access = await _tokens(fresh)
+    fresh_state = next(iter(fresh.connections.rows.values()))
+    fresh_state.authorization_version = 99
+    fresh_app = _mount(fresh)
+    async with AsyncClient(
+        transport=ASGITransport(app=fresh_app), base_url="https://mcp.skyline.ru"
+    ) as client:
+        stale = await client.post(
+            "/mcp",
+            headers=_mcp_headers(fresh_access),
+            json={
+                "jsonrpc": "2.0",
+                "id": 10,
+                "method": "tools/call",
+                "params": {"name": "get_profile", "arguments": {}},
+            },
+        )
+        assert stale.status_code == 401
+        assert "stale authorization_version" in stale.headers["www-authenticate"]
+        assert fresh_access not in stale.headers["www-authenticate"]
+        assert fresh_access not in stale.text
+    set_mcp_broker(None)
+
+
+@pytest.mark.asyncio
+async def test_valid_bearer_tool_call_and_business_error_stay_distinct() -> None:
+    world = _World()
+    _code, access = await _tokens(world)
+    app = _mount(world)
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="https://mcp.skyline.ru"
+    ) as client:
+        ok = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access, **{"MCP-Protocol-Version": "2025-03-26"}),
+            json={
+                "jsonrpc": "2.0",
+                "id": 11,
+                "method": "tools/call",
+                "params": {"name": "get_profile", "arguments": {}},
+            },
+        )
+        assert ok.status_code == 200
+        assert ok.json()["result"]["isError"] is False
+        denied = await client.post(
+            "/mcp",
+            headers=_mcp_headers(access),
+            json={
+                "jsonrpc": "2.0",
+                "id": 12,
+                "method": "tools/call",
+                "params": {
+                    "name": "get_capabilities",
+                    "arguments": {"shop_id": "other-shop"},
+                },
+            },
+        )
+        assert denied.status_code == 200
+        assert denied.json()["result"]["isError"] is True
+        assert "www-authenticate" not in {key.lower() for key in denied.headers}
+    set_mcp_broker(None)
