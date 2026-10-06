@@ -15,6 +15,7 @@ from .middlewars.channel_subscription import ChannelSubscriptionMiddleware
 from .middlewars.gate import GateMiddleware
 from .middlewars.phone_required import PhoneRequiredMiddleware
 from .middlewars.return_to_start_from_state import ReturnToStart
+from app.modules.wb_sky_mcp.bot_handlers import router as mcp_oauth_router
 from .user_interface.handlers import gate, phone_collection, request_presentation, start
 
 global_router = Router()
@@ -38,6 +39,7 @@ scene_registry.add(BonusScene)
 scene_registry.add(UserBalanceScene)
 
 # gate.router first — gate:* callbacks when invite_gate re-enabled (dormant on rollout)
+_ = global_router.include_router(mcp_oauth_router)
 _ = global_router.include_router(gate.router)
 _ = global_router.include_router(phone_collection.router)
 _ = global_router.include_router(request_presentation.router)

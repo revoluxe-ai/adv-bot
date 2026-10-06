@@ -2,7 +2,32 @@
 
 ## Status
 
-Proposed
+Accepted
+
+## Owner acceptance
+
+Accepted by Owner on 2026-10-06 in the implementation GO for change
+`wb-sky-mcp-read-interface` (PR #452, branch
+`cursor/wb-sky-mcp-read-interface-127c`).
+
+Evidence: Owner marked `wb-sky-mcp-oauth-telegram-bridge` ACCEPTED and fixed
+the canonical rules: MCP V1 is read-only; there is no separate login website;
+the existing Telegram bot is the human consent UI; WB Sky backend is the
+OAuth authorization server and the MCP resource server; principal is
+`User.id`; Telegram user id is not a bearer; shop grants are recomputed from
+`WBUserCabinet` on every shop-bound call; there is no separate MCP
+microservice; MCP is mounted in the existing FastAPI client-bot process.
+
+Owner amendments applied with this acceptance:
+
+- scopes are `wbsky:read` plus technical `offline_access` (refresh only, no
+  extra data permission); write/changeset/apply/admin scopes are rejected;
+- client identity is CIMD for the ChatGPT HTTPS metadata document, validated
+  server-side with an allowlist and SSRF checks (arbitrary URLs are not fetched);
+- `resource` stays bound from authorize through the access token audience;
+- authorization responses that return to the client include exact `iss`;
+- public origin and issuer come from configuration, default
+  `https://mcp.skyline.ru`; `MCP_ENABLED` defaults to false.
 
 ## Context
 
@@ -59,7 +84,8 @@ Proposed
 - Сайт логина, форма пароля, новый IdP
 - Telegram bot token, webhook secret или user id как MCP bearer
 - Постоянный shop list внутри access token как authority
-- Выдача scope кроме `wbsky:read` этим change
+- Выдача data scope кроме `wbsky:read`. Технический `offline_access`
+  допустим только для refresh и не расширяет права на данные
 - Fail-open, если Redis или PostgreSQL недоступны
 
 ## Examples

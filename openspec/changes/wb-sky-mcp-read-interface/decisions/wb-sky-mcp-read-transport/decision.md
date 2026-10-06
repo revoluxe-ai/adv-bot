@@ -2,7 +2,20 @@
 
 ## Status
 
-Proposed
+Accepted
+
+## Owner acceptance
+
+Accepted by Owner on 2026-10-06 in the implementation GO for change
+`wb-sky-mcp-read-interface` (PR #452, branch
+`cursor/wb-sky-mcp-read-interface-127c`).
+
+Evidence: Owner marked `wb-sky-mcp-read-transport` ACCEPTED. Canonical read
+semantics stay on the existing Full AI Package / `ExportService`. MCP V1
+exposes only `get_profile`, `list_shops`, `get_capabilities`, and
+`get_ai_package`. ChangeSet and write tools are out of this version. The
+transport is Streamable HTTP on `/mcp` in the existing FastAPI process.
+Oversized payloads are `OMITTED_OVER_BUDGET` rather than silently truncated.
 
 ## Context
 

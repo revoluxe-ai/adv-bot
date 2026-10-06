@@ -977,6 +977,27 @@ class Settings:
         else:
             raise ValueError(': CAN_MIN_BID_DEFAULT must be true or false')
 
+    @property
+    def mcp_enabled(self) -> bool:
+        """Включает маршруты MCP. По умолчанию выключено. Не включать на stage/prod без GO."""
+        from app.modules.wb_sky_mcp.config import load_mcp_config
+
+        return load_mcp_config().enabled
+
+    @property
+    def mcp_public_base_url(self) -> str:
+        """Публичный origin MCP. По умолчанию https://mcp.skyline.ru."""
+        from app.modules.wb_sky_mcp.config import load_mcp_config
+
+        return load_mcp_config().public_base_url
+
+    @property
+    def mcp_oauth_issuer(self) -> str:
+        """Issuer OAuth без нормализации слэша. По умолчанию https://mcp.skyline.ru."""
+        from app.modules.wb_sky_mcp.config import load_mcp_config
+
+        return load_mcp_config().issuer
+
 
 # TODO: Внедрить полные прогоны Pyright, сначала только узнать надо ли
 

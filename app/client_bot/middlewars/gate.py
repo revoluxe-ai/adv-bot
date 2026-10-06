@@ -149,6 +149,11 @@ class GateMiddleware(BaseMiddleware):
             logger.debug("GateMiddleware: admin bypass user=%s", telegram_id)
             return await handler(event, data)
 
+        if isinstance(event, CallbackQuery):
+            callback_data = event.data or ""
+            if callback_data.startswith("mcpok:") or callback_data.startswith("mcpno:"):
+                return await handler(event, data)
+
         user = await _resolve_user(event, telegram_id)
         logger.debug(
             "GateMiddleware: loaded user=%s passed_gate=%s invite_gate=%s",

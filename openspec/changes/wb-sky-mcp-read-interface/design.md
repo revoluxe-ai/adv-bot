@@ -50,12 +50,14 @@ PR #449 (ChangeSet, не влит) и PR #450 (ремонт Full AI Package) э�
   управление кампаниями раздельны; MCP не запускает сбор.
 - `openspec/decisions/clickhouse-sql-database-qualification/decision.md` —
   MCP не пишет свой ClickHouse SQL; читает через экспортёр.
-- Proposed `decisions/wb-sky-mcp-read-transport/decision.md` — MCP adapter
+- Accepted `decisions/wb-sky-mcp-read-transport/decision.md` — MCP adapter
   может звать `ExportService`, не становясь вторым экспортёром.
-- Proposed `decisions/wb-sky-mcp-oauth-telegram-bridge/decision.md` —
+- Accepted `decisions/wb-sky-mcp-oauth-telegram-bridge/decision.md` —
   свой OAuth-мост, субъект `User.id`, магазины с живой связи.
 
-Пока оба decision Proposed, реализация MUST NOT начинаться.
+Оба decision Accepted Owner GO 2026-10-06 (PR #452). Реализация этого
+change идёт по тому GO: CIMD, resource indicator, `offline_access` как
+технический refresh, точный `iss`, флаг `MCP_ENABLED` по умолчанию false.
 
 ## Ownership & Placement
 
