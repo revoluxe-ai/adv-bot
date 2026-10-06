@@ -1,0 +1,58 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "wb-sky-mcp-read-interface",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-caabac3b666cb5d4",
+  "PLAN_CONTENT_HASH": "97ea30a907d376f4eea65b54fa099fd17880eb5f7d2219cc072f193b43bf9db4",
+  "PLAN_PATH": "openspec/changes/wb-sky-mcp-read-interface/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/wb-sky-mcp-read-interface/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 21,
+  "SOURCE_SPEC_SHA": "2aeccf0a2abb3f83512483b83847c9acb6e47473ce952536fb93520aa8577bbf",
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:Authorize creates a one-time session,Authorize rejects weak or foreign requests",
+      "L2:Deep link is not an API credential",
+      "L3:Confirm binds the canonical principal,Opening the bot is not consent",
+      "L4:Return completes the original transaction",
+      "L5:Token exchange checks PKCE,Profile hides credentials",
+      "L6:Shop list follows current cabinets,Capabilities list only real read support,Package returns structured canonical content,One shop per package,Foreign shop id fails closed",
+      "L7:Disconnect invalidates tokens",
+      "L8:Removed shop disappears immediately,Already revoked connection stays denied"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/wb-sky-mcp-read-interface/design.md",
+      "content_hash": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md",
+        "content_hash": "2aeccf0a2abb3f83512483b83847c9acb6e47473ce952536fb93520aa8577bbf"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/wb-sky-mcp-read-interface/design.md#lifecycle",
+      "content_hash": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/wb-sky-mcp-read-interface/owner-contract.md",
+      "content_hash": "664a353651a56b9ae0c88907aa0ce7215bfb4e901d844cbd5ce68bec211faf9e"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7",
+    "SPEC_REVISION": [
+      "2aeccf0a2abb3f83512483b83847c9acb6e47473ce952536fb93520aa8577bbf"
+    ],
+    "LIFECYCLE_REVISION": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7",
+    "OWNER_CONTRACT_REVISION": "664a353651a56b9ae0c88907aa0ce7215bfb4e901d844cbd5ce68bec211faf9e",
+    "SOURCE_SPEC_SHA": "2aeccf0a2abb3f83512483b83847c9acb6e47473ce952536fb93520aa8577bbf",
+    "PRODUCER_COMMAND": "/opsx-spec-scenario-coverage mode=plan change=wb-sky-mcp-read-interface"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}
