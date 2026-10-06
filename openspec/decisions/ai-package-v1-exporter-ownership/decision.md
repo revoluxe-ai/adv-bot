@@ -28,7 +28,16 @@ and shop-runner updaters are not extended with ZIP or AI packaging concerns.
    be referenced as patterns; export MUST NOT add ZIP/manifest logic into those
    modules — shared SQL MAY be extracted only into `ai_package_v1` or shared
    `sql/` with export-owned tests.
-5. Telegram/GUI MUST NOT be the v1 export entrypoint; operator/Job/CLI only.
+5. Export orchestration MUST stay in `app/modules/ai_package_v1/`.
+   Operator/Job/CLI remain valid entrypoints. A Telegram or other GUI handler
+   MAY be only a human transport adapter: after shop authorization it resolves
+   canonical `WBCabinet.shop_id` and calls
+   `PackageZipAssembler.assemble_zip(shop_id, period)`. Telegram/GUI MUST NOT
+   own datasets, manifest/ZIP encoding, or a second exporter.
+   Amendment source: change `telegram-ai-package-export` (Owner transport-only
+   authorization). The previous absolute ban on any Telegram/GUI export surface
+   is narrowed by this clause only; every other read-only invariant in this
+   decision stays in force.
 
 ## Applies to
 
@@ -46,6 +55,9 @@ and shop-runner updaters are not extended with ZIP or AI packaging concerns.
 - Script entry `scripts/ai_package_v1_export.py` (or ops Job wrapper) calling
   export service
 - Deterministic validator in `app/modules/ai_package_v1/` or `tests/` helpers
+- Telegram transport adapter that authorizes the current user, resolves
+  `WBCabinet.shop_id` on a read-only PostgreSQL session, and calls
+  `PackageZipAssembler.assemble_zip` (change `telegram-ai-package-export`)
 
 ## Forbidden
 
@@ -60,7 +72,8 @@ and shop-runner updaters are not extended with ZIP or AI packaging concerns.
 - Placing export orchestration inside `shop_runner` updater/write services
 - Using funnel or campaign orders as shop product orders/sales source
 - DDL/migrations solely for export in this change (use existing tables only)
-- Telegram handlers or GUI flows as required export surface
+- Telegram/GUI code that encodes ZIP, queries package datasets, shells out to
+  an exporter, or bypasses `PackageZipAssembler`
 
 ## Examples
 
@@ -85,6 +98,7 @@ and shop-runner updaters are not extended with ZIP or AI packaging concerns.
 
 - Archived: `openspec/changes/archive/2026-10-01-ai-package-v1-contract`
 - Strategy archive: `openspec/changes/archive/2026-09-26-ai-package-data-source-strategy`
+- Transport-only narrowing: `openspec/changes/telegram-ai-package-export`
 
 ## Review checklist
 

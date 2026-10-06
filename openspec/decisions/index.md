@@ -109,7 +109,8 @@ architecture decisions belong here.
   - Scope: ownership/layering for AI Package v1 read-only export under
     `app/modules/ai_package_v1/`; `READ_ONLY_NO_MUTATION`; forbidden WB API,
     shop-runner orchestrator, and collector triggers on export path; CLI/Job
-    entry only (no TG/GUI).
+    entry plus a transport-only Telegram adapter that calls
+    `PackageZipAssembler` (no second exporter).
 
 ## Change Requirements
 

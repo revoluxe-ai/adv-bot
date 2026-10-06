@@ -463,6 +463,17 @@ class ExportShopAdvExcel(CallbackData, prefix="shop_adv_excel_export"):
     wb_user_cabinet_original_id: int
 
 
+class ExportShopAiPackage(CallbackData, prefix="shop_ai_pkg"):
+    """Выгрузка Full AI Package ZIP для магазина (только transport callback).
+
+    В callback только ``WBUserCabinet.id``. Shop UUID, период, токены и
+    секреты сюда не кладутся: shop_id резолвится на сервере после проверки
+    владельца.
+    """
+
+    wb_user_cabinet_original_id: int
+
+
 class ImportShopAdvExcel(CallbackData, prefix="shop_adv_excel_import"):
     """Загрузка Excel с правками по магазину; далее ожидается документ в FSM."""
 
