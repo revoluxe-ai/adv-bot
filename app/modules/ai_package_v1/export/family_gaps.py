@@ -92,15 +92,6 @@ def build_family_gap_catalog() -> list[FamilyGapEntry]:
             ),
         },
         {
-            "family_id": "campaign_change_events",
-            "status": "GAP",
-            "reason_codes": [str(ReasonCode.UNKNOWN)],
-            "notes": (
-                "Лента изменений кампании не входит в пакет; "
-                "BLOCKED_BY_CHANGE_EVENTS."
-            ),
-        },
-        {
             "family_id": "product_prices_stocks",
             "family_status": str(FamilyStatus.GAP),
             "reason_codes": [str(ReasonCode.UNKNOWN)],

@@ -117,7 +117,7 @@ def _build(
 ) -> AnalysisBuildResult:
     return AnalysisAggregationService().build(
         AnalysisBuildRequest(
-            shop_id=1,
+            shop_id="1",
             generated_at=generated_at,
             period=period
             or ExportPeriod(start=date(2026, 10, 4), end=date(2026, 10, 5)),
@@ -173,7 +173,7 @@ def _uncomputable(row: dict[str, object], metric_id: str) -> list[str]:
 
 def _keyword_row() -> KeywordWindowRowV1:
     return KeywordWindowRowV1(
-        shop_id=1,
+        shop_id="1",
         adv_id=111,
         leg_role=KeywordLegRole.AUTO,
         nmid=500,
@@ -533,7 +533,7 @@ def test_s17_manifest_lists_analysis_contract() -> None:
     result = _build(facts=(_fact(111, CUTOFF), _fact(222, CUTOFF)))
     manifest = ExportManifest(
         package_schema_version=PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS,
-        shop_id=1,
+        shop_id="1",
         period=ExportPeriod(start=date(2026, 10, 4), end=CUTOFF),
         generated_at=GENERATED,
         datasets=result.cards,
@@ -580,7 +580,7 @@ def test_s18_caller_period_does_not_clip_30d(monkeypatch: pytest.MonkeyPatch) ->
     asyncio.run(
         ChAnalysisCampaignReader().fetch_daily_facts_with_client(
             _Client(),
-            shop_id=1,
+            shop_id="1",
             adv_ids=[111],
             end_date=date(2026, 10, 6),
         )
@@ -629,7 +629,7 @@ def test_s21_windows_do_not_close_store_drr_gap() -> None:
         "campaign_change_events",
         "shop_product_orders_sales_feed",
     ):
-        assert by_id[family_id]["status"] == "GAP"
+        assert by_id[family_id]["family_status"] == "GAP"
     result = _build(facts=(_fact(111, CUTOFF), _fact(222, CUTOFF)))
     assert "SHOP_DRR" not in _metrics_of(_window(result.package_rows, "30d", None))
 
@@ -639,7 +639,7 @@ def test_s22_tampered_contract_fails_validation() -> None:
     result = _build()
     manifest = ExportManifest(
         package_schema_version=PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS,
-        shop_id=1,
+        shop_id="1",
         period=ExportPeriod(start=date(2026, 10, 4), end=CUTOFF),
         generated_at=GENERATED,
         datasets=result.cards,

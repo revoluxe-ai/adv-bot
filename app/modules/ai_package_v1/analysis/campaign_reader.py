@@ -20,7 +20,7 @@ class AnalysisCampaignReaderProtocol(Protocol):
     async def fetch_daily_facts(
         self,
         *,
-        shop_id: int,
+        shop_id: str,
         adv_ids: Sequence[int],
         end_date: date,
     ) -> list[CampaignDailyFact]:
@@ -34,7 +34,7 @@ class EmptyAnalysisCampaignReader:
     async def fetch_daily_facts(
         self,
         *,
-        shop_id: int,
+        shop_id: str,
         adv_ids: Sequence[int],
         end_date: date,
     ) -> list[CampaignDailyFact]:
@@ -54,7 +54,7 @@ class ChAnalysisCampaignReader:
     async def fetch_daily_facts(
         self,
         *,
-        shop_id: int,
+        shop_id: str,
         adv_ids: Sequence[int],
         end_date: date,
     ) -> list[CampaignDailyFact]:
@@ -74,7 +74,7 @@ class ChAnalysisCampaignReader:
         self,
         client: Any,
         *,
-        shop_id: int,
+        shop_id: str,
         adv_ids: Sequence[int],
         end_date: date,
     ) -> list[CampaignDailyFact]:

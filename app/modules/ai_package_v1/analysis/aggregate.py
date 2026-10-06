@@ -54,7 +54,7 @@ def legs_from_scope(
 
 def fold_campaign_windows(
     *,
-    shop_id: int,
+    shop_id: str,
     cutoff: PackageCutoff,
     windows: list[WindowSpec],
     legs: list[tuple[int, str]],
@@ -94,7 +94,7 @@ def fold_campaign_windows(
 def fold_package_scope(
     campaign_rows: list[dict[str, object]],
     *,
-    shop_id: int,
+    shop_id: str,
     cutoff: PackageCutoff,
     windows: list[WindowSpec],
     source_complete_through: date | None,
@@ -126,7 +126,7 @@ def fold_package_scope(
 def fold_keyword_products(
     keyword_windows: tuple[KeywordWindowRowV1, ...],
     *,
-    shop_id: int,
+    shop_id: str,
     cutoff: PackageCutoff,
     source_complete_through: date | None,
     source_first: date | None,
@@ -158,7 +158,7 @@ def fold_keyword_products(
 
 def _campaign_row(
     *,
-    shop_id: int,
+    shop_id: str,
     cutoff: PackageCutoff,
     spec: WindowSpec,
     catalog_index: int,
@@ -213,7 +213,7 @@ def _campaign_row(
 
 def _package_row(
     *,
-    shop_id: int,
+    shop_id: str,
     cutoff: PackageCutoff,
     spec: WindowSpec,
     catalog_index: int,
@@ -281,7 +281,7 @@ def _package_row(
 
 def _keyword_product_row(
     *,
-    shop_id: int,
+    shop_id: str,
     cutoff: PackageCutoff,
     members: list[KeywordWindowRowV1],
     source_complete_through: date | None,
@@ -461,7 +461,7 @@ def _reserved_keyword_uncomputable() -> list[dict[str, object]]:
 
 def _base_row(
     *,
-    shop_id: int,
+    shop_id: str,
     cutoff: PackageCutoff,
     spec: WindowSpec,
     catalog_index: int,

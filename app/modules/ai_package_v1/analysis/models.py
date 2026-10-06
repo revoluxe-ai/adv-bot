@@ -36,7 +36,7 @@ class AnalysisBuildRequest:
     полноту. Совпадение конца окна с границей пакета таким доказательством не является.
     """
 
-    shop_id: int
+    shop_id: str
     generated_at: str
     period: ExportPeriod
     scope: tuple[ExportScopeAdv, ...]
