@@ -211,6 +211,20 @@ async def test_position_api_future_version_excluded() -> None:
     assert "tuple_variants_at_max_version" in reader.query_text
 
 
+def test_position_sql_max_version_not_nested_in_aggregates() -> None:
+    """Outer max(version) alias must not be version (ClickHouse code 184)."""
+    sql = ChKeywordPositionReader().query_text
+    final_select = sql.rsplit("SELECT", maxsplit=1)[1]
+    assert "FROM rows_at_max" in final_select
+    assert "max(version) AS max_version" in final_select
+    assert "max(version) AS version" not in sql
+    after_uniq = sql.split("uniqExact(", maxsplit=1)[1]
+    assert "max(version)" not in after_uniq
+    assert "(avr_position, total_views, orders, version)" in final_select
+    assert "s.version = lv.max_version" in sql
+    assert "version <= {cutoff_instant_ms:UInt64}" in sql
+
+
 @pytest.mark.asyncio
 async def test_position_max_version_conflict_parsed_ambiguous() -> None:
     """Equal max version conflict → null position in reader parse."""
