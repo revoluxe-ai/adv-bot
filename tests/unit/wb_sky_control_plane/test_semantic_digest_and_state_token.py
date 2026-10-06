@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from typing import cast
 
 import pytest
 
@@ -31,7 +32,6 @@ from app.modules.wb_sky_control_plane.models.enums import (
     CampaignTopology,
     MappingStatus,
     PaymentTypeAuthority,
-    PlacementFlagAuthority,
     ProductMembershipAuthority,
 )
 from app.modules.wb_sky_control_plane.models.snapshot import (
@@ -39,22 +39,22 @@ from app.modules.wb_sky_control_plane.models.snapshot import (
     CampaignLegSnapshotV1,
     CampaignResourceSnapshotV1,
     LocalPolicyStateV1,
-    PlacementAuthorityV1,
 )
 
 pytestmark = pytest.mark.unit
 
 
 def _snapshot(**policy_overrides: object) -> CampaignResourceSnapshotV1:
-    budget = {"auto_budget_daily_limit": 100}
-    sales = {"plan_for_sales_for_day": 5}
-    bid_control = {"auto_shelf_bid_control_enabled": False}
+    """Build a snapshot; policy overrides are cast to dict[str, object] only."""
+    budget: dict[str, object] = {"auto_budget_daily_limit": 100}
+    sales: dict[str, object] = {"plan_for_sales_for_day": 5}
+    bid_control: dict[str, object] = {"auto_shelf_bid_control_enabled": False}
     if "budget" in policy_overrides:
-        budget = policy_overrides["budget"]  # type: ignore[assignment]
+        budget = cast(dict[str, object], policy_overrides["budget"])
     if "sales" in policy_overrides:
-        sales = policy_overrides["sales"]  # type: ignore[assignment]
+        sales = cast(dict[str, object], policy_overrides["sales"])
     if "bid_control" in policy_overrides:
-        bid_control = policy_overrides["bid_control"]  # type: ignore[assignment]
+        bid_control = cast(dict[str, object], policy_overrides["bid_control"])
     return CampaignResourceSnapshotV1(
         resource_id="cmp_abc123",
         wb_cabinet_id=42,

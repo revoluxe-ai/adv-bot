@@ -2,13 +2,12 @@
 
 ### Requirement: ChangeSetV1 envelope and state_token
 
-The system MUST accept a transport-independent `ChangeSetV1` document (canonical
-type in `app/modules/wb_sky_control_plane/models/changeset.py` after adoption) with
-`schema_version` for changeset v1, `changeset_id`, shop scope, source and actor
-metadata, `created_at`, optional intent, a non-empty operation list, and a
-`state_token` identifying the snapshot generation used for dry-run. Missing,
-unknown, or stale `state_token` MUST reject the whole ChangeSet with `REJECTED`.
-The document MUST NOT be treated as Excel or `CampaignSettingsSnapshotV1`.
+The system MUST accept a transport-independent `ChangeSetV1` (canonical type in
+`wb_sky_control_plane` `models/changeset.py` after adoption) with `schema_version`,
+`changeset_id`, shop scope, source, actor, `created_at`, optional intent, a
+non-empty operation list, and `state_token` for the dry-run snapshot generation.
+Missing, unknown, or stale `state_token` MUST reject the whole ChangeSet with
+`REJECTED`. The document MUST NOT be Excel or `CampaignSettingsSnapshotV1`.
 
 #### Scenario: Valid existing bounded operation produces OK
 

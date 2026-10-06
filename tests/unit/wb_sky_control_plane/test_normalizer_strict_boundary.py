@@ -62,12 +62,13 @@ def test_missing_nm_settings_key_is_unknown() -> None:
 
 
 def test_explicit_empty_nm_settings_is_known_empty() -> None:
+    empty_nm_settings: list[dict[str, int]] = []
     raw = {
         "id": 1005,
         "bid_type": "unified",
         "status": 9,
         "settings": {"payment_type": "cpm"},
-        "nm_settings": [],
+        "nm_settings": empty_nm_settings,
     }
     leg = normalize_wb_campaign_leg(raw, role=CampaignLegRole.AUTO)
     assert leg.product_membership == ProductMembershipAuthority.KNOWN_EMPTY
@@ -100,6 +101,7 @@ def test_malformed_nm_settings_list_is_unknown() -> None:
 
 def test_unknown_payment_type_value_is_unknown() -> None:
     """Unknown payment_type values fail closed to UNKNOWN."""
+    empty_nm_settings: list[dict[str, int]] = []
     raw = {
         "id": 1003,
         "bid_type": "unified",
@@ -108,7 +110,7 @@ def test_unknown_payment_type_value_is_unknown() -> None:
             "payment_type": "weird",
             "placements": {"search": False},
         },
-        "nm_settings": [],
+        "nm_settings": empty_nm_settings,
     }
     leg = normalize_wb_campaign_leg(raw, role=CampaignLegRole.AUTO)
     assert leg.payment_type == PaymentTypeAuthority.UNKNOWN

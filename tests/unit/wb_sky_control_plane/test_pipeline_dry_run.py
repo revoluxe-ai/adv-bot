@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -25,22 +26,23 @@ _WB_CABINET_ID = 5
 
 
 class _FakeWbReader:
-    async def fetch_adverts_raw_by_ids(self, adv_ids: list[int]) -> list[dict[str, object]]:
-        out: list[dict[str, object]] = []
+    async def fetch_adverts_raw_by_ids(
+        self, adv_ids: list[int]
+    ) -> list[Mapping[str, object]]:
+        out: list[Mapping[str, object]] = []
         for adv_id in adv_ids:
-            out.append(
-                {
-                    "id": adv_id,
-                    "bid_type": "unified" if adv_id == 100 else "manual",
-                    "status": 9,
-                    "settings": {
-                        "payment_type": "cpm",
-                        "placements": {"search": False, "recommendations": True},
-                        "name": f"c-{adv_id}",
-                    },
-                    "nm_settings": [{"nm_id": 777}],
-                }
-            )
+            row: dict[str, object] = {
+                "id": adv_id,
+                "bid_type": "unified" if adv_id == 100 else "manual",
+                "status": 9,
+                "settings": {
+                    "payment_type": "cpm",
+                    "placements": {"search": False, "recommendations": True},
+                    "name": f"c-{adv_id}",
+                },
+                "nm_settings": [{"nm_id": 777}],
+            }
+            out.append(row)
         return out
 
 

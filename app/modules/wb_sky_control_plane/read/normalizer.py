@@ -104,9 +104,10 @@ def _extract_product_membership(raw_item: Mapping[str, Any]) -> _ProductMembersh
                 membership=ProductMembershipAuthority.UNKNOWN,
                 nm_ids=[],
             )
-        nm_raw: object | None = entry.get("nm_id")
+        entry_map = cast(Mapping[str, object], entry)
+        nm_raw = entry_map.get("nm_id")
         if nm_raw is None:
-            nm_raw = entry.get("nmId")
+            nm_raw = entry_map.get("nmId")
         if nm_raw is None:
             return _ProductMembershipExtract(
                 membership=ProductMembershipAuthority.UNKNOWN,
@@ -137,12 +138,18 @@ def normalize_wb_campaign_leg(
 ) -> CampaignLegSnapshotV1:
     """Normalize one raw WB v2 advert dict into authoritative leg snapshot."""
     settings_raw = raw_item.get("settings")
-    settings: Mapping[str, Any] = settings_raw if isinstance(settings_raw, Mapping) else {}
+    settings: Mapping[str, Any]
+    if isinstance(settings_raw, Mapping):
+        settings = cast(Mapping[str, Any], settings_raw)
+    else:
+        settings = {}
 
     placements_raw = settings.get("placements")
-    placements_map: Mapping[str, Any] = (
-        placements_raw if isinstance(placements_raw, Mapping) else {}
-    )
+    placements_map: Mapping[str, Any]
+    if isinstance(placements_raw, Mapping):
+        placements_map = cast(Mapping[str, Any], placements_raw)
+    else:
+        placements_map = {}
 
     wb_adv_id_raw = raw_item.get("id")
     if wb_adv_id_raw is None:

@@ -16,9 +16,11 @@ def canonicalize(value: Any) -> Any:
             for k, v in sorted(mapping.items(), key=lambda item: str(item[0]))
         }
     if isinstance(value, list):
-        return [canonicalize(item) for item in value]
+        items = cast(list[Any], value)
+        return [canonicalize(item) for item in items]
     if isinstance(value, tuple):
-        return [canonicalize(item) for item in value]
+        tuple_items = cast(tuple[Any, ...], value)
+        return [canonicalize(item) for item in tuple_items]
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if hasattr(value, "value"):  # Enum

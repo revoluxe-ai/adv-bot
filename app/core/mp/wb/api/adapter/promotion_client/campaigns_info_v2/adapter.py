@@ -84,22 +84,25 @@ class CampaignsInfoV2Adapter(BaseSectionAdapter):
                 ids=",".join(str(adv_id) for adv_id in chunk),
             )
             try:
-                payload = json.loads(response.content)
+                decoded: object = json.loads(response.content)
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 raise ValueError("WB v2 adverts response is not valid JSON") from exc
-            if not isinstance(payload, dict):
+            if not isinstance(decoded, dict):
                 raise ValueError("WB v2 adverts response root must be a JSON object")
+            payload = cast(dict[str, object], decoded)
             adverts_raw = payload.get("adverts")
             if adverts_raw is None:
                 raise ValueError("WB v2 adverts response missing adverts field")
             if not isinstance(adverts_raw, list):
                 raise ValueError("WB v2 adverts field must be a JSON array")
-            for item in adverts_raw:
+            adverts = cast(list[object], adverts_raw)
+            for item in adverts:
                 if not isinstance(item, dict):
                     raise ValueError("WB v2 advert entry must be a JSON object")
-                if item.get("id") is None:
+                advert = cast(dict[str, object], item)
+                if advert.get("id") is None:
                     raise ValueError("WB v2 advert entry missing id")
-                raw_items.append(cast(Mapping[str, Any], item))
+                raw_items.append(cast(Mapping[str, Any], advert))
         return raw_items
 
     @retry_decorator(period=1, limit=5)

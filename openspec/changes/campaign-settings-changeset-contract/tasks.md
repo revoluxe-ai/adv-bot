@@ -8,7 +8,7 @@
 
 ## 2. Adoption gate (before any product code)
 
-- [ ] **LOCAL_FOUNDATION_ADOPTION_REQUIRED** — Record an explicit local preservation checkpoint that binds the exact owned paths (`app/modules/wb_sky_control_plane/**`, `tests/unit/wb_sky_control_plane/**`, Alembic `e8a1b2c3d4e5_add_wb_sky_campaign_resource_registry.py`, and related WIP files) to change `campaign-settings-changeset-contract`. Do **not** claim existing HOME-PC dirty WIP already belongs to PR #449 without this checkpoint.
+- [x] **LOCAL_FOUNDATION_ADOPTION_REQUIRED** — Preservation checkpoint is commit `2b9b4f1d2` (`chore(control-plane): adopt existing ChangeSetV1 foundation`) on this branch. It binds `app/modules/wb_sky_control_plane/**`, `tests/unit/wb_sky_control_plane/**`, and Alembic `e8a1b2c3d4e5_add_wb_sky_campaign_resource_registry.py` to change `campaign-settings-changeset-contract`. Sections 3–5 stay open; this checkbox does not mark product implementation done.
 
 ## 3. Extend control plane (after adoption only)
 

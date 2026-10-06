@@ -17,7 +17,7 @@ pytestmark = pytest.mark.unit
 
 
 def _op(**kwargs: object) -> SetBudgetPolicyOperation:
-    defaults = {
+    defaults: dict[str, object] = {
         "operation_id": "op-1",
         "resource": CampaignResourceRef(resource_id="cmp_abc123"),
         "payload": BudgetPolicyPayload(auto_budget_daily_limit=100),

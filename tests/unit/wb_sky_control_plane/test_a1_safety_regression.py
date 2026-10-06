@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -36,19 +37,20 @@ class _RecordingWbReader:
 
     async def fetch_adverts_raw_by_ids(
         self, adv_ids: list[int]
-    ) -> list[dict[str, object]]:
-        return [
-            {
-                "id": adv_ids[0],
-                "bid_type": "unified",
-                "status": 9,
-                "settings": {
-                    "payment_type": "cpm",
-                    "placements": {"search": False, "recommendations": True},
-                },
-                "nm_settings": [{"nm_id": 1}],
-            }
-        ]
+    ) -> list[Mapping[str, object]]:
+        row: dict[str, object] = {
+            "id": adv_ids[0],
+            "bid_type": "unified",
+            "status": 9,
+            "settings": {
+                "payment_type": "cpm",
+                "placements": {"search": False, "recommendations": True},
+            },
+            "nm_settings": [{"nm_id": 1}],
+        }
+        rows: list[Mapping[str, object]] = []
+        rows.append(row)
+        return rows
 
 
 @pytest.mark.asyncio
