@@ -6,8 +6,8 @@
 """
 
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Mapping
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
