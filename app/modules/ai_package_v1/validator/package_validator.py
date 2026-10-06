@@ -13,8 +13,12 @@ from app.modules.ai_package_v1.domain.campaign_settings_snapshot_v1 import (
     SCHEMA_VERSION,
     CampaignSettingsSnapshotV1,
 )
+from app.modules.ai_package_v1.analysis.validation import (
+    AnalysisValidationError,
+    validate_analysis_files,
+)
 from app.modules.ai_package_v1.domain.manifest import (
-    PACKAGE_SCHEMA_VERSION,
+    SUPPORTED_PACKAGE_SCHEMA_VERSIONS,
     sha256_hex,
 )
 from app.modules.ai_package_v1.export.dataset_cards import CAMPAIGN_SETTINGS_JSON_LOGICAL
@@ -143,7 +147,7 @@ def validate_domain_manifest(
         PackageValidationError: при несоответствии контракту или хешу.
     """
     version = manifest.get("package_schema_version")
-    if version != PACKAGE_SCHEMA_VERSION:
+    if version not in SUPPORTED_PACKAGE_SCHEMA_VERSIONS:
         raise PackageValidationError(
             f"unsupported package_schema_version: {version!r}",
         )
@@ -185,6 +189,10 @@ def validate_domain_manifest(
     _validate_family_gaps_payload(manifest, files)
     _validate_package_summary_payload(manifest, files)
     _validate_dataset_shop_identity(manifest_shop_id, files)
+    try:
+        validate_analysis_files(files, schema_version=str(version))
+    except AnalysisValidationError as exc:
+        raise PackageValidationError(str(exc)) from exc
 
 
 def validate_zip_package(zip_bytes: bytes) -> None:

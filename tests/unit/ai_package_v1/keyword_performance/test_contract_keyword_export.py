@@ -9,6 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.domain.enums import DatasetId
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.domain.manifest import DomainPayload
@@ -321,6 +324,7 @@ async def test_keyword_cards_in_manifest(fake_deps: FakeKeywordDeps) -> None:
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=MagicMock(),
         keyword_assembler=build_fake_assembler(fake_deps),
     )
@@ -576,6 +580,7 @@ async def test_default_export_service_keyword_enabled() -> None:
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=settings,
         keyword_assembler=KeywordPerformanceAssembler(
             scope_reader=scope_reader,

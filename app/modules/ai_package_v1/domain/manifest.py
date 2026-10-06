@@ -14,6 +14,10 @@ from app.modules.ai_package_v1.domain.serialization import canonical_json_bytes
 from app.modules.ai_package_v1.domain.shop_id import AuthoritativeShopId
 
 PACKAGE_SCHEMA_VERSION = "1.0.0"
+PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS = "1.1.0"
+SUPPORTED_PACKAGE_SCHEMA_VERSIONS = frozenset(
+    {PACKAGE_SCHEMA_VERSION, PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS}
+)
 MANIFEST_LOGICAL_NAME = "manifest.json"
 
 

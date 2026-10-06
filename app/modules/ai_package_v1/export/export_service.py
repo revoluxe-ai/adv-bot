@@ -19,7 +19,17 @@ from app.modules.ai_package_v1.domain.funnel_orders_boundary import (
     FunnelOrdersMetric,
     assert_funnel_orders_do_not_populate_shop_product_orders,
 )
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    AnalysisCampaignReaderProtocol,
+    ChAnalysisCampaignReader,
+)
+from app.modules.ai_package_v1.analysis.models import AnalysisBuildRequest
+from app.modules.ai_package_v1.analysis.service import (
+    AnalysisAggregationService,
+    annotate_data_map,
+)
 from app.modules.ai_package_v1.domain.manifest import (
+    PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS,
     DomainPayload,
     ExportManifest,
     build_file_descriptors,
@@ -44,6 +54,10 @@ from app.modules.ai_package_v1.export.payload_encode import (
 from app.modules.ai_package_v1.export.scope_collect import (
     collect_main_nmids,
     collect_scoped_adv_ids,
+)
+from app.modules.ai_package_v1.keyword_performance.domain.cutoff import PackageCutoff
+from app.modules.ai_package_v1.keyword_performance.export.dataset_cards import (
+    DATA_MAP_LOGICAL,
 )
 from app.modules.ai_package_v1.keyword_performance.export.keyword_assembler import (
     KeywordAssemblerProtocol,
@@ -90,6 +104,7 @@ class ExportService:
         pg_snapshot_reader: PgSnapshotReader | None = None,
         settings_assembler: CampaignSettingsAssembler | None = None,
         keyword_assembler: KeywordAssemblerProtocol | None = None,
+        analysis_campaign_reader: AnalysisCampaignReaderProtocol | None = None,
     ) -> None:
         """Собирает read-only зависимости export.
 
@@ -114,6 +129,8 @@ class ExportService:
             self._keyword_assembler = keyword_assembler
         else:
             self._keyword_assembler = KeywordPerformanceAssembler()
+        self._analysis_reader = analysis_campaign_reader or ChAnalysisCampaignReader()
+        self._analysis_service = AnalysisAggregationService()
 
     async def export(
         self,
@@ -257,6 +274,24 @@ class ExportService:
             generated_at=timestamp,
         )
 
+        cutoff = PackageCutoff.from_generated_at(timestamp)
+        analysis_facts = await self._analysis_reader.fetch_daily_facts(
+            shop_id=manifest_shop_id,
+            adv_ids=adv_ids,
+            end_date=cutoff.package_cutoff_date,
+        )
+        analysis = self._analysis_service.build(
+            AnalysisBuildRequest(
+                shop_id=manifest_shop_id,
+                generated_at=timestamp,
+                period=period,
+                scope=tuple(scope),
+                campaign_facts=tuple(analysis_facts),
+                keyword_windows=tuple(keyword_result.windows),
+                keyword_history_first=keyword_result.keyword_history_first,
+                keyword_history_last=keyword_result.keyword_history_last,
+            )
+        )
         payloads = [
             DomainPayload(
                 logical_name="datasets/campaign_full_stat.csv",
@@ -273,9 +308,11 @@ class ExportService:
                 dataset_id="campaign_settings_snapshot",
                 content=settings_payload_content,
             ),
-            *keyword_result.payloads,
+            *_with_analysis_data_map(keyword_result.payloads),
+            *analysis.payloads,
         ]
         manifest = ExportManifest(
+            package_schema_version=PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS,
             shop_id=manifest_shop_id,
             period=period,
             generated_at=timestamp,
@@ -285,7 +322,25 @@ class ExportService:
                 settings_card,
                 shop_orders_card,
                 *keyword_result.cards,
+                *analysis.cards,
             ],
             files=build_file_descriptors(payloads),
         )
         return ExportResult(manifest=manifest, payloads=payloads)
+
+
+def _with_analysis_data_map(payloads: tuple[DomainPayload, ...]) -> list[DomainPayload]:
+    """Вписывает зерно анализа в уже собранную карту данных."""
+    annotated: list[DomainPayload] = []
+    for payload in payloads:
+        if payload.logical_name == DATA_MAP_LOGICAL:
+            annotated.append(
+                DomainPayload(
+                    logical_name=payload.logical_name,
+                    dataset_id=payload.dataset_id,
+                    content=annotate_data_map(payload.content),
+                )
+            )
+        else:
+            annotated.append(payload)
+    return annotated

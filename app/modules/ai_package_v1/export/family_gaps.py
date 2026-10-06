@@ -85,7 +85,20 @@ def build_family_gap_catalog() -> list[FamilyGapEntry]:
             "family_id": "store_drr",
             "family_status": str(FamilyStatus.GAP),
             "reason_codes": [str(ReasonCode.UNKNOWN)],
-            "notes": "Store DRR не экспортируется в v1 AI Package.",
+            "notes": (
+                "Store DRR остаётся разрывом: BLOCKED_BY_SHOP_WIDE_CAMPAIGN_COVERAGE, "
+                "BLOCKED_BY_COMMON_SALES, BLOCKED_BY_SHOP_DRR_SOURCE. "
+                "Аналитические окна этот разрыв не закрывают."
+            ),
+        },
+        {
+            "family_id": "campaign_change_events",
+            "status": "GAP",
+            "reason_codes": [str(ReasonCode.UNKNOWN)],
+            "notes": (
+                "Лента изменений кампании не входит в пакет; "
+                "BLOCKED_BY_CHANGE_EVENTS."
+            ),
         },
         {
             "family_id": "product_prices_stocks",
