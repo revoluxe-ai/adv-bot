@@ -4,8 +4,8 @@
   "CHANGE_ID": "wb-sky-mcp-read-interface",
   "MODE": "plan",
   "PLAN_STATUS": "ready",
-  "PLAN_EVIDENCE_ID": "SCPV1-caabac3b666cb5d4",
-  "PLAN_CONTENT_HASH": "97ea30a907d376f4eea65b54fa099fd17880eb5f7d2219cc072f193b43bf9db4",
+  "PLAN_EVIDENCE_ID": "SCPV1-f0d1412a12fa9174",
+  "PLAN_CONTENT_HASH": "b3b087949078a95d509051c55b69a32d3e05b70c35290a33637eefdd7283a90e",
   "PLAN_PATH": "openspec/changes/wb-sky-mcp-read-interface/scenario-coverage/plan.md",
   "RECEIPT_PATH": "openspec/changes/wb-sky-mcp-read-interface/scenario-coverage/plan.receipt.json",
   "SCENARIO_COUNT": 21,
@@ -27,7 +27,7 @@
   "INPUTS": {
     "DESIGN_REVISION": {
       "path": "openspec/changes/wb-sky-mcp-read-interface/design.md",
-      "content_hash": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7"
+      "content_hash": "f3248bd160ed6b6175de007e65c4332bae57f06665ecc5a6affad3876a270b0d"
     },
     "SPEC_REVISION": [
       {
@@ -36,8 +36,8 @@
       }
     ],
     "LIFECYCLE_REVISION": {
-      "source": "openspec/changes/wb-sky-mcp-read-interface/design.md#lifecycle",
-      "content_hash": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7"
+      "source": "openspec/changes/wb-sky-mcp-read-interface/design.md#Жизненный цикл",
+      "content_hash": "f3248bd160ed6b6175de007e65c4332bae57f06665ecc5a6affad3876a270b0d"
     },
     "OWNER_CONTRACT_REVISION": {
       "path": "openspec/changes/wb-sky-mcp-read-interface/owner-contract.md",
@@ -45,14 +45,16 @@
     }
   },
   "GENERATED_FROM": {
-    "DESIGN_REVISION": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7",
+    "DESIGN_REVISION": "f3248bd160ed6b6175de007e65c4332bae57f06665ecc5a6affad3876a270b0d",
     "SPEC_REVISION": [
       "2aeccf0a2abb3f83512483b83847c9acb6e47473ce952536fb93520aa8577bbf"
     ],
-    "LIFECYCLE_REVISION": "9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7",
+    "LIFECYCLE_REVISION": "f3248bd160ed6b6175de007e65c4332bae57f06665ecc5a6affad3876a270b0d",
     "OWNER_CONTRACT_REVISION": "664a353651a56b9ae0c88907aa0ce7215bfb4e901d844cbd5ce68bec211faf9e",
     "SOURCE_SPEC_SHA": "2aeccf0a2abb3f83512483b83847c9acb6e47473ce952536fb93520aa8577bbf",
     "PRODUCER_COMMAND": "/opsx-spec-scenario-coverage mode=plan change=wb-sky-mcp-read-interface"
   },
-  "MATERIALIZATION_STATUS": "COMMITTED"
+  "MATERIALIZATION_STATUS": "COMMITTED",
+  "SUPERSEDES_PLAN_EVIDENCE_ID": "SCPV1-caabac3b666cb5d4",
+  "HASH_TOOLING": "content_hash=sha256(LF-normalized file bytes); SOURCE_SPEC_SHA=spec file content_hash; identity_blob=canonical JSON UTF-8 (sort_keys=True, separators=(',', ':'), no trailing newline) over {CHANGE_ID, MODE, DESIGN_REVISION, SPEC_REVISION[], LIFECYCLE_REVISION, OWNER_CONTRACT_REVISION, SOURCE_SPEC_SHA}; PLAN_EVIDENCE_ID=SCPV1-first16(sha256(identity_blob)); PLAN_CONTENT_HASH=sha256(LF-normalized plan.md bytes)"
 }

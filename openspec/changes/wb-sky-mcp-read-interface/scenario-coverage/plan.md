@@ -3,11 +3,13 @@
 CHANGE_ID: wb-sky-mcp-read-interface
 MODE: plan
 PLAN_STATUS: ready
-PLAN_EVIDENCE_ID: SCPV1-caabac3b666cb5d4
+PLAN_EVIDENCE_ID: SCPV1-f0d1412a12fa9174
 LIFECYCLE_STATUS: DERIVED
 
-Планирование требуемых доказательств. Тесты не объявлены существующими,
-выполненными или пройденными. Это не PASS аудита и не GO архива.
+Планирование требуемых доказательств по текущим design, spec и
+owner-contract. Тесты не объявлены существующими, выполненными или
+пройденными. Это не PASS аудита и не GO архива. Пара заменяет
+`SCPV1-caabac3b666cb5d4`: тот план был снят с более раннего design.
 
 ## Lifecycle coverage
 
@@ -35,6 +37,11 @@ Steady-state: сценарий «Already revoked connection stays denied» по�
 OPEN_QUESTIONS: нет
 UNRESOLVED_GAPS: нет
 
+Новых заголовков Scenario текущий spec не добавляет. Принятый design
+(решения Accepted, протокольный ремонт) не вводит отдельный Scenario:
+его нормы остаются обязанностями доказательств у уже существующих
+сценариев ниже.
+
 ## SCENARIO_COVERAGE_PLAN
 
 SCHEMA_VERSION: 1
@@ -45,32 +52,46 @@ SCENARIOS_TOTAL: 21
 
 Общий production entry для чтения: MCP tool после проверки bearer.
 Общий entry для согласия: OAuth authorize → бот → complete → token.
-Тонкие концы: Redis, PostgreSQL кабинетов, ExportService, подпись JWT.
-Проверяемое поведение (решение допуска, привязка принципала, отказ чужого
-shop_id, прокидывание GAP) не мокается. Мок допустим только на краю сети WB
-и Telegram Bot API. Экспортёр в сценарии пакета — реальный orchestration
-с подмененными reader-краями, не подмена самого ExportService целиком.
+Тонкие концы: Redis, PostgreSQL подключения и кабинетов, ExportService,
+подпись JWT. Проверяемое поведение (решение допуска, привязка принципала,
+отказ чужого shop_id, прокидывание GAP, сравнение redirect_uri, отказ
+мутации) не мокается. Мок допустим только на краю сети WB и Telegram Bot
+API. Экспортёр в сценарии пакета — реальный orchestration с подмененными
+reader-краями, не подмена самого ExportService целиком.
+
+Нормы текущего design, которые не стали отдельными Scenario:
+
+- сервер заявляет только MCP `2025-03-26`;
+- метод token endpoint — пересечение CIMD с `{"none"}`;
+- после проверенных client и redirect ошибка authorize уходит редиректом
+  с `error`, исходным `state` и точным `iss`; до проверки redirect отказ
+  локальный;
+- недействительный bearer на `/mcp` — HTTP 401 и `WWW-Authenticate`;
+- refresh хранится только как SHA-256, вращается при обмене, повтор уже
+  сменённого refresh не выпускает второй успешный доступ;
+- явная отмена в боте завершает ту же транзакцию отказом `access_denied`
+  без кода и без токенов.
 
 SCENARIOS:
 
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Write tool is not advertised
-  REQUIRED_EVIDENCE: список инструментов равен четырём read tools
+  REQUIRED_EVIDENCE: список инструментов равен ровно четырём read tools: get_profile, list_shops, get_capabilities, get_ai_package; записи и ChangeSet нет
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Mutation request is rejected
   REQUIRED_EVIDENCE: неизвестное имя не доходит до WB write и до экспортёра
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Authorize creates a one-time session
-  REQUIRED_EVIDENCE: Redis-транзакция 10 минут, ответ содержит только deep link бота
+  REQUIRED_EVIDENCE: Redis-транзакция 10 минут, ответ содержит только deep link бота; метод клиента выбирается пересечением CIMD с none
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Authorize rejects weak or foreign requests
-  REQUIRED_EVIDENCE: нет записи транзакции при плохом PKCE, scope, redirect или client
+  REQUIRED_EVIDENCE: нет записи транзакции при плохом PKCE, scope, redirect или client; до проверки redirect отказ локальный; после проверенных client и redirect отказ уходит редиректом с error, исходным state и точным iss
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Deep link is not an API credential
-  REQUIRED_EVIDENCE: txn id, ticket и code отвергнуты на /mcp
+  REQUIRED_EVIDENCE: txn id, ticket и code отвергнуты на /mcp; недействительный bearer — HTTP 401 и WWW-Authenticate, не успешный tool result
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Opening the bot is not consent
   REQUIRED_EVIDENCE: /start с payload не ставит статус confirmed
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Confirm binds the canonical principal
   REQUIRED_EVIDENCE: sub будущего токена равен User.id, не telegram id
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Return completes the original transaction
-  REQUIRED_EVIDENCE: 302 только на сохранённый redirect_uri с исходным state; билет одноразовый
+  REQUIRED_EVIDENCE: 302 только на сохранённый redirect_uri с исходным state; билет одноразовый; явная отмена отдаёт error=access_denied с тем же state и точным iss и не выпускает код, access token или refresh token
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Token exchange checks PKCE
-  REQUIRED_EVIDENCE: верный verifier выдаёт токен; повтор кода отвергнут
+  REQUIRED_EVIDENCE: верный verifier выдаёт токен; повтор кода отвергнут; refresh хранится хешем SHA-256, вращается при обмене, повтор того же refresh даёт не больше одного успеха
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Profile hides credentials
   REQUIRED_EVIDENCE: белый список полей, нет bot token, WB token, password, telegram id
 - SCENARIO_ID: openspec/changes/wb-sky-mcp-read-interface/specs/wb-sky-mcp-read-interface/spec.md::Shop list follows current cabinets
@@ -105,6 +126,7 @@ MOCKING_CONSTRAINTS: не мокать решение shop grant и не мок�
 
 GENERATED_FROM:
 
-- design.md 9bfbb9e796856ce915ed22af9b01ac8bc3d372813b107599ce7ab49891b4c6c7
+- design.md f3248bd160ed6b6175de007e65c4332bae57f06665ecc5a6affad3876a270b0d
 - spec.md 2aeccf0a2abb3f83512483b83847c9acb6e47473ce952536fb93520aa8577bbf
 - owner-contract.md 664a353651a56b9ae0c88907aa0ce7215bfb4e901d844cbd5ce68bec211faf9e
+- lifecycle design.md#Жизненный цикл f3248bd160ed6b6175de007e65c4332bae57f06665ecc5a6affad3876a270b0d
