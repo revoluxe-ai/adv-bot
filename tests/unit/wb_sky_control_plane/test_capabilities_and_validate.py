@@ -12,6 +12,7 @@ from app.modules.wb_sky_control_plane.models.changeset import (
     CampaignResourceRef,
     ChangeSetV1,
     LogicalScopeV1,
+    OperationPreconditionV1,
     SetBudgetPolicyOperation,
     SetSalesPolicyOperation,
     SalesPolicyPayload,
@@ -91,6 +92,7 @@ def test_one_invalid_operation_rejects_whole_changeset() -> None:
         state_token="st1_abc",
     )
     caps = _eligible_caps()
+    pre = OperationPreconditionV1(state_token="st1_abc")
     changeset = ChangeSetV1(
         changeset_id="cs-x",
         scope=LogicalScopeV1(shop_id="shop-1"),
@@ -99,11 +101,13 @@ def test_one_invalid_operation_rejects_whole_changeset() -> None:
                 operation_id="op-1",
                 resource=CampaignResourceRef(resource_id=resource_id),
                 payload=BudgetPolicyPayload(auto_budget_daily_limit=100),
+                preconditions=pre,
             ),
             SetSalesPolicyOperation(
                 operation_id="op-2",
                 resource=CampaignResourceRef(resource_id="cmp_missing"),
                 payload=SalesPolicyPayload(plan_for_sales_for_day=5),
+                preconditions=pre,
             ),
         ],
     )

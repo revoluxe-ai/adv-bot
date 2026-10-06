@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.wb_sky_control_plane.kernel.capabilities_eval import evaluate_capabilities
-from app.modules.wb_sky_control_plane.kernel.semantic_digest import compute_semantic_digest
+from app.modules.wb_sky_control_plane.kernel.preflight import collect_pure_preflight_errors
 from app.modules.wb_sky_control_plane.kernel.validate import validate_changeset
 from app.modules.wb_sky_control_plane.models.changeset import ChangeSetV1
 from app.modules.wb_sky_control_plane.models.enums import DryRunStatus
@@ -25,13 +25,24 @@ async def dry_run(
     prior: PriorChangeSetRecord | None = None,
     capability_grants: frozenset[str] | None = None,
 ) -> DryRunResultV1:
-    """Execute A1 read-only pipeline: resolve → classify → validate → diff.
+    """A1 dry-run: фаза A (pure) → resolve → фаза C (semantic validate/diff).
 
-    Side effects: read-only SQL SELECT and read-only WB HTTP GET only.
-    ``validate_changeset`` itself performs no I/O. ``prior`` is not persisted.
-    No ORM DML/flush/commit and no WB mutation calls.
+    Фаза A отклоняет без вызова resolver (PG SELECT / WB GET).
+    ``validate_changeset`` не выполняет I/O. ``prior`` не сохраняется.
     """
-    semantic_digest = compute_semantic_digest(changeset)
+    semantic_digest, pure_errors = collect_pure_preflight_errors(
+        changeset,
+        prior=prior,
+        capability_grants=capability_grants,
+    )
+    if pure_errors:
+        return DryRunResultV1(
+            status=DryRunStatus.REJECTED,
+            changeset_id=changeset.changeset_id,
+            semantic_digest=semantic_digest,
+            errors=pure_errors,
+        )
+
     snapshots, resolve_errors = await resolve_changeset_snapshots(
         changeset, session=session, wb_reader=wb_reader
     )
@@ -53,6 +64,7 @@ async def dry_run(
         capabilities,
         prior=prior,
         capability_grants=capability_grants,
+        skip_pure_checks=True,
     )
     return DryRunResultV1(
         status=validated.status,

@@ -36,6 +36,8 @@ from app.modules.wb_sky_control_plane.models.changeset import (
     SalesPolicyPayload,
     SetBudgetPolicyOperation,
     SetSalesPolicyOperation,
+    SetBidControlPolicyOperation,
+    BidControlPolicyPayload,
 )
 from app.modules.wb_sky_control_plane.models.enums import (
     CampaignTopology,
@@ -568,3 +570,73 @@ def test_excel_editable_does_not_grant_mutability() -> None:
     assert "bot_active" in editable
     mutable = set(BUDGET_FIELDS) | set(SALES_FIELDS) | set(BID_CONTROL_FIELDS)
     assert "bot_active" not in mutable
+
+
+def test_bid_control_policy_ok_via_validate_pipeline() -> None:
+    """E2E validate_changeset: campaign.set_bid_control_policy → OK."""
+    operation = SetBidControlPolicyOperation(
+        operation_id="op-bid-ok",
+        resource=CampaignResourceRef(resource_id=_RESOURCE),
+        payload=BidControlPolicyPayload(
+            auto_shelf_bid_control_enabled=True,
+            auto_shelf_bid_control_strategy="plan_distance",
+        ),
+        preconditions=_pre(),
+    )
+    snapshot = _snapshot(
+        bid_control={
+            "auto_shelf_bid_control_enabled": False,
+            "auto_shelf_bid_control_strategy": None,
+        }
+    )
+    result = _run(
+        _changeset([operation]),
+        {_RESOURCE: snapshot},
+        capability_grants=_GRANTS,
+    )
+    assert result.status == DryRunStatus.OK
+    assert len(result.diffs) >= 1
+    paths = {entry.field_path for entry in result.diffs}
+    assert f"{_RESOURCE}.bid_control.auto_shelf_bid_control_enabled" in paths
+
+
+def test_bid_control_policy_no_op_via_validate_pipeline() -> None:
+    operation = SetBidControlPolicyOperation(
+        operation_id="op-bid-noop",
+        resource=CampaignResourceRef(resource_id=_RESOURCE),
+        payload=BidControlPolicyPayload(auto_shelf_bid_control_enabled=True),
+        preconditions=_pre(),
+    )
+    snapshot = _snapshot(
+        bid_control={
+            "auto_shelf_bid_control_enabled": True,
+            "auto_shelf_bid_control_strategy": "plan_distance",
+        }
+    )
+    result = _run(_changeset([operation]), {_RESOURCE: snapshot})
+    assert result.status == DryRunStatus.NO_OP
+    assert result.diffs == []
+
+
+def test_bid_control_policy_rejected_requires_strategy_invariant() -> None:
+    """REJECTED: enabled без стратегии в том же поколении (domain validator)."""
+    operation = SetBidControlPolicyOperation(
+        operation_id="op-bid-bad",
+        resource=CampaignResourceRef(resource_id=_RESOURCE),
+        payload=BidControlPolicyPayload(auto_shelf_bid_control_enabled=True),
+        preconditions=_pre(),
+    )
+    snapshot = _snapshot(
+        bid_control={
+            "auto_shelf_bid_control_enabled": False,
+            "auto_shelf_bid_control_strategy": None,
+        }
+    )
+    result = _run(_changeset([operation]), {_RESOURCE: snapshot})
+    assert result.status == DryRunStatus.REJECTED
+    assert result.diffs == []
+    assert any(
+        error.code == "DOMAIN_INVARIANT"
+        and error.details.get("validator") == "bid_control_enabled_requires_strategy"
+        for error in result.errors
+    )

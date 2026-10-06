@@ -3,11 +3,13 @@
 ### Requirement: ChangeSetV1 envelope and state_token
 
 The system MUST accept a transport-independent `ChangeSetV1` (canonical type in
-`wb_sky_control_plane` `models/changeset.py` after adoption) with `schema_version`,
-`changeset_id`, shop scope, source, actor, `created_at`, optional intent, a
-non-empty operation list, and `state_token` for the dry-run snapshot generation.
-Missing, unknown, or stale `state_token` MUST reject the whole ChangeSet with
-`REJECTED`. The document MUST NOT be Excel or `CampaignSettingsSnapshotV1`.
+`wb_sky_control_plane` `models/changeset.py`) with `contract_version`, `changeset_id`,
+shop scope, metadata, and a non-empty operation list. Each bounded operation MUST
+carry per-operation `preconditions.state_token` (not an envelope-level token).
+Phase A (pre-I/O) MUST reject missing or empty `preconditions.state_token`.
+After authoritative snapshot resolution, stale or mismatched token equality MUST
+reject the whole ChangeSet with `REJECTED`. The document MUST NOT be Excel or
+`CampaignSettingsSnapshotV1`.
 
 #### Scenario: Valid existing bounded operation produces OK
 
@@ -110,12 +112,15 @@ fail closed. Excel `editable` MUST NOT alone grant mutability.
 
 ### Requirement: Validation pipeline and normalization
 
-The validator MUST run: structural validation, `state_token` binding, resource
-resolution, registry/`mutation_policy`, normalization via
-`campaign_settings_contract.normalize_value` for registered settings fields,
-deterministic domain validation, capability validation, optional
-`expected_current_value` check, then diff. Cross-field invariants MUST use named
-domain validators. A declared invariant without implementation MUST fail closed.
+Phase A (pure, before PG/WB resolution) MUST reject duplicate operation ids,
+duplicate operation slots, unsupported operations, unknown grant tokens, missing
+per-operation `preconditions.state_token`, and `changeset_id` replay hash conflict.
+Phase B resolves `CampaignResourceRef` and loads authoritative snapshots. Phase C
+MUST run in order: stale `state_token` equality check; mutation policy field gate;
+normalization via `campaign_settings_contract.normalize_value`; deterministic domain
+validation; capability validation (tri-state fail-closed); optional
+`expected_current_value`; semantic diff. Cross-field invariants use named domain
+validators. A declared invariant without implementation MUST fail closed.
 
 #### Scenario: Normalization records requested and normalized values
 

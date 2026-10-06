@@ -149,6 +149,8 @@
     "tools/wb_api_master_map.py",
     "app/modules/campaign_settings_contract",
     "app/modules/campaign_settings_history",
+    "app/modules/wb_sky_control_plane",
+    "tests/unit/wb_sky_control_plane",
     "scripts/clickhouse_migration_control_plane",
     "tests/unit/clickhouse_migration_contract_fixture.py",
     "tests/unit/test_clickhouse_migration_legacy_baseline.py",
