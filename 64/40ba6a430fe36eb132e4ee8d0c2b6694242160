@@ -1,0 +1,21 @@
+openspec/specs/ai-package-full-export/spec.md
+  s_dd606da85c99d5::t_8238892b361119 4-6
+tests/unit/ai_package_v1/test_campaign_settings_contract.py
+  s_dd606da85c99d5::t_612d05b2e98d68 88-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6440ba6a430fe36eb132e4ee8d0c2b6694242160",
+  "prompts": {},
+  "sessions": {
+    "s_dd606da85c99d5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "644d2524-3b65-403a-91aa-b96b034d86f2",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
