@@ -34,6 +34,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ShopMassAdvOpsBack,
     ShopMassAdvOpsMenu,
     ExportShopAdvExcel,
+    ExportShopAiPackage,
     ImportShopAdvExcel,
     ToggleCabinetActive,
 )
@@ -170,6 +171,16 @@ def build_shop_main_keyboard(
                 ).pack(),
             )
         )
+
+    # Read-only AI Package: и FREE, и PAID. Рядом с Excel, но отдельный callback.
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="📦 Выгрузить AI-пакет",
+            callback_data=ExportShopAiPackage(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
 
     # Безопасный resolve: user может отсутствовать / быть None
     # (например, loader без joinedload или detached ORM вне сессии).
