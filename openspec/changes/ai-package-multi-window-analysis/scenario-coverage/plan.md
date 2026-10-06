@@ -3,7 +3,7 @@
 CHANGE_ID: ai-package-multi-window-analysis
 MODE: plan
 PLAN_STATUS: ready
-PLAN_EVIDENCE_ID: SCPV1-8c0bb2ab6613a007
+PLAN_EVIDENCE_ID: SCPV1-56cb1ebe559693c3
 LIFECYCLE_STATUS: DERIVED
 
 Required-evidence planning only. Does not claim tests exist, were executed, or passed.
@@ -12,13 +12,13 @@ Required-evidence planning only. Does not claim tests exist, were executed, or p
 
 LIFECYCLE_COVERAGE (Derived Lifecycle L1–L7 from design.md):
 
-- L1 → S02, S03 — водяной знак и последний полный день; год не равен 365 дням
+- L1 → S02, S03, S24 — номинальная граница пакета отдельно от полноты источника; год не равен 365 дням
 - L2 → S01, S04 — запрошенный период, окно и история; произвольный период не пресет
 - L3 → S18 — чтение фактов на диапазоне окон
 - L4 → S05, S07, S15 — агрегат без копии сырья и без слияния ног
-- L5 → S06, S13, S21 — частичное покрытие и честный разрыв
+- L5 → S06, S13, S21, S24, S25 — частичное покрытие, честный разрыв, отказ полного статуса по границе пакета
 - L6 → S12, S13 — статус сопоставимости
-- L7 → S08, S09, S10, S11, S14, S16, S17, S19, S20, S22, S23 — контракт, инструкция, отказ экономик, транспорт
+- L7 → S08, S09, S10, S11, S14, S16, S17, S19, S20, S22, S23, S25, S26 — контракт, инструкция, охват пакета, ключевой артикул, отказ экономик, транспорт
 
 Steady-state reconcile: not_applicable. Это снимок чтения на один экспорт, не контур записи состояния.
 
@@ -28,14 +28,14 @@ OPEN_QUESTIONS: none blocking plan ready.
 
 | AT | Scenarios | Смысл |
 |---|---|---|
-| AT-01 | S02, S03 | Границы окон и исключение неполного дня |
+| AT-01 | S02, S03, S24 | Номинальные границы и отказ считать границу пакета полнотой |
 | AT-02 | S03 | Календарный год |
 | AT-03 | S05 | Нет размножения сырья; агрегаты горизонтов |
 | AT-04 | S01 | Окно против истории |
 | AT-05 | S06 | Пропуск, ноль, пусто, разрыв |
 | AT-06 | S07 | Auto и Search |
 | AT-07 | S08, S09 | Прямая и связанная область |
-| AT-08 | S10, S21 | DRR магазина не выпускается из разрыва |
+| AT-08 | S10, S21, S25 | DRR магазина требует весь расход и всю выручку |
 | AT-09 | S12, S13 | Знаменатель и несопоставимость |
 | AT-10 | S19, S22 | Версии и целостность контракта |
 | AT-11 | S15, S16 | Порядок и один доменный результат |
@@ -48,7 +48,7 @@ OPEN_QUESTIONS: none blocking plan ready.
 
 SCHEMA_VERSION: 1
 CHANGE_ID: ai-package-multi-window-analysis
-SOURCE_SPEC_SHA: 86f76b4670e291d69de2135d4493e94565481ec9c5304e0aa4a14f18320b6a6a
+SOURCE_SPEC_SHA: a6e98820b58876f2b59727a743867866c309af5c578266e8e2af85abe17c35eb
 PLAN_STATUS: ready
 
 SCENARIOS:
@@ -64,7 +64,7 @@ SCENARIOS:
 - SCENARIO_ID: S02
   GIVEN_WHEN_THEN: окно 1 дня исключает дату водяного знака
   PRODUCTION_ENTRYPOINT: каталог окон
-  CAUSAL_PATH: generated_at → последний полный день
+  CAUSAL_PATH: generated_at → package_cutoff_date, не полнота источника
   REQUIRED_EVIDENCE: SCENARIO_SEAM unit
   REALITY_CONSTRAINTS: без часовой таблицы как нормы
   MOCKING_CONSTRAINTS: фиксированный водяной знак
@@ -237,9 +237,33 @@ SCENARIOS:
   REALITY_CONSTRAINTS: нет
   MOCKING_CONSTRAINTS: нет
 
+- SCENARIO_ID: S24
+  GIVEN_WHEN_THEN: граница пакета 2026-10-05 не делает кампанийный 1d полным, если источник полон только по 2026-09-25
+  PRODUCTION_ENTRYPOINT: покрытие окна ноги
+  CAUSAL_PATH: package_cutoff_date отдельно от source_complete_through
+  REQUIRED_EVIDENCE: SCENARIO_SEAM unit
+  REALITY_CONSTRAINTS: часовой пояс WB не выдумывается
+  MOCKING_CONSTRAINTS: доказанная полнота источника задана фикстурой
+
+- SCENARIO_ID: S25
+  GIVEN_WHEN_THEN: сумма ног пакета не называется расходом всего магазина и не входит в DRR магазина
+  PRODUCTION_ENTRYPOINT: агрегат охвата пакета
+  CAUSAL_PATH: PACKAGE_CAMPAIGN_SCOPE без полного охвата кампаний магазина
+  REQUIRED_EVIDENCE: CONTRACT_CASES
+  REALITY_CONSTRAINTS: нет
+  MOCKING_CONSTRAINTS: нет доказательства shop-wide coverage
+
+- SCENARIO_ID: S26
+  GIVEN_WHEN_THEN: артикул ключевой истории не изображает всю экономику товара
+  PRODUCTION_ENTRYPOINT: витрина ключевого артикула
+  CAUSAL_PATH: KEYWORD_PERFORMANCE_PRODUCT_SCOPE
+  REQUIRED_EVIDENCE: CONTRACT_CASES
+  REALITY_CONSTRAINTS: нет
+  MOCKING_CONSTRAINTS: нет фактов всех продаж артикула
+
 UNRESOLVED_GAPS: none
 
 GENERATED_FROM:
-- design.md content_hash a57fa11460786e0b840a11570f2ec8a642605a3f60788b569651b180ace00fb1
-- owner-contract.md content_hash b8821f585d2b69cf2de9e7273e1da9965c7ddd3a03ed08ca74287ff02c8aa7e5
+- design.md content_hash 1da7495d752fc908dca5f905ed83a202f4d8089da45f08e448e51c1375b0146c
+- owner-contract.md content_hash e3be5e18ff8169dc83dfe7c7f3657d2ef931de194470d6886c90a87a77b23afd
 - spec hashes listed in plan.receipt.json INPUTS.SPEC_REVISION

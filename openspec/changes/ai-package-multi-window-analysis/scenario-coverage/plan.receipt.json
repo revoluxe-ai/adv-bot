@@ -4,21 +4,21 @@
   "CHANGE_ID": "ai-package-multi-window-analysis",
   "MODE": "plan",
   "PLAN_STATUS": "ready",
-  "PLAN_EVIDENCE_ID": "SCPV1-8c0bb2ab6613a007",
-  "PLAN_CONTENT_HASH": "861bf7721b6fcfb6f717379420c18b2e5603d3ecb9e9e59e98700b0aa26323ad",
+  "PLAN_EVIDENCE_ID": "SCPV1-56cb1ebe559693c3",
+  "PLAN_CONTENT_HASH": "52641fb4ac0cdc2105eb6859476b2de7cb838ae622ec4f66d432ca7221879a24",
   "PLAN_PATH": "openspec/changes/ai-package-multi-window-analysis/scenario-coverage/plan.md",
   "RECEIPT_PATH": "openspec/changes/ai-package-multi-window-analysis/scenario-coverage/plan.receipt.json",
-  "SCENARIO_COUNT": 23,
-  "SOURCE_SPEC_SHA": "86f76b4670e291d69de2135d4493e94565481ec9c5304e0aa4a14f18320b6a6a",
+  "SCENARIO_COUNT": 26,
+  "SOURCE_SPEC_SHA": "a6e98820b58876f2b59727a743867866c309af5c578266e8e2af85abe17c35eb",
   "LIFECYCLE_COVERAGE": {
     "covered": [
-      "L1:S02,S03",
+      "L1:S02,S03,S24",
       "L2:S01,S04",
       "L3:S18",
       "L4:S05,S07,S15",
-      "L5:S06,S13,S21",
+      "L5:S06,S13,S21,S24,S25",
       "L6:S12,S13",
-      "L7:S08,S09,S10,S11,S14,S16,S17,S19,S20,S22,S23"
+      "L7:S08,S09,S10,S11,S14,S16,S17,S19,S20,S22,S23,S25,S26"
     ],
     "gaps": []
   },
@@ -26,7 +26,7 @@
   "INPUTS": {
     "DESIGN_REVISION": {
       "path": "openspec/changes/ai-package-multi-window-analysis/design.md",
-      "content_hash": "a57fa11460786e0b840a11570f2ec8a642605a3f60788b569651b180ace00fb1"
+      "content_hash": "1da7495d752fc908dca5f905ed83a202f4d8089da45f08e448e51c1375b0146c"
     },
     "SPEC_REVISION": [
       {
@@ -35,37 +35,37 @@
       },
       {
         "path": "openspec/changes/ai-package-multi-window-analysis/specs/ai-package-multi-window-analysis/spec.md",
-        "content_hash": "4a58506e9583591d84d683c23943b2987fe9af79dc202169ce934dacb265ea79"
+        "content_hash": "0f9feb0414aa8d58c9d3436f8998caed8abaf866941a2f24dd374602543cceea"
       },
       {
         "path": "openspec/changes/ai-package-multi-window-analysis/specs/ai-package-v1-contract-tests/spec.md",
-        "content_hash": "c3ce26e43d5fdb9d9bfdff44f36cad423cdc959b528925a78302533773fa4bd5"
+        "content_hash": "9c0d2ed3e918bf2a5e540453cf5cb04148b4e148e6e8ce27671759b02924dd43"
       },
       {
         "path": "openspec/changes/ai-package-multi-window-analysis/specs/ai-package-v1-exporter/spec.md",
-        "content_hash": "6959d02dc2319e55919601aa928c380ea7b0185a265f8fe80021a16fd15c3064"
+        "content_hash": "7dad3157abda0a429d1c7a2d82f1504c1a2a00b7c1040069eab3412a72343001"
       }
     ],
     "LIFECYCLE_REVISION": {
       "source": "openspec/changes/ai-package-multi-window-analysis/design.md",
-      "content_hash": "a57fa11460786e0b840a11570f2ec8a642605a3f60788b569651b180ace00fb1"
+      "content_hash": "1da7495d752fc908dca5f905ed83a202f4d8089da45f08e448e51c1375b0146c"
     },
     "OWNER_CONTRACT_REVISION": {
       "path": "openspec/changes/ai-package-multi-window-analysis/owner-contract.md",
-      "content_hash": "b8821f585d2b69cf2de9e7273e1da9965c7ddd3a03ed08ca74287ff02c8aa7e5"
+      "content_hash": "e3be5e18ff8169dc83dfe7c7f3657d2ef931de194470d6886c90a87a77b23afd"
     }
   },
   "GENERATED_FROM": {
-    "DESIGN_REVISION": "a57fa11460786e0b840a11570f2ec8a642605a3f60788b569651b180ace00fb1",
+    "DESIGN_REVISION": "1da7495d752fc908dca5f905ed83a202f4d8089da45f08e448e51c1375b0146c",
     "SPEC_REVISION": [
       "f0b98fd352e6f1280d4f1793d97b28bc119567a2037f2eb1ed1fcbdeba05b7e2",
-      "4a58506e9583591d84d683c23943b2987fe9af79dc202169ce934dacb265ea79",
-      "c3ce26e43d5fdb9d9bfdff44f36cad423cdc959b528925a78302533773fa4bd5",
-      "6959d02dc2319e55919601aa928c380ea7b0185a265f8fe80021a16fd15c3064"
+      "0f9feb0414aa8d58c9d3436f8998caed8abaf866941a2f24dd374602543cceea",
+      "9c0d2ed3e918bf2a5e540453cf5cb04148b4e148e6e8ce27671759b02924dd43",
+      "7dad3157abda0a429d1c7a2d82f1504c1a2a00b7c1040069eab3412a72343001"
     ],
-    "LIFECYCLE_REVISION": "a57fa11460786e0b840a11570f2ec8a642605a3f60788b569651b180ace00fb1",
-    "OWNER_CONTRACT_REVISION": "b8821f585d2b69cf2de9e7273e1da9965c7ddd3a03ed08ca74287ff02c8aa7e5",
-    "SOURCE_SPEC_SHA": "86f76b4670e291d69de2135d4493e94565481ec9c5304e0aa4a14f18320b6a6a"
+    "LIFECYCLE_REVISION": "1da7495d752fc908dca5f905ed83a202f4d8089da45f08e448e51c1375b0146c",
+    "OWNER_CONTRACT_REVISION": "e3be5e18ff8169dc83dfe7c7f3657d2ef931de194470d6886c90a87a77b23afd",
+    "SOURCE_SPEC_SHA": "a6e98820b58876f2b59727a743867866c309af5c578266e8e2af85abe17c35eb"
   },
   "MATERIALIZATION_STATUS": "COMMITTED"
 }
