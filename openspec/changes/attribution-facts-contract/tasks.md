@@ -3,10 +3,10 @@
 Planning artifact. Implementation via `/opsx-apply` after Owner implementation GO.
 
 ```text
-TASKS_STATUS: READY_FOR_IMPLEMENTATION_GO
+TASKS_STATUS: SLICE_A_COMPLETE
 PLANNING_READY: yes
-APPLY_READY: pending Owner implementation GO
-OWNER_CONTRACT_STATUS: ACCEPTED (Owner GO materialize OpenSpec)
+APPLY_READY: slice_a_applied
+OWNER_CONTRACT_STATUS: ACCEPTED (Owner GO Slice A)
 ```
 
 ## Out of scope (all slices)
@@ -18,12 +18,12 @@ ChangeSet Apply; unrelated collectors; production deployment.
 
 ## Slice A — Domain contract + port + unit tests
 
-- [ ] A.1 Scaffold `app/modules/attribution_facts/` package (domain, ports)
-- [ ] A.2 Implement `AttributionCommerceFact`, keys, `MembershipSnapshot`, coverage types
-- [ ] A.3 Pure `classify_fact`, `reconcile_day`, derived metric helpers (CPO/DRR)
-- [ ] A.4 Define `AttributionFactsReader` protocol + in-memory fake
-- [ ] A.5 Unit tests: DIRECT/LINKED/UNKNOWN/UNATTRIBUTED, revision replace, DENOMINATOR_ZERO
-- [ ] A.6 Unit tests: fail-closed reason codes; no zero-on-missing
+- [x] A.1 Scaffold `app/modules/attribution_facts/` package (domain, ports)
+- [x] A.2 Implement `AttributionCommerceFact`, keys, `MembershipSnapshot`, coverage types
+- [x] A.3 Pure `classify_fact`, `reconcile_day`, derived metric helpers (CPO/DRR)
+- [x] A.4 Define `AttributionFactsReader` protocol + in-memory fake
+- [x] A.5 Unit tests: DIRECT/LINKED/UNKNOWN/UNATTRIBUTED, revision replace, DENOMINATOR_ZERO
+- [x] A.6 Unit tests: fail-closed reason codes; no zero-on-missing
 
 **Gate:** `poetry run pytest -m unit tests/unit/attribution_facts/ -v`
 
