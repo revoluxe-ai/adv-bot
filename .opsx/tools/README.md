@@ -43,4 +43,11 @@ poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet packet.
 poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet packet.json
 ```
 
+Seal untracked packet at current HEAD (after pull, before live run):
+
+```bash
+export AUTHORIZE_ONE_LIVE_RUN='<owner-secret>'
+poetry run python .opsx/tools/opsx_seal_provider_packet.py --live-token "$AUTHORIZE_ONE_LIVE_RUN"
+```
+
 Unit tests: `tests/unit/opsx/test_opsx_provider_run_guard.py`.
