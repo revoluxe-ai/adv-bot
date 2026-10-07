@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "change_id": "attribution-facts-contract",
+  "scope": "slice_a_l1_only",
+  "producer": "slice-a-repair-verify",
+  "produced_at": "2026-10-07",
+  "head_note": "post-repair; not full-change certify",
+  "scenarios": {
+    "S01": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_classification.py::test_direct_classification"
+    },
+    "S02": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_classification.py::test_linked_classification"
+    },
+    "S03": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_classification.py::test_empty_promoted_unknown_not_linked"
+    },
+    "S04": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py::test_s04_*"
+    },
+    "S07": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py::test_s07_*"
+    },
+    "S10": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_reconciliation_and_coverage.py::test_revision_replaces_not_sums"
+    },
+    "S13": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py::test_s13_reader_partial_coverage_exposes_reason_codes"
+    },
+    "S14": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py::test_s14_package_cutoff_does_not_imply_complete_coverage"
+    }
+  },
+  "deferred_scenarios": ["S05", "S06", "S08", "S09", "S11", "S12", "S15", "S16"],
+  "pytest_command": "pytest -m unit tests/unit/attribution_facts/",
+  "full_change_cert_deferred": true
+}
