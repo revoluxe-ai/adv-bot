@@ -14,15 +14,15 @@
 
 **`SLICE_A_BLOCKED_BY_APPLY = NO`** — `ApplyEvidenceRef` types + invariants only.
 
-- [ ] 2.1 Domain types: `DecisionMemoryRecord`, `ExperimentRecordV1`, `ExperimentPlan`,
+- [x] 2.1 Domain types: `DecisionMemoryRecord`, `ExperimentRecordV1`, `ExperimentPlan`,
   `treatment_mode`, `ApplyEvidenceRef`, WindowModel, MetricSpecRef, ExposureModel,
   FactualResult, Interpretation, PostHocAnalysisRecord, ValiditySnapshot,
   EvaluationProvenance, InterventionSignature.
-- [ ] 2.2 Event taxonomy + projection rules (execution_state, outcome, plan freeze);
+- [x] 2.2 Event taxonomy + projection rules (execution_state, outcome, plan freeze);
   cardinality 0..N compatible, V1 writer may enforce 0..1.
-- [ ] 2.3 `DecisionMemoryReader` + repository protocols; **test-only in-memory fake**
+- [x] 2.3 `DecisionMemoryReader` + repository protocols; **test-only in-memory fake**
   (not production store).
-- [ ] 2.4 Unit tests: invariants (EVALUATED+INCONCLUSIVE, freeze gate, exposure gate,
+- [x] 2.4 Unit tests: invariants (EVALUATED+INCONCLUSIVE, freeze gate, exposure gate,
   validity blocks SUCCEEDED/FAILED, observational causal level).
 - [ ] 2.5 **Vocabulary freeze sign-off** before Slice B schema.
 

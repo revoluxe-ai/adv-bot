@@ -1,0 +1,309 @@
+"""In-memory decision memory store for unit tests only (Slice A fake)."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import datetime, timezone
+from uuid import uuid4
+
+from app.modules.decision_experiment_memory.domain.enums import (
+    DecisionStatus,
+    RegistrationKind,
+)
+from app.modules.decision_experiment_memory.domain.plan import (
+    ExperimentPlan,
+    ExperimentPlanBody,
+    build_plan,
+)
+from app.modules.decision_experiment_memory.domain.records import (
+    DecisionMemoryRecord,
+    ExperimentRecordV1,
+    new_experiment_shell,
+)
+from app.modules.decision_experiment_memory.events import (
+    MemoryEvent,
+    MemoryEventType,
+)
+from app.modules.decision_experiment_memory.plan_freeze import (
+    assert_plan_revision_unchanged,
+    freeze_plan_on_experiment,
+)
+from app.modules.decision_experiment_memory.projections import (
+    with_aborted_execution,
+    with_exposure_confirmed,
+)
+from app.modules.decision_experiment_memory.protocols import (
+    DecisionMemoryReader,
+    DecisionMemoryRepository,
+)
+
+
+class InMemoryDecisionMemoryRepository(DecisionMemoryReader, DecisionMemoryRepository):
+    """Test-only fake implementing reader + append-only writer ports."""
+
+    def __init__(self) -> None:
+        self._decisions: dict[str, DecisionMemoryRecord] = {}
+        self._experiments: dict[str, ExperimentRecordV1] = {}
+        self._plans: dict[tuple[str, int], ExperimentPlan] = {}
+        self._events: list[MemoryEvent] = []
+
+    def append_event(self, event: MemoryEvent) -> None:
+        self._events.append(event)
+
+    def save_decision(self, record: DecisionMemoryRecord) -> None:
+        if record.status == DecisionStatus.APPLY_CONFIRMED and record.apply_evidence_ref is None:
+            raise ValueError("ApplyEvidenceRef required for APPLY_CONFIRMED")
+        self._decisions[record.decision_id] = record
+
+    def save_experiment(self, record: ExperimentRecordV1) -> None:
+        from app.modules.decision_experiment_memory.domain.records import (
+            assert_distinct_experiment_identity,
+        )
+
+        assert_distinct_experiment_identity(
+            decision_id=record.decision_id,
+            experiment_id=record.experiment_id,
+        )
+        self._experiments[record.experiment_id] = record
+
+    def save_plan(self, plan: ExperimentPlan) -> None:
+        key = (plan.experiment_id, plan.plan_revision)
+        existing = self._plans.get(key)
+        if existing is not None:
+            assert_plan_revision_unchanged(existing, plan.plan_digest)
+            return
+        self._plans[key] = plan
+
+    def get_decision(self, decision_id: str) -> DecisionMemoryRecord | None:
+        return self._decisions.get(decision_id)
+
+    def list_experiments_for_decision(
+        self,
+        decision_id: str,
+    ) -> tuple[ExperimentRecordV1, ...]:
+        return tuple(
+            e for e in self._experiments.values() if e.decision_id == decision_id
+        )
+
+    def get_experiment(self, experiment_id: str) -> ExperimentRecordV1 | None:
+        return self._experiments.get(experiment_id)
+
+    def get_plan_revision(
+        self,
+        experiment_id: str,
+        plan_revision: int,
+    ) -> ExperimentPlan | None:
+        return self._plans.get((experiment_id, plan_revision))
+
+    def list_events(
+        self,
+        *,
+        decision_id: str | None = None,
+        experiment_id: str | None = None,
+    ) -> tuple[MemoryEvent, ...]:
+        out: list[MemoryEvent] = []
+        for event in self._events:
+            if decision_id is not None and event.decision_id != decision_id:
+                continue
+            if experiment_id is not None and event.experiment_id != experiment_id:
+                continue
+            out.append(event)
+        return tuple(out)
+
+    def record_decision(
+        self,
+        record: DecisionMemoryRecord,
+    ) -> None:
+        """Append decision and emit DECISION_RECORDED."""
+        self.save_decision(record)
+        self.append_event(
+            MemoryEvent(
+                event_id=str(uuid4()),
+                event_type=MemoryEventType.DECISION_RECORDED,
+                occurred_at=record.created_at,
+                decision_id=record.decision_id,
+                payload={"status": record.status.value},
+            )
+        )
+
+    def register_experiment_with_plan(
+        self,
+        *,
+        decision_id: str,
+        experiment_id: str,
+        plan_body: ExperimentPlanBody,
+        registration_kind: RegistrationKind,
+        intervention_signature_digest: str,
+        registered_at: datetime | None = None,
+    ) -> ExperimentRecordV1:
+        """Create experiment shell + plan revision 1."""
+        when = registered_at or datetime.now(tz=timezone.utc)
+        body = plan_body
+        body = replace(body, experiment_id=experiment_id)
+        plan = build_plan(
+            experiment_id=experiment_id,
+            plan_revision=1,
+            registered_at=when,
+            registration_kind=registration_kind,
+            body=body,
+        )
+        shell = new_experiment_shell(
+            experiment_id=experiment_id,
+            decision_id=decision_id,
+            treatment_mode=plan.treatment_mode,
+            experiment_design=plan.experiment_design,
+            intervention_signature_digest=intervention_signature_digest,
+            active_plan_revision=1,
+        )
+        self.save_plan(plan)
+        self.save_experiment(shell)
+        self.append_event(
+            MemoryEvent(
+                event_id=str(uuid4()),
+                event_type=MemoryEventType.PLAN_REGISTERED,
+                occurred_at=when,
+                decision_id=decision_id,
+                experiment_id=experiment_id,
+                payload={"plan_revision": 1, "plan_digest": plan.plan_digest},
+            )
+        )
+        return shell
+
+    def freeze_plan(
+        self,
+        experiment_id: str,
+        plan_revision: int,
+        occurred_at: datetime | None = None,
+    ) -> ExperimentRecordV1:
+        """Emit PLAN_FROZEN and set frozen digest on experiment."""
+        plan = self.get_plan_revision(experiment_id, plan_revision)
+        if plan is None:
+            raise KeyError(f"plan revision {plan_revision} missing")
+        experiment = self.get_experiment(experiment_id)
+        if experiment is None:
+            raise KeyError(f"experiment {experiment_id} missing")
+        frozen = freeze_plan_on_experiment(experiment, plan)
+        self.save_experiment(frozen)
+        when = occurred_at or datetime.now(tz=timezone.utc)
+        self.append_event(
+            MemoryEvent(
+                event_id=str(uuid4()),
+                event_type=MemoryEventType.PLAN_FROZEN,
+                occurred_at=when,
+                experiment_id=experiment_id,
+                payload={
+                    "plan_revision": plan_revision,
+                    "plan_digest": plan.plan_digest,
+                },
+            )
+        )
+        return frozen
+
+    def append_protocol_deviation(
+        self,
+        experiment_id: str,
+        *,
+        plan_revision: int,
+        reason: str,
+        occurred_at: datetime | None = None,
+    ) -> None:
+        """Append PROTOCOL_DEVIATION without mutating frozen plan bytes."""
+        experiment = self.get_experiment(experiment_id)
+        if experiment is None:
+            raise KeyError(experiment_id)
+        when = occurred_at or datetime.now(tz=timezone.utc)
+        self.append_event(
+            MemoryEvent(
+                event_id=str(uuid4()),
+                event_type=MemoryEventType.PROTOCOL_DEVIATION,
+                occurred_at=when,
+                experiment_id=experiment_id,
+                payload={
+                    "plan_revision": plan_revision,
+                    "frozen_plan_digest": experiment.frozen_plan_digest,
+                    "reason": reason,
+                },
+            )
+        )
+
+    def link_decision_status(
+        self,
+        decision_id: str,
+        status: DecisionStatus,
+    ) -> DecisionMemoryRecord:
+        """Update decision status (no auto APPLY_CONFIRMED without evidence)."""
+        record = self.get_decision(decision_id)
+        if record is None:
+            raise KeyError(decision_id)
+        if status == DecisionStatus.APPLY_CONFIRMED and record.apply_evidence_ref is None:
+            raise ValueError("ApplyEvidenceRef required for APPLY_CONFIRMED")
+        updated = DecisionMemoryRecord(
+            decision_id=record.decision_id,
+            shop_id=record.shop_id,
+            status=status,
+            created_at=record.created_at,
+            observation=record.observation,
+            rationale=record.rationale,
+            intended_action=record.intended_action,
+            decision_fingerprint=record.decision_fingerprint,
+            changeset_ref=record.changeset_ref,
+            apply_evidence_ref=record.apply_evidence_ref,
+            dry_run_receipt_id=record.dry_run_receipt_id,
+        )
+        self.save_decision(updated)
+        return updated
+
+    def confirm_exposure(
+        self,
+        experiment_id: str,
+        *,
+        effective_from: datetime,
+        observation_start: datetime,
+        state_token: str,
+    ) -> ExperimentRecordV1:
+        """Emit EXPOSURE_CONFIRMED and update exposure model."""
+        experiment = self.get_experiment(experiment_id)
+        if experiment is None:
+            raise KeyError(experiment_id)
+        from app.modules.decision_experiment_memory.domain.records import ExposureModel
+
+        exposure = ExposureModel(
+            changeset_ref=experiment.exposure.changeset_ref,
+            apply_evidence_ref=experiment.exposure.apply_evidence_ref,
+            resulting_state_token=state_token,
+            effective_from=effective_from,
+            observation_start=observation_start,
+            exposure_confirmed=True,
+        )
+        updated = with_exposure_confirmed(experiment, exposure=exposure)
+        self.save_experiment(updated)
+        self.append_event(
+            MemoryEvent(
+                event_id=str(uuid4()),
+                event_type=MemoryEventType.EXPOSURE_CONFIRMED,
+                occurred_at=datetime.now(tz=timezone.utc),
+                experiment_id=experiment_id,
+                payload={
+                    "effective_from": effective_from.isoformat(),
+                    "observation_start": observation_start.isoformat(),
+                },
+            )
+        )
+        return updated
+
+    def abort_experiment(self, experiment_id: str) -> ExperimentRecordV1:
+        """Emit EXECUTION_ABORTED with V1 outcome projection."""
+        experiment = self.get_experiment(experiment_id)
+        if experiment is None:
+            raise KeyError(experiment_id)
+        aborted = with_aborted_execution(experiment)
+        self.save_experiment(aborted)
+        self.append_event(
+            MemoryEvent(
+                event_id=str(uuid4()),
+                event_type=MemoryEventType.EXECUTION_ABORTED,
+                occurred_at=datetime.now(tz=timezone.utc),
+                experiment_id=experiment_id,
+            )
+        )
+        return aborted
