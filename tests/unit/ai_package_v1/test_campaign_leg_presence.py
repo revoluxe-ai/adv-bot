@@ -38,6 +38,9 @@ from app.modules.ai_package_v1.domain.settings_enums import (
     SettingsCoverageLevel,
     SettingsFreshnessLevel,
 )
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.export.export_service import ExportService
 from app.modules.ai_package_v1.export.family_status import derive_family_status_from_card
 from app.modules.ai_package_v1.export.package_summary import build_package_summary_document
@@ -152,6 +155,7 @@ def _service(rows: list[CampaignStatRow]) -> ExportService:
         campaign_reader=_FixtureCampaignReader(rows),  # type: ignore[arg-type]
         funnel_reader=_EmptyFunnelReader(),  # type: ignore[arg-type]
         freshness_reader=_NoFreshness(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=settings,
         keyword_assembler=build_fake_assembler(deps),
     )

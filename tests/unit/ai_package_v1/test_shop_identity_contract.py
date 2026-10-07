@@ -37,6 +37,9 @@ from app.modules.ai_package_v1.domain.shop_id import (
     manifest_shop_id,
     require_authoritative_shop_id,
 )
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.export.export_service import ExportService
 from app.modules.ai_package_v1.export.package_summary import PACKAGE_SUMMARY_LOGICAL
 from app.modules.ai_package_v1.export.package_zip_assembler import PackageZipAssembler
@@ -215,6 +218,7 @@ async def test_uuid_shop_id_roundtrip_through_package() -> None:
         campaign_reader=_StampCampaignReader(),  # type: ignore[arg-type]
         funnel_reader=_StampFunnelReader(),  # type: ignore[arg-type]
         freshness_reader=_NoFreshness(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=settings,
         keyword_assembler=build_fake_assembler(deps),
     )
