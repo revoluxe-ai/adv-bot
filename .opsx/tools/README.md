@@ -43,6 +43,11 @@ poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet packet.
 poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet packet.json
 ```
 
+Packets include explicit `pytest_targets` (POSIX repo paths). Verification uses
+`PurePosixPath` so Windows cannot fail on backslash parents. Frozen run block
+must list targets and `guard verify` → `guard run` only (no direct
+`poetry run pytest` before guard).
+
 Seal untracked packet at current HEAD (after pull, before live run):
 
 ```bash

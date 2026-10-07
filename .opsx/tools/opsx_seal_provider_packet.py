@@ -58,7 +58,7 @@ def build_packet(
         "-vv",
         "--tb=short",
     ]
-    pytest_line = " ".join(pytest_argv)
+    pytest_targets = list(guard.extract_pytest_targets_from_argv(tuple(pytest_argv)))
     block = (
         "set -euo pipefail\n"
         "cd \"$(git rev-parse --show-toplevel)\"\n"
@@ -74,8 +74,10 @@ def build_packet(
         "docker compose -f tests/docker-compose.test.yml up -d test_db test_clickhouse test_redis\n"
         "pg_isready -h 127.0.0.1 -p 5433 -U test_user -d test_adv_bot_db\n"
         "curl -fsS http://127.0.0.1:8124/ping >/dev/null\n"
-        f"{pytest_line}\n"
-        f"poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet "
+        f"# PYTEST_TARGETS: {pytest_targets[0]}\n"
+        "poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet "
+        f".opsx/runs/scenario-coverage/{change_id}/provider-run-packet.json --repo .\n"
+        "poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet "
         f".opsx/runs/scenario-coverage/{change_id}/provider-run-packet.json --repo .\n"
         "docker compose -f tests/docker-compose.test.yml down\n"
     )
@@ -87,6 +89,7 @@ def build_packet(
         "allowed_run_block_sha256": guard.allowed_run_block_sha256(block),
         "allowed_run_block_text": block,
         "pytest_argv": pytest_argv,
+        "pytest_targets": pytest_targets,
         "provider_test_ids": _default_test_ids(),
         "postgres_host": "127.0.0.1",
         "postgres_port": 5433,

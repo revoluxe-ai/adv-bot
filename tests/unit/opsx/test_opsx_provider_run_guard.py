@@ -38,19 +38,25 @@ def _minimal_block(
     host: str = "127.0.0.1",
     port: int = 5433,
     dbname: str = "test_adv_bot_db",
-    pytest_line: str = (
-        "poetry run pytest tests/integration/wb_sky_mcp/ "
-        "-m destructive_local -vv --tb=short"
-    ),
+    target: str = "tests/integration/wb_sky_mcp/",
+    include_unguarded_pytest: bool = False,
 ) -> str:
-    return (
-        f"export POSTGRES_MASTER_HOST={host}\n"
-        f"export POSTGRES_PORT={port}\n"
-        f"export POSTGRES_DBNAME={dbname}\n"
-        "export REDIS_HOST=127.0.0.1\n"
-        "export REDIS_PORT=6379\n"
-        f"{pytest_line}\n"
-    )
+    lines = [
+        f"export POSTGRES_MASTER_HOST={host}",
+        f"export POSTGRES_PORT={port}",
+        f"export POSTGRES_DBNAME={dbname}",
+        "export REDIS_HOST=127.0.0.1",
+        "export REDIS_PORT=6379",
+        f"# PYTEST_TARGETS: {target}",
+        "poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet pkt.json --repo .",
+        "poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet pkt.json --repo .",
+    ]
+    if include_unguarded_pytest:
+        lines.insert(
+            -2,
+            "poetry run pytest tests/integration/wb_sky_mcp/ -m destructive_local",
+        )
+    return "\n".join(lines) + "\n"
 
 
 def _packet(
@@ -73,6 +79,7 @@ def _packet(
     test_ids: tuple[str, ...] = (
         "tests/integration/wb_sky_mcp/test_mcp_pg_connection_repository.py::test_x",
     ),
+    pytest_targets: tuple[str, ...] = ("tests/integration/wb_sky_mcp/",),
     host: str = "127.0.0.1",
     port: int = 5433,
     dbname: str = "test_adv_bot_db",
@@ -85,6 +92,7 @@ def _packet(
         allowed_run_block_sha256=guard.allowed_run_block_sha256(block),
         allowed_run_block_text=block,
         pytest_argv=pytest_argv,
+        pytest_targets=pytest_targets,
         provider_test_ids=test_ids,
         postgres_host=host,
         postgres_port=port,
@@ -244,12 +252,18 @@ def test_command_and_db_coords_mismatch_rejects() -> None:
     assert verdict.status == "BLOCKED_FINGERPRINT_MISMATCH"
     assert verdict.mismatch_field == "postgres_port_in_block"
 
-    wrong_cmd_block = _minimal_block(
-        pytest_line="poetry run pytest tests/other/ -m destructive_local"
-    )
+    other_block = _minimal_block(target="tests/other/")
     packet_cmd = _packet(
-        wrong_cmd_block,
-        pytest_argv=("poetry", "run", "pytest", "tests/integration/wb_sky_mcp/"),
+        other_block,
+        pytest_argv=(
+            "poetry",
+            "run",
+            "pytest",
+            "tests/other/",
+            "-m",
+            "destructive_local",
+        ),
+        pytest_targets=("tests/other/",),
     )
     verdict_cmd = guard.verify_provider_run_packet(
         Path("/tmp"),
@@ -262,7 +276,7 @@ def test_command_and_db_coords_mismatch_rejects() -> None:
         ),
         live_token=_TEST_LIVE_TOKEN,
     )
-    assert verdict_cmd.mismatch_field == "pytest_argv_in_block"
+    assert verdict_cmd.mismatch_field == "provider_test_ids"
 
 
 @pytest.mark.unit
@@ -344,6 +358,105 @@ def test_one_shot_consumed_blocks_second_spawn(tmp_path: Path) -> None:
     assert second.status == "BLOCKED_AUTHORIZATION"
     assert second.mismatch_field == "AUTH_CONSUMED"
     assert mock_run.call_count == 1
+
+
+@pytest.mark.unit
+def test_extract_pytest_targets_ignores_options() -> None:
+    argv = (
+        "poetry",
+        "run",
+        "pytest",
+        "tests/integration/wb_sky_mcp/",
+        "-m",
+        "destructive_local",
+        "-vv",
+        "--tb=short",
+    )
+    assert guard.extract_pytest_targets_from_argv(argv) == (
+        "tests/integration/wb_sky_mcp/",
+    )
+
+
+@pytest.mark.unit
+def test_provider_test_ids_use_posix_paths_on_windows_host_semantics() -> None:
+    """Regression: host Path.parent must not be used for packet verification."""
+
+    node = (
+        "tests/integration/wb_sky_mcp/"
+        "test_mcp_pg_connection_repository.py::test_sql_connection_repository_persist_and_raw_select"
+    )
+    targets = ("tests/integration/wb_sky_mcp/",)
+    assert guard.provider_test_id_within_targets(node, targets)
+    block = _minimal_block()
+    packet = _packet(
+        block,
+        test_ids=(node,),
+        pytest_targets=targets,
+    )
+    verdict = guard.verify_provider_run_packet(
+        Path("/tmp"),
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.status == "PERMIT"
+
+
+@pytest.mark.unit
+def test_provider_test_outside_sealed_target_rejected() -> None:
+    block = _minimal_block()
+    packet = _packet(
+        block,
+        test_ids=("tests/integration/other/test_x.py::test_x",),
+    )
+    verdict = guard.verify_provider_run_packet(
+        Path("/tmp"),
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.mismatch_field == "provider_test_ids"
+    assert verdict.spawn_count == 0
+
+
+@pytest.mark.unit
+def test_unguarded_pytest_line_in_block_rejected() -> None:
+    block = _minimal_block(include_unguarded_pytest=True)
+    packet = _packet(block)
+    verdict = guard.verify_provider_run_packet(
+        Path("/tmp"),
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.mismatch_field == "unguarded_pytest_in_block"
+
+
+@pytest.mark.unit
+def test_verify_failure_does_not_consume_authorization(tmp_path: Path) -> None:
+    block = _minimal_block()
+    packet = _packet(block, test_ids=("tests/integration/other/t.py::test_x",))
+    repo = tmp_path
+    guard.verify_provider_run_packet(
+        repo,
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    ledger = guard.authorization_ledger_path(repo, packet.change_id)
+    assert not ledger.is_file()
 
 
 @pytest.mark.unit

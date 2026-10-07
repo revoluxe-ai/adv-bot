@@ -18,7 +18,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 EXIT_BLOCKED_FINGERPRINT = 3
@@ -53,6 +53,7 @@ class ProviderRunPacket:
     allowed_run_block_sha256: str
     allowed_run_block_text: str
     pytest_argv: tuple[str, ...]
+    pytest_targets: tuple[str, ...]
     provider_test_ids: tuple[str, ...]
     postgres_host: str
     postgres_port: int
@@ -80,6 +81,9 @@ class ProviderRunPacket:
         test_ids_raw = _req("provider_test_ids")
         provider_test_ids = tuple(str(x) for x in test_ids_raw)
 
+        targets_raw = _req("pytest_targets")
+        pytest_targets = tuple(normalize_repo_posix_path(str(x)) for x in targets_raw)
+
         port_raw = _req("postgres_port")
         postgres_port = int(port_raw)
 
@@ -96,6 +100,7 @@ class ProviderRunPacket:
             allowed_run_block_sha256=str(_req("allowed_run_block_sha256")),
             allowed_run_block_text=str(_req("allowed_run_block_text")),
             pytest_argv=pytest_argv,
+            pytest_targets=pytest_targets,
             provider_test_ids=provider_test_ids,
             postgres_host=str(_req("postgres_host")),
             postgres_port=postgres_port,
@@ -126,6 +131,77 @@ def sha256_bytes(payload: bytes) -> str:
     """SHA-256 lowercase hex от точных байт stdout/блока."""
 
     return hashlib.sha256(payload).hexdigest()
+
+
+def normalize_repo_posix_path(raw: str) -> str:
+    """Repo-relative path in POSIX form (host OS must not affect verification)."""
+
+    replaced = raw.replace("\\", "/")
+    if replaced.endswith("/") and len(replaced) > 1:
+        base = PurePosixPath(replaced.rstrip("/")).as_posix()
+        return f"{base}/"
+    return PurePosixPath(replaced).as_posix()
+
+
+def extract_pytest_targets_from_argv(argv: Sequence[str]) -> tuple[str, ...]:
+    """Collect repo-relative test paths from argv; stop before pytest options."""
+
+    tokens = list(argv)
+    if "pytest" not in tokens:
+        return ()
+    idx = tokens.index("pytest") + 1
+    targets: list[str] = []
+    option_with_value = frozenset(
+        {"-m", "-k", "--markers", "--keyword", "--tb", "--maxfail"}
+    )
+    i = idx
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok.startswith("-"):
+            if tok in option_with_value and i + 1 < len(tokens):
+                i += 2
+                continue
+            if "=" in tok:
+                i += 1
+                continue
+            break
+        targets.append(normalize_repo_posix_path(tok))
+        i += 1
+    return tuple(targets)
+
+
+def provider_test_id_within_targets(
+    node_id: str,
+    pytest_targets: Sequence[str],
+) -> bool:
+    """True when node file path is under a sealed POSIX pytest target."""
+
+    file_part = normalize_repo_posix_path(node_id.split("::", 1)[0])
+    file_path = PurePosixPath(file_part)
+    for target in pytest_targets:
+        target_norm = normalize_repo_posix_path(target)
+        target_path = PurePosixPath(target_norm.rstrip("/"))
+        if target_norm.endswith("/") or target_path.suffix == "":
+            try:
+                file_path.relative_to(target_path)
+                return True
+            except ValueError:
+                continue
+        if file_path == target_path:
+            return True
+    return False
+
+
+def block_has_unguarded_pytest_invocation(block_text: str) -> bool:
+    """True when a non-comment line would spawn pytest outside guard run."""
+
+    for line in block_text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("poetry run pytest"):
+            return True
+    return False
 
 
 def allowed_run_block_sha256(block_text: str) -> str:
@@ -484,27 +560,34 @@ def verify_provider_run_packet(
             "missing_or_mismatch",
         )
 
-    expected_pytest = " ".join(packet.pytest_argv)
-    if expected_pytest not in block:
-        return _blocked("pytest_argv_in_block", expected_pytest, "missing")
-
-    integration_target = packet.pytest_argv[-1] if packet.pytest_argv else ""
-    if integration_target and integration_target not in block:
+    extracted_targets = extract_pytest_targets_from_argv(packet.pytest_argv)
+    if tuple(packet.pytest_targets) != extracted_targets:
         return _blocked(
-            "pytest_integration_target",
-            integration_target,
-            "missing_from_block",
+            "pytest_targets",
+            ",".join(packet.pytest_targets),
+            ",".join(extracted_targets),
+        )
+
+    for target in packet.pytest_targets:
+        if target not in block:
+            return _blocked("pytest_targets_in_block", target, "missing")
+
+    guard_run_fragment = (
+        "opsx_provider_run_guard.py run --packet"
+    )
+    if guard_run_fragment not in block:
+        return _blocked("guard_run_in_block", guard_run_fragment, "missing")
+
+    if block_has_unguarded_pytest_invocation(block):
+        return _blocked(
+            "unguarded_pytest_in_block",
+            "forbidden",
+            "poetry run pytest present",
         )
 
     for node_id in packet.provider_test_ids:
-        file_part = node_id.split("::", 1)[0]
-        parent = str(Path(file_part).parent)
-        if (
-            file_part not in block
-            and parent not in block
-            and integration_target not in file_part
-        ):
-            return _blocked("provider_test_ids", node_id, "not_covered_by_block")
+        if not provider_test_id_within_targets(node_id, packet.pytest_targets):
+            return _blocked("provider_test_ids", node_id, "not_covered_by_targets")
 
     auth_block = _check_authorization(repo_root, packet, live_token=live_token)
     if auth_block is not None:
