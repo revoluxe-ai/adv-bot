@@ -91,5 +91,6 @@ k8s/xray-client/config.json
 opsx-export/
 .opsx/runs/**/team/packets/_*
 .opsx/runs/scenario-coverage/**/one_shot_authorization.json
+.opsx/runs/scenario-coverage/**/provider-run-packet.json
 .opsx/runs/scenario-coverage/**/provider-run-*.log
 .opsx/runs/scenario-coverage/**/provider-run-*.redacted.log

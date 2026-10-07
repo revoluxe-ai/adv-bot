@@ -44,10 +44,10 @@ def build_packet(
 ) -> dict[str, object]:
     """Build packet dict bound to current git HEAD and worktree fingerprints."""
 
-    head = compute_audited_head(repo_root)
-    status = compute_audited_status_sha256(repo_root)
-    diff = compute_audited_tracked_diff_sha256(repo_root)
-    manifest = compute_audited_untracked_manifest_sha256(repo_root)
+    head = guard.compute_audited_head(repo_root)
+    status = guard.compute_audited_status_sha256(repo_root)
+    diff = guard.compute_audited_tracked_diff_sha256(repo_root)
+    manifest = guard.compute_audited_untracked_manifest_sha256(repo_root)
     pytest_argv = [
         "poetry",
         "run",
@@ -83,7 +83,7 @@ def build_packet(
         "audited_status_sha256": status,
         "audited_tracked_diff_sha256": diff,
         "audited_untracked_manifest_sha256": manifest,
-        "allowed_run_block_sha256": allowed_run_block_sha256(block),
+        "allowed_run_block_sha256": guard.allowed_run_block_sha256(block),
         "allowed_run_block_text": block,
         "pytest_argv": pytest_argv,
         "provider_test_ids": _default_test_ids(),
@@ -93,7 +93,9 @@ def build_packet(
         "redis_host": "127.0.0.1",
         "redis_port": redis_port,
         "change_id": change_id,
-        "one_shot_authorization_id": one_shot_authorization_token_sha256(live_token),
+        "one_shot_authorization_id": guard.one_shot_authorization_token_sha256(
+            live_token
+        ),
     }
 
 
@@ -128,7 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    _ = ProviderRunPacket.from_mapping(packet)
+    _ = guard.ProviderRunPacket.from_mapping(packet)
     print(json.dumps({"packet_path": str(out), "audited_head": packet["audited_head"]}, indent=2))
     return 0
 
