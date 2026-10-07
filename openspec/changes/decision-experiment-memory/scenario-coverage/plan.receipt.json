@@ -1,0 +1,53 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "decision-experiment-memory",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-f31a3328d581455d",
+  "PLAN_CONTENT_HASH": "248ff092f68be2210f6c061fb67be7fa97bf7d46897d7dadc142f9dc5fe9ae04",
+  "PLAN_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 12,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S01,S02",
+      "L2:S03,S04",
+      "L3:S05,S06",
+      "L4:S07,S08",
+      "L5:S09,S10,S11",
+      "L6:S12"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/decision-experiment-memory/design.md",
+      "content_hash": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/decision-experiment-memory/specs/decision-experiment-memory/spec.md",
+        "content_hash": "14b14a726da719512a7a0875721c8a99a94351baaa8c74995bae5b3ef72874a4"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/decision-experiment-memory/design.md#derived-lifecycle",
+      "content_hash": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/decision-experiment-memory/owner-contract.md",
+      "content_hash": "94bebea9841d5fd9916c6558d82be3e360d44b5bda214a3fb9567f8aa384b57f"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644",
+    "SPEC_REVISION": [
+      "14b14a726da719512a7a0875721c8a99a94351baaa8c74995bae5b3ef72874a4"
+    ],
+    "LIFECYCLE_REVISION": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644",
+    "OWNER_CONTRACT_REVISION": "94bebea9841d5fd9916c6558d82be3e360d44b5bda214a3fb9567f8aa384b57f"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}
