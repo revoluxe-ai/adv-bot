@@ -20,17 +20,15 @@ class CampaignSettingsHistoryAsOfAdapter(CampaignSettingsHistoryAsOfPort):
     def __init__(self, client: ClickHouseClientProtocol) -> None:
         self._repo = ClickHouseCampaignSettingsHistoryRepository(client)
 
-    async def snapshots_covering(
+    async def snapshots_as_of(
         self,
         adv_setting_id: int,
         *,
-        range_start: datetime,
-        range_end: datetime,
+        as_of_exclusive: datetime,
     ) -> tuple[HistorySnapshotView, ...]:
-        timeline = await self._repo.timeline(
+        timeline = await self._repo.timeline_up_to(
             adv_setting_id,
-            start_at=range_start,
-            end_at=range_end,
+            end_at=as_of_exclusive,
         )
         return tuple(
             HistorySnapshotView(

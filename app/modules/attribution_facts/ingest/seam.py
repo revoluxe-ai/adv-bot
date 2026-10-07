@@ -61,6 +61,22 @@ def get_last_ingest_batch() -> object | None:
     return _last_batch_store.get()
 
 
+def _physical_adv_id_from_item(item: dict[str, object]) -> int | None:
+    for key in ("advertId", "advert_id"):
+        raw = item.get(key)
+        if raw is None:
+            continue
+        if not isinstance(raw, (int, str, float)):
+            continue
+        try:
+            adv_id = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if adv_id > 0:
+            return adv_id
+    return None
+
+
 def _fullstats_item_to_dict(item: object) -> dict[str, object]:
     if isinstance(item, dict):
         return cast(dict[str, object], item)
@@ -84,7 +100,18 @@ async def maybe_ingest_fullstats_chunk(items: list[object]) -> None:
     activation = _active_ingest.get()
     if activation is None or not items:
         return
-    raw_items = tuple(_fullstats_item_to_dict(item) for item in items)
+    raw_dicts = tuple(_fullstats_item_to_dict(item) for item in items)
+    raw_items = tuple(
+        row
+        for row in raw_dicts
+        if _physical_adv_id_from_item(row) == activation.physical_adv_id
+    )
+    if not raw_items:
+        logger.warning(
+            "attribution ingest skipped: no items for physical_adv_id=%s",
+            activation.physical_adv_id,
+        )
+        return
     resolver = MembershipSnapshotResolver(
         shop_id=activation.shop_id,
         adv_setting_id=activation.adv_setting_id,

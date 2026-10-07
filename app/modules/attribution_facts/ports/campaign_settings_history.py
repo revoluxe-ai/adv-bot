@@ -19,19 +19,19 @@ class HistorySnapshotView:
 class CampaignSettingsHistoryAsOfPort(Protocol):
     """Read-only as-of snapshots по adv_setting_id."""
 
-    async def snapshots_covering(
+    async def snapshots_as_of(
         self,
         adv_setting_id: int,
         *,
-        range_start: datetime,
-        range_end: datetime,
+        as_of_exclusive: datetime,
     ) -> tuple[HistorySnapshotView, ...]:
         """
-        Вернуть snapshots в [range_start, range_end) в порядке observed_at.
+        Все snapshots с observed_at < as_of_exclusive (обычно конец event_date).
+
+        Caller выбирает latest eligible (см. ``select_as_of_snapshot``).
 
         Args:
             adv_setting_id: PG adv_setting id.
-            range_start: Нижняя граница observed_at (inclusive).
-            range_end: Верхняя граница observed_at (exclusive).
+            as_of_exclusive: Верхняя граница observed_at (exclusive).
         """
         ...

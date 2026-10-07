@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -38,17 +38,14 @@ class _InMemoryHistory:
     def __init__(self, snapshots: tuple[HistorySnapshotView, ...]) -> None:
         self._snapshots = snapshots
 
-    async def snapshots_covering(
+    async def snapshots_as_of(
         self,
         adv_setting_id: int,
         *,
-        range_start: datetime,
-        range_end: datetime,
+        as_of_exclusive: datetime,
     ) -> tuple[HistorySnapshotView, ...]:
         return tuple(
-            s
-            for s in self._snapshots
-            if range_start <= s.observed_at < range_end
+            s for s in self._snapshots if s.observed_at < as_of_exclusive
         )
 
 
@@ -97,14 +94,12 @@ def test_s09_collapsed_mapper_cannot_complete() -> None:
 
 @pytest.mark.asyncio
 async def test_s05_history_precedence_over_inventory() -> None:
-    """S05: history as-of wins; inventory не используется."""
+    """S05: history as-of wins (incl. prior-day snapshot); inventory не используется."""
     history = _InMemoryHistory(
         (
             HistorySnapshotView(
-                snapshot_id="h1",
-                observed_at=datetime(2026, 9, 7, 12, 0, tzinfo=UTC).replace(
-                    tzinfo=None
-                ),
+                snapshot_id="prior-day",
+                observed_at=datetime(2026, 9, 6, 15, 0),  # noqa: DTZ001
                 payload_json=_payload([837395782]),
             ),
         )

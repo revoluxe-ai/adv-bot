@@ -8,7 +8,6 @@ from datetime import date
 from app.modules.attribution_facts.domain.enums import AttributionReasonCode
 from app.modules.attribution_facts.domain.models import MembershipSnapshot
 from app.modules.attribution_facts.membership.as_of import (
-    event_date_observed_lower_bound,
     event_date_observed_upper_bound,
     select_as_of_snapshot,
 )
@@ -65,12 +64,10 @@ class MembershipSnapshotResolver:
             MembershipResolveResult; snapshot None → UNKNOWN classification.
         """
         if self._history is not None:
-            range_start = event_date_observed_lower_bound(event_date)
-            range_end = event_date_observed_upper_bound(event_date)
-            timeline = await self._history.snapshots_covering(
+            as_of_exclusive = event_date_observed_upper_bound(event_date)
+            timeline = await self._history.snapshots_as_of(
                 self._adv_setting_id,
-                range_start=range_start,
-                range_end=range_end,
+                as_of_exclusive=as_of_exclusive,
             )
             picked = select_as_of_snapshot(timeline, event_date)
             if picked is not None:

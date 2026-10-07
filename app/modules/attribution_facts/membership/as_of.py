@@ -15,11 +15,6 @@ def event_date_observed_upper_bound(event_date: date) -> datetime:
     return datetime.combine(next_day, time.min)
 
 
-def event_date_observed_lower_bound(event_date: date) -> datetime:
-    """Начало календарного event_date для timeline query."""
-    return datetime.combine(event_date, time.min)
-
-
 def select_as_of_snapshot(
     snapshots: tuple[HistorySnapshotView, ...],
     event_date: date,
