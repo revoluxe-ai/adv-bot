@@ -28,13 +28,17 @@ Do not maintain a second path list inside command bodies.
 
 ## Provider-run guard (fail-closed)
 
-`opsx_provider_run_guard.py` — verify INDEPENDENT_REAUDIT fingerprints before
-any authorized provider pytest (`AUTHORIZE_ONE_LIVE_RUN`). Mismatch →
-`BLOCKED_FINGERPRINT_MISMATCH`, spawn count 0.
+`opsx_provider_run_guard.py` — verify INDEPENDENT_REAUDIT fingerprints and
+one-shot authorization before any provider pytest. Env
+`AUTHORIZE_ONE_LIVE_RUN` must match packet `one_shot_authorization_id`
+(SHA-256 of token). Only `AUTHORIZED_UNUSED` may spawn; consumption is
+written to `.opsx/runs/scenario-coverage/<change_id>/one_shot_authorization.json`
+at spawn boundary (not rolled back on pytest failure).
 
 ```bash
+export AUTHORIZE_ONE_LIVE_RUN='<owner-secret>'
 poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet packet.json --repo .
-poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet packet.json --dry-run
+poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet packet.json
 ```
 
 Unit tests: `tests/unit/opsx/test_opsx_provider_run_guard.py`.

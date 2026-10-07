@@ -10,6 +10,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+_TEST_LIVE_TOKEN = "unit-test-authorize-one-live-run"
+
 pytestmark = pytest.mark.unit
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -28,6 +30,7 @@ def _load_guard():
 
 
 guard = _load_guard()
+_TEST_AUTH_ID = guard.one_shot_authorization_token_sha256(_TEST_LIVE_TOKEN)
 
 
 def _minimal_block(
@@ -84,6 +87,8 @@ def _packet(
         postgres_host=host,
         postgres_port=port,
         postgres_dbname=dbname,
+        change_id="wb-sky-mcp-read-interface",
+        one_shot_authorization_id=_TEST_AUTH_ID,
     )
 
 
@@ -104,6 +109,7 @@ def test_matching_packet_permit_dry_run_no_subprocess() -> None:
         compute_status=_identity_compute("status_hash"),
         compute_diff=_identity_compute("diff_hash"),
         compute_manifest=_identity_compute("manifest_hash"),
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert verdict.status == "PERMIT"
     assert verdict.spawn_count == 0
@@ -118,6 +124,7 @@ def test_matching_packet_permit_dry_run_no_subprocess() -> None:
         compute_status=_identity_compute("status_hash"),
         compute_diff=_identity_compute("diff_hash"),
         compute_manifest=_identity_compute("manifest_hash"),
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert run_verdict.status == "PERMIT"
     assert run_verdict.spawn_count == 0
@@ -136,6 +143,7 @@ def test_run_block_sha_mismatch_rejects_spawn_zero() -> None:
         compute_status=_identity_compute(packet.audited_status_sha256),
         compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
         compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert verdict.status == "BLOCKED_FINGERPRINT_MISMATCH"
     assert verdict.mismatch_field == "allowed_run_block_sha256"
@@ -150,6 +158,7 @@ def test_run_block_sha_mismatch_rejects_spawn_zero() -> None:
         compute_status=_identity_compute(packet.audited_status_sha256),
         compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
         compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
     )
     mock_run.assert_not_called()
     assert run_verdict.spawn_count == 0
@@ -166,6 +175,7 @@ def test_head_mismatch_rejects() -> None:
         compute_status=_identity_compute(packet.audited_status_sha256),
         compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
         compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert verdict.status == "BLOCKED_FINGERPRINT_MISMATCH"
     assert verdict.mismatch_field == "audited_head"
@@ -186,6 +196,7 @@ def test_status_diff_untracked_mismatch_rejects() -> None:
         Path("/tmp"),
         packet,
         compute_status=_identity_compute("bad"),
+        live_token=_TEST_LIVE_TOKEN,
         **base,
     )
     assert v_status.mismatch_field == "audited_status_sha256"
@@ -197,6 +208,7 @@ def test_status_diff_untracked_mismatch_rejects() -> None:
         compute_diff=_identity_compute("bad"),
         compute_manifest=base["compute_manifest"],
         compute_head=base["compute_head"],
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert v_diff.mismatch_field == "audited_tracked_diff_sha256"
 
@@ -207,6 +219,7 @@ def test_status_diff_untracked_mismatch_rejects() -> None:
         compute_diff=base["compute_diff"],
         compute_manifest=_identity_compute("bad"),
         compute_head=base["compute_head"],
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert v_manifest.mismatch_field == "audited_untracked_manifest_sha256"
 
@@ -222,6 +235,7 @@ def test_command_and_db_coords_mismatch_rejects() -> None:
         compute_status=_identity_compute(packet.audited_status_sha256),
         compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
         compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert verdict.status == "BLOCKED_FINGERPRINT_MISMATCH"
     assert verdict.mismatch_field == "postgres_port_in_block"
@@ -242,8 +256,90 @@ def test_command_and_db_coords_mismatch_rejects() -> None:
         compute_manifest=_identity_compute(
             packet_cmd.audited_untracked_manifest_sha256
         ),
+        live_token=_TEST_LIVE_TOKEN,
     )
     assert verdict_cmd.mismatch_field == "pytest_argv_in_block"
+
+
+@pytest.mark.unit
+def test_auth_not_authorized_blocks_spawn(tmp_path: Path) -> None:
+    block = _minimal_block()
+    packet = _packet(block)
+    repo = tmp_path
+    verdict = guard.verify_provider_run_packet(
+        repo,
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=None,
+    )
+    assert verdict.status == "BLOCKED_AUTHORIZATION"
+    assert verdict.mismatch_field == "AUTH_NOT_AUTHORIZED"
+    mock_run = MagicMock()
+    run_v = guard.run_guarded_pytest(
+        repo,
+        packet,
+        subprocess_runner=mock_run,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=None,
+    )
+    mock_run.assert_not_called()
+    assert run_v.spawn_count == 0
+
+
+@pytest.mark.unit
+def test_auth_token_mismatch_blocks_spawn(tmp_path: Path) -> None:
+    block = _minimal_block()
+    packet = _packet(block)
+    repo = tmp_path
+    verdict = guard.verify_provider_run_packet(
+        repo,
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token="wrong-token",
+    )
+    assert verdict.status == "BLOCKED_AUTHORIZATION"
+    assert verdict.mismatch_field == "AUTH_TOKEN_MISMATCH"
+
+
+@pytest.mark.unit
+def test_one_shot_consumed_blocks_second_spawn(tmp_path: Path) -> None:
+    block = _minimal_block()
+    packet = _packet(block)
+    repo = tmp_path
+    base_kw = {
+        "compute_head": _identity_compute(packet.audited_head),
+        "compute_status": _identity_compute(packet.audited_status_sha256),
+        "compute_diff": _identity_compute(packet.audited_tracked_diff_sha256),
+        "compute_manifest": _identity_compute(packet.audited_untracked_manifest_sha256),
+        "live_token": _TEST_LIVE_TOKEN,
+    }
+    mock_run = MagicMock()
+    first = guard.run_guarded_pytest(
+        repo,
+        packet,
+        subprocess_runner=mock_run,
+        **base_kw,
+    )
+    assert first.spawn_count == 1
+    assert mock_run.call_count == 1
+    second = guard.run_guarded_pytest(
+        repo,
+        packet,
+        subprocess_runner=mock_run,
+        **base_kw,
+    )
+    assert second.status == "BLOCKED_AUTHORIZATION"
+    assert second.mismatch_field == "AUTH_CONSUMED"
+    assert mock_run.call_count == 1
 
 
 @pytest.mark.unit

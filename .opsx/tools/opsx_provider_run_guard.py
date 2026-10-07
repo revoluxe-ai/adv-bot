@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
@@ -27,8 +28,18 @@ EXIT_USAGE = 2
 GuardStatus = Literal[
     "PERMIT",
     "BLOCKED_FINGERPRINT_MISMATCH",
+    "BLOCKED_AUTHORIZATION",
     "BLOCKED_PACKET_INVALID",
 ]
+
+AuthorizationState = Literal[
+    "NOT_AUTHORIZED",
+    "AUTHORIZED_UNUSED",
+    "AUTHORIZED_CONSUMED",
+    "EXPIRED_OR_INVALID",
+]
+
+EXIT_BLOCKED_AUTHORIZATION = 4
 
 
 @dataclass(frozen=True)
@@ -46,6 +57,8 @@ class ProviderRunPacket:
     postgres_host: str
     postgres_port: int
     postgres_dbname: str
+    change_id: str
+    one_shot_authorization_id: str
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> ProviderRunPacket:
@@ -82,6 +95,8 @@ class ProviderRunPacket:
             postgres_host=str(_req("postgres_host")),
             postgres_port=postgres_port,
             postgres_dbname=str(_req("postgres_dbname")),
+            change_id=str(_req("change_id")),
+            one_shot_authorization_id=str(_req("one_shot_authorization_id")),
         )
 
 
@@ -94,6 +109,7 @@ class GuardVerdict:
     expected: str | None = None
     computed: str | None = None
     spawn_count: int = 0
+    authorization_state: AuthorizationState | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -226,6 +242,130 @@ def _blocked(
     )
 
 
+def one_shot_authorization_token_sha256(token: str) -> str:
+    """SHA-256 fingerprint of ``AUTHORIZE_ONE_LIVE_RUN`` secret (UTF-8)."""
+
+    return sha256_bytes(token.encode("utf-8"))
+
+
+def authorization_ledger_path(repo_root: Path, change_id: str) -> Path:
+    """Durable one-shot consumption ledger (not certification evidence)."""
+
+    return (
+        repo_root
+        / ".opsx"
+        / "runs"
+        / "scenario-coverage"
+        / change_id
+        / "one_shot_authorization.json"
+    )
+
+
+def _load_authorization_ledger(path: Path) -> dict[str, Any] | None:
+    if not path.is_file():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _save_authorization_ledger(
+    path: Path,
+    *,
+    one_shot_authorization_id: str,
+    authorization_state: AuthorizationState,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "one_shot_authorization_id": one_shot_authorization_id,
+        "authorization_state": authorization_state,
+    }
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def resolve_authorization_state(
+    repo_root: Path,
+    packet: ProviderRunPacket,
+    *,
+    live_token: str | None,
+) -> AuthorizationState:
+    """Classify authorization without consuming the one-shot token."""
+
+    if not live_token:
+        return "NOT_AUTHORIZED"
+    token_id = one_shot_authorization_token_sha256(live_token)
+    if token_id != packet.one_shot_authorization_id:
+        return "EXPIRED_OR_INVALID"
+    ledger_path = authorization_ledger_path(repo_root, packet.change_id)
+    ledger = _load_authorization_ledger(ledger_path)
+    if ledger is None:
+        return "AUTHORIZED_UNUSED"
+    stored_id = str(ledger.get("one_shot_authorization_id", ""))
+    stored_state = str(ledger.get("authorization_state", ""))
+    if stored_id != packet.one_shot_authorization_id:
+        return "EXPIRED_OR_INVALID"
+    if stored_state == "AUTHORIZED_CONSUMED":
+        return "AUTHORIZED_CONSUMED"
+    if stored_state == "AUTHORIZED_UNUSED":
+        return "AUTHORIZED_UNUSED"
+    return "EXPIRED_OR_INVALID"
+
+
+def consume_one_shot_authorization(
+    repo_root: Path,
+    packet: ProviderRunPacket,
+    *,
+    live_token: str,
+) -> AuthorizationState:
+    """Mark token consumed at spawn boundary; never rolls back on pytest failure."""
+
+    state = resolve_authorization_state(repo_root, packet, live_token=live_token)
+    if state != "AUTHORIZED_UNUSED":
+        return state
+    ledger_path = authorization_ledger_path(repo_root, packet.change_id)
+    _save_authorization_ledger(
+        ledger_path,
+        one_shot_authorization_id=packet.one_shot_authorization_id,
+        authorization_state="AUTHORIZED_CONSUMED",
+    )
+    return "AUTHORIZED_CONSUMED"
+
+
+def _blocked_authorization(
+    state: AuthorizationState,
+    *,
+    mismatch_field: str,
+) -> GuardVerdict:
+    return GuardVerdict(
+        status="BLOCKED_AUTHORIZATION",
+        mismatch_field=mismatch_field,
+        expected="AUTHORIZED_UNUSED",
+        computed=state,
+        spawn_count=0,
+        authorization_state=state,
+    )
+
+
+def _check_authorization(
+    repo_root: Path,
+    packet: ProviderRunPacket,
+    *,
+    live_token: str | None,
+) -> GuardVerdict | None:
+    state = resolve_authorization_state(repo_root, packet, live_token=live_token)
+    if state == "AUTHORIZED_UNUSED":
+        return None
+    if state == "NOT_AUTHORIZED":
+        return _blocked_authorization(state, mismatch_field="AUTH_NOT_AUTHORIZED")
+    if state == "AUTHORIZED_CONSUMED":
+        return _blocked_authorization(state, mismatch_field="AUTH_CONSUMED")
+    if state == "EXPIRED_OR_INVALID":
+        if live_token and one_shot_authorization_token_sha256(live_token) != (
+            packet.one_shot_authorization_id
+        ):
+            return _blocked_authorization(state, mismatch_field="AUTH_TOKEN_MISMATCH")
+        return _blocked_authorization(state, mismatch_field="AUTH_INVALID")
+    return _blocked_authorization(state, mismatch_field="AUTH_INVALID")
+
+
 def verify_provider_run_packet(
     repo_root: Path,
     packet: ProviderRunPacket,
@@ -234,6 +374,7 @@ def verify_provider_run_packet(
     compute_status: Callable[[Path], str] | None = None,
     compute_diff: Callable[[Path], str] | None = None,
     compute_manifest: Callable[[Path], str] | None = None,
+    live_token: str | None = None,
 ) -> GuardVerdict:
     """Сверить packet с текущим worktree; без subprocess pytest."""
 
@@ -320,7 +461,15 @@ def verify_provider_run_packet(
         ):
             return _blocked("provider_test_ids", node_id, "not_covered_by_block")
 
-    return GuardVerdict(status="PERMIT", spawn_count=0)
+    auth_block = _check_authorization(repo_root, packet, live_token=live_token)
+    if auth_block is not None:
+        return auth_block
+
+    return GuardVerdict(
+        status="PERMIT",
+        spawn_count=0,
+        authorization_state="AUTHORIZED_UNUSED",
+    )
 
 
 def run_guarded_pytest(
@@ -334,6 +483,7 @@ def run_guarded_pytest(
     compute_status: Callable[[Path], str] | None = None,
     compute_diff: Callable[[Path], str] | None = None,
     compute_manifest: Callable[[Path], str] | None = None,
+    live_token: str | None = None,
 ) -> GuardVerdict:
     """Проверить packet; при PERMIT — один subprocess (или dry_run)."""
 
@@ -344,12 +494,28 @@ def run_guarded_pytest(
         compute_status=compute_status,
         compute_diff=compute_diff,
         compute_manifest=compute_manifest,
+        live_token=live_token,
     )
     if verdict.status != "PERMIT":
         return verdict
 
     if dry_run:
-        return GuardVerdict(status="PERMIT", spawn_count=0)
+        return GuardVerdict(
+            status="PERMIT",
+            spawn_count=0,
+            authorization_state="AUTHORIZED_UNUSED",
+        )
+
+    if not live_token:
+        return _blocked_authorization("NOT_AUTHORIZED", mismatch_field="AUTH_NOT_AUTHORIZED")
+
+    consumed = consume_one_shot_authorization(
+        repo_root,
+        packet,
+        live_token=live_token,
+    )
+    if consumed != "AUTHORIZED_CONSUMED":
+        return _blocked_authorization(consumed, mismatch_field="AUTH_CONSUMED")
 
     runner = subprocess_runner or subprocess.run
     env = dict(extra_env or {})
@@ -359,7 +525,11 @@ def run_guarded_pytest(
         env=env,
         check=False,
     )
-    return GuardVerdict(status="PERMIT", spawn_count=1)
+    return GuardVerdict(
+        status="PERMIT",
+        spawn_count=1,
+        authorization_state="AUTHORIZED_CONSUMED",
+    )
 
 
 def _load_packet_json(path: Path) -> ProviderRunPacket:
@@ -403,19 +573,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     packet = _load_packet_json(args.packet)
     repo_root = args.repo.resolve()
 
+    live_token = os.environ.get("AUTHORIZE_ONE_LIVE_RUN")
+
     if args.mode == "verify":
-        verdict = verify_provider_run_packet(repo_root, packet)
+        verdict = verify_provider_run_packet(
+            repo_root,
+            packet,
+            live_token=live_token,
+        )
     else:
         verdict = run_guarded_pytest(
             repo_root,
             packet,
             dry_run=args.dry_run,
+            live_token=live_token,
         )
 
     print(json.dumps(verdict.to_dict(), indent=2, sort_keys=True))
     if verdict.status == "BLOCKED_FINGERPRINT_MISMATCH":
         print("BLOCKED_FINGERPRINT_MISMATCH", file=sys.stderr)
         return EXIT_BLOCKED_FINGERPRINT
+    if verdict.status == "BLOCKED_AUTHORIZATION":
+        print("BLOCKED_AUTHORIZATION", file=sys.stderr)
+        return EXIT_BLOCKED_AUTHORIZATION
     if verdict.status == "PERMIT":
         return EXIT_PERMIT
     return EXIT_USAGE
