@@ -33,7 +33,9 @@ one-shot authorization before any provider pytest. Env
 `AUTHORIZE_ONE_LIVE_RUN` must match packet `one_shot_authorization_id`
 (SHA-256 of token). Only `AUTHORIZED_UNUSED` may spawn; consumption is
 written to `.opsx/runs/scenario-coverage/<change_id>/one_shot_authorization.json`
-at spawn boundary (not rolled back on pytest failure).
+at spawn boundary (not rolled back on pytest failure). Child pytest inherits
+the parent process environment (PATH, Poetry) and receives audited test DB /
+Redis coordinates from the packet (overriding conflicting parent values).
 
 ```bash
 export AUTHORIZE_ONE_LIVE_RUN='<owner-secret>'

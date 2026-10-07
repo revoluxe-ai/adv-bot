@@ -57,6 +57,8 @@ class ProviderRunPacket:
     postgres_host: str
     postgres_port: int
     postgres_dbname: str
+    redis_host: str
+    redis_port: int
     change_id: str
     one_shot_authorization_id: str
 
@@ -81,6 +83,9 @@ class ProviderRunPacket:
         port_raw = _req("postgres_port")
         postgres_port = int(port_raw)
 
+        redis_port_raw = _req("redis_port")
+        redis_port = int(redis_port_raw)
+
         return cls(
             audited_head=str(_req("audited_head")),
             audited_status_sha256=str(_req("audited_status_sha256")),
@@ -95,6 +100,8 @@ class ProviderRunPacket:
             postgres_host=str(_req("postgres_host")),
             postgres_port=postgres_port,
             postgres_dbname=str(_req("postgres_dbname")),
+            redis_host=str(_req("redis_host")),
+            redis_port=redis_port,
             change_id=str(_req("change_id")),
             one_shot_authorization_id=str(_req("one_shot_authorization_id")),
         )
@@ -366,6 +373,32 @@ def _check_authorization(
     return _blocked_authorization(state, mismatch_field="AUTH_INVALID")
 
 
+def build_provider_subprocess_env(
+    packet: ProviderRunPacket,
+    *,
+    parent_env: Mapping[str, str] | None = None,
+    extra_env: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Child pytest env: inherit parent (PATH, Poetry), bind audited test coordinates."""
+
+    env = dict(parent_env if parent_env is not None else os.environ)
+    env.update(
+        {
+            "POSTGRES_MASTER_HOST": packet.postgres_host,
+            "POSTGRES_REPLICA_HOST": packet.postgres_host,
+            "POSTGRES_PORT": str(packet.postgres_port),
+            "POSTGRES_DBNAME": packet.postgres_dbname,
+            "ALLOW_DESTRUCTIVE_TEST_DB": "1",
+            "ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE": "1",
+            "REDIS_HOST": packet.redis_host,
+            "REDIS_PORT": str(packet.redis_port),
+        }
+    )
+    if extra_env:
+        env.update(extra_env)
+    return env
+
+
 def verify_provider_run_packet(
     repo_root: Path,
     packet: ProviderRunPacket,
@@ -436,6 +469,18 @@ def verify_provider_run_packet(
         return _blocked(
             "postgres_dbname_in_block",
             packet.postgres_dbname,
+            "missing_or_mismatch",
+        )
+    if f"REDIS_HOST={packet.redis_host}" not in block:
+        return _blocked(
+            "redis_host_in_block",
+            packet.redis_host,
+            "missing_or_mismatch",
+        )
+    if f"REDIS_PORT={packet.redis_port}" not in block:
+        return _blocked(
+            "redis_port_in_block",
+            str(packet.redis_port),
             "missing_or_mismatch",
         )
 
@@ -518,7 +563,7 @@ def run_guarded_pytest(
         return _blocked_authorization(consumed, mismatch_field="AUTH_CONSUMED")
 
     runner = subprocess_runner or subprocess.run
-    env = dict(extra_env or {})
+    env = build_provider_subprocess_env(packet, extra_env=extra_env)
     _ = runner(
         list(packet.pytest_argv),
         cwd=repo_root,

@@ -47,6 +47,8 @@ def _minimal_block(
         f"export POSTGRES_MASTER_HOST={host}\n"
         f"export POSTGRES_PORT={port}\n"
         f"export POSTGRES_DBNAME={dbname}\n"
+        "export REDIS_HOST=127.0.0.1\n"
+        "export REDIS_PORT=6379\n"
         f"{pytest_line}\n"
     )
 
@@ -87,6 +89,8 @@ def _packet(
         postgres_host=host,
         postgres_port=port,
         postgres_dbname=dbname,
+        redis_host="127.0.0.1",
+        redis_port=6379,
         change_id="wb-sky-mcp-read-interface",
         one_shot_authorization_id=_TEST_AUTH_ID,
     )
@@ -340,6 +344,59 @@ def test_one_shot_consumed_blocks_second_spawn(tmp_path: Path) -> None:
     assert second.status == "BLOCKED_AUTHORIZATION"
     assert second.mismatch_field == "AUTH_CONSUMED"
     assert mock_run.call_count == 1
+
+
+@pytest.mark.unit
+def test_build_provider_subprocess_env_preserves_path_and_overrides_db() -> None:
+    block = _minimal_block()
+    packet = _packet(block)
+    parent = {
+        "PATH": "/usr/local/bin:/bin",
+        "POSTGRES_MASTER_HOST": "prod-db.example.com",
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DBNAME": "production",
+        "REDIS_PORT": "6380",
+    }
+    env = guard.build_provider_subprocess_env(packet, parent_env=parent)
+    assert env["PATH"] == parent["PATH"]
+    assert env["POSTGRES_MASTER_HOST"] == "127.0.0.1"
+    assert env["POSTGRES_REPLICA_HOST"] == "127.0.0.1"
+    assert env["POSTGRES_PORT"] == "5433"
+    assert env["POSTGRES_DBNAME"] == "test_adv_bot_db"
+    assert env["REDIS_HOST"] == "127.0.0.1"
+    assert env["REDIS_PORT"] == "6379"
+    assert env["ALLOW_DESTRUCTIVE_TEST_DB"] == "1"
+    assert env["ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE"] == "1"
+
+
+@pytest.mark.unit
+def test_run_guarded_pytest_passes_merged_env_to_subprocess(tmp_path: Path) -> None:
+    block = _minimal_block()
+    packet = _packet(block)
+    repo = tmp_path
+    captured: dict[str, object] = {}
+
+    def _capture_run(argv, cwd, env, check):  # type: ignore[no-untyped-def]
+        captured["argv"] = argv
+        captured["env"] = env
+
+    base_kw = {
+        "compute_head": _identity_compute(packet.audited_head),
+        "compute_status": _identity_compute(packet.audited_status_sha256),
+        "compute_diff": _identity_compute(packet.audited_tracked_diff_sha256),
+        "compute_manifest": _identity_compute(packet.audited_untracked_manifest_sha256),
+        "live_token": _TEST_LIVE_TOKEN,
+        "extra_env": {"PATH": "/opt/poetry/bin"},
+    }
+    guard.run_guarded_pytest(
+        repo,
+        packet,
+        subprocess_runner=_capture_run,
+        **base_kw,
+    )
+    env = captured["env"]
+    assert env["PATH"] == "/opt/poetry/bin"
+    assert env["POSTGRES_DBNAME"] == "test_adv_bot_db"
 
 
 @pytest.mark.unit
