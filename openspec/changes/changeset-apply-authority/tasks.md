@@ -10,7 +10,7 @@ BASELINE_SHA: record at verify — `origin/stage` at branch cut
 - [x] 0.2 Materialize `scenario-coverage/plan.md` with S01–S20 rows
 - [x] 0.3 `git diff --check` clean on planning artifacts
 - [x] 0.4 `git merge-tree $(git merge-base HEAD origin/stage) HEAD origin/stage` → CLEAN
-- [ ] 0.5 Owner contract review (`OWNER_CONTRACT_REVIEW_READY`)
+- [x] 0.5 Owner contract review (`OWNER_CONTRACT_REVIEW_READY`) + planning merge repairs
 
 ## 1. Architecture (planning)
 

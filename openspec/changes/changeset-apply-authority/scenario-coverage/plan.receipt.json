@@ -4,7 +4,7 @@
   "CHANGE_ID": "changeset-apply-authority",
   "MODE": "plan",
   "PLAN_STATUS": "ready",
-  "PLAN_EVIDENCE_ID": "ab433bc951a1ea38b8530438ed483b63295d04bb12b0867c879017dfd125aed3",
+  "PLAN_EVIDENCE_ID": "c4c3e0ffb1fa38b90405b298c53a286853cb217a3f40ab55c9ecb95820112841",
   "PLAN_CONTENT_HASH": "f68fe9158fafd28a4a0b9e9c90daada9e8b570c402ee79e148531b5909cf245a",
   "PLAN_PATH": "openspec/changes/changeset-apply-authority/scenario-coverage/plan.md",
   "RECEIPT_PATH": "openspec/changes/changeset-apply-authority/scenario-coverage/plan.receipt.json",
@@ -21,7 +21,7 @@
     "SPEC_REVISION": [
       {
         "path": "openspec/changes/changeset-apply-authority/specs/changeset-apply-authority/spec.md",
-        "content_hash": "9cfb0413d3fb11453f8d82597872002e176eb404208f2bc78323a5935176e8dd"
+        "content_hash": "4a25c92b799037ef04fa77f43a7bb6607ad17fb04f3dec08f3aed8a6b2acd6db"
       }
     ],
     "LIFECYCLE_REVISION": {
@@ -41,7 +41,7 @@
     "SPEC_REVISION": [
       {
         "path": "openspec/changes/changeset-apply-authority/specs/changeset-apply-authority/spec.md",
-        "content_hash": "9cfb0413d3fb11453f8d82597872002e176eb404208f2bc78323a5935176e8dd"
+        "content_hash": "4a25c92b799037ef04fa77f43a7bb6607ad17fb04f3dec08f3aed8a6b2acd6db"
       }
     ],
     "LIFECYCLE_REVISION": {
