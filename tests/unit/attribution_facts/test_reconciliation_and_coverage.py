@@ -55,11 +55,11 @@ _PROV = ObservationProvenance(
 def test_reconciliation_pass() -> None:
     """Nm sums совпадают с day totals."""
     day = CampaignDayTotals(
-        physical_adv_id=1, event_date=_DAY, orders=5, gmv_rub=Decimal("500")
+        physical_adv_id=1, event_date=_DAY, orders=5, gmv_rub=Decimal(500)
     )
     rows = (
-        NmDayContribution(1, 100, 3, Decimal("300")),
-        NmDayContribution(1, 200, 2, Decimal("200")),
+        NmDayContribution(1, 100, 3, Decimal(300)),
+        NmDayContribution(1, 200, 2, Decimal(200)),
     )
     result = reconcile_campaign_day(day, rows)
     assert result.passed
@@ -69,9 +69,9 @@ def test_reconciliation_pass() -> None:
 def test_reconciliation_gap_fail() -> None:
     """Расхождение orders → RECONCILIATION_FAILED и unattributed."""
     day = CampaignDayTotals(
-        physical_adv_id=1, event_date=_DAY, orders=5, gmv_rub=Decimal("500")
+        physical_adv_id=1, event_date=_DAY, orders=5, gmv_rub=Decimal(500)
     )
-    rows = (NmDayContribution(1, 100, 2, Decimal("200")),)
+    rows = (NmDayContribution(1, 100, 2, Decimal(200)),)
     result = reconcile_campaign_day(day, rows)
     assert not result.passed
     assert AttributionReasonCode.RECONCILIATION_FAILED in result.reason_codes
@@ -137,8 +137,8 @@ def _fact(
 
 def test_physical_adv_ids_remain_distinct() -> None:
     """Fact keys различаются по physical_adv_id (Auto vs Search)."""
-    f_auto = _fact(10, 1, 1, Decimal("100"), AttributionClass.DIRECT)
-    f_search = _fact(20, 1, 1, Decimal("100"), AttributionClass.DIRECT)
+    f_auto = _fact(10, 1, 1, Decimal(100), AttributionClass.DIRECT)
+    f_search = _fact(20, 1, 1, Decimal(100), AttributionClass.DIRECT)
     assert f_auto.key != f_search.key
     assert f_auto.key.physical_adv_id == 10
     assert f_search.key.physical_adv_id == 20
@@ -160,9 +160,9 @@ def test_fact_key_excludes_advertised_nm() -> None:
 def test_denominator_zero_cpo() -> None:
     """CPO absent + DENOMINATOR_ZERO при нулевых direct orders."""
     coverage = AttributionCoverage(status=AttributionCoverageStatus.COMPLETE)
-    facts = (_fact(1, 1, 0, Decimal("0"), AttributionClass.DIRECT),)
+    facts = (_fact(1, 1, 0, Decimal(0), AttributionClass.DIRECT),)
     spend = (
-        CampaignDaySpendReference(1, _DAY, Decimal("100")),
+        CampaignDaySpendReference(1, _DAY, Decimal(100)),
     )
     result = compute_cpo_fact("CPO_FACT_DIRECT", facts, spend, AttributionClass.DIRECT, coverage)
     assert result.value is None
@@ -172,8 +172,8 @@ def test_denominator_zero_cpo() -> None:
 def test_blocked_economics_when_not_complete() -> None:
     """Fail-closed CPO при не-COMPLETE coverage."""
     coverage = AttributionCoverage(status=AttributionCoverageStatus.PARTIAL)
-    facts = (_fact(1, 1, 2, Decimal("200"), AttributionClass.DIRECT),)
-    spend = (CampaignDaySpendReference(1, _DAY, Decimal("100")),)
+    facts = (_fact(1, 1, 2, Decimal(200), AttributionClass.DIRECT),)
+    spend = (CampaignDaySpendReference(1, _DAY, Decimal(100)),)
     result = compute_cpo_fact("CPO_FACT_DIRECT", facts, spend, AttributionClass.DIRECT, coverage)
     assert result.value is None
     assert not can_emit_direct_linked_economics(coverage)
@@ -183,23 +183,23 @@ def test_drr_direct_linked() -> None:
     """DRR вычисляется при COMPLETE и ненулевом GMV."""
     coverage = AttributionCoverage(status=AttributionCoverageStatus.COMPLETE)
     facts = (
-        _fact(1, 1, 2, Decimal("200"), AttributionClass.DIRECT),
-        _fact(1, 2, 1, Decimal("100"), AttributionClass.LINKED),
+        _fact(1, 1, 2, Decimal(200), AttributionClass.DIRECT),
+        _fact(1, 2, 1, Decimal(100), AttributionClass.LINKED),
     )
-    spend = (CampaignDaySpendReference(1, _DAY, Decimal("30")),)
+    spend = (CampaignDaySpendReference(1, _DAY, Decimal(30)),)
     d_direct = compute_drr_fact(
         "DRR_FACT_DIRECT", facts, spend, AttributionClass.DIRECT, coverage
     )
     d_linked = compute_drr_fact(
         "DRR_FACT_LINKED", facts, spend, AttributionClass.LINKED, coverage
     )
-    assert d_direct.value == Decimal("30") / Decimal("200")
-    assert d_linked.value == Decimal("30") / Decimal("100")
+    assert d_direct.value == Decimal(30) / Decimal(200)
+    assert d_linked.value == Decimal(30) / Decimal(100)
 
 
 def test_revision_replaces_not_sums() -> None:
     """Latest observation заменяет prior."""
-    base = _fact(1, 1, 1, Decimal("100"), AttributionClass.DIRECT)
+    base = _fact(1, 1, 1, Decimal(100), AttributionClass.DIRECT)
     newer_prov = ObservationProvenance(
         observation_id="obs-2",
         source_revision=2,
@@ -208,7 +208,7 @@ def test_revision_replaces_not_sums() -> None:
     )
     newer = AttributionCommerceFact(
         key=base.key,
-        metrics=AttributionMetrics(attributed_orders=3, attributed_gmv_rub=Decimal("300")),
+        metrics=AttributionMetrics(attributed_orders=3, attributed_gmv_rub=Decimal(300)),
         attribution_class=AttributionClass.DIRECT,
         provenance=newer_prov,
     )

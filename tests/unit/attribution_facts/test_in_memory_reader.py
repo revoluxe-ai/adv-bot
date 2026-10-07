@@ -48,7 +48,7 @@ async def test_in_memory_reader_filters_scope() -> None:
             ordered_nm_id=1,
             source_family=SourceFamily.WB_PROMOTION_FULLSTATS_NM_DAY,
         ),
-        metrics=AttributionMetrics(attributed_orders=1, attributed_gmv_rub=Decimal("1")),
+        metrics=AttributionMetrics(attributed_orders=1, attributed_gmv_rub=Decimal(1)),
         attribution_class=AttributionClass.DIRECT,
         provenance=_PROV,
     )
@@ -58,8 +58,8 @@ async def test_in_memory_reader_filters_scope() -> None:
         passed=True,
         nm_orders_sum=1,
         day_orders=1,
-        nm_gmv_sum=Decimal("1"),
-        day_gmv_rub=Decimal("1"),
+        nm_gmv_sum=Decimal(1),
+        day_gmv_rub=Decimal(1),
         unattributed_orders=0,
     )
     reader = InMemoryAttributionFactsReader(

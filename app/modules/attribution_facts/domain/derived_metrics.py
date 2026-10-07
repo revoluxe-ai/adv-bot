@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from app.modules.attribution_facts.domain.coverage import can_emit_direct_linked_economics
+from app.modules.attribution_facts.domain.coverage import (
+    can_emit_direct_linked_economics,
+)
 from app.modules.attribution_facts.domain.enums import (
     AttributionClass,
     AttributionReasonCode,
@@ -24,7 +26,7 @@ def _sum_metric(
     orders: bool,
 ) -> int | Decimal:
     total_orders = 0
-    total_gmv = Decimal("0")
+    total_gmv = Decimal(0)
     for fact in facts:
         if fact.attribution_class != attr_class:
             continue
@@ -37,7 +39,7 @@ def _sum_metric(
 
 
 def _sum_spend(spend_refs: tuple[CampaignDaySpendReference, ...]) -> Decimal:
-    return sum((ref.spend_rub for ref in spend_refs), start=Decimal("0"))
+    return sum((ref.spend_rub for ref in spend_refs), start=Decimal(0))
 
 
 def compute_cpo_fact(

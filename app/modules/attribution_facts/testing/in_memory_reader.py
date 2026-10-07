@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from app.modules.attribution_facts.domain.coverage import evaluate_window_coverage
 from app.modules.attribution_facts.domain.models import (
     AttributionCommerceFact,
@@ -10,7 +12,6 @@ from app.modules.attribution_facts.domain.models import (
     DateWindow,
     DayReconciliationResult,
 )
-from app.modules.attribution_facts.ports.reader import AttributionFactsReader
 
 
 class InMemoryAttributionFactsReader:
@@ -26,8 +27,8 @@ class InMemoryAttributionFactsReader:
         facts: tuple[AttributionCommerceFact, ...] = (),
         reconciliations: tuple[DayReconciliationResult, ...] = (),
         partial_membership_fallback: bool = False,
-        source_complete_through=None,
-        package_cutoff_date=None,
+        source_complete_through: date | None = None,
+        package_cutoff_date: date | None = None,
     ) -> None:
         self._facts = facts
         self._reconciliations = reconciliations

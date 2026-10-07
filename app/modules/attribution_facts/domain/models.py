@@ -131,12 +131,17 @@ class DateWindow:
     end: date
 
 
+def _empty_physical_adv_ids() -> frozenset[int]:
+    """Пустой scope по physical adv ids (typed default для strict pyright)."""
+    return frozenset()
+
+
 @dataclass(frozen=True, slots=True)
 class AttributionScope:
     """Фильтр read-side запроса (physical legs, не synthetic merge)."""
 
     shop_id: str
-    physical_adv_ids: frozenset[int] = field(default_factory=frozenset)
+    physical_adv_ids: frozenset[int] = field(default_factory=_empty_physical_adv_ids)
     allow_pair_aggregate: Literal[False] = False
 
 

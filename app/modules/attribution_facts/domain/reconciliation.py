@@ -32,7 +32,7 @@ def reconcile_campaign_day(
         Результат с unattributed_orders при расхождении.
     """
     nm_orders = sum(row.orders for row in nm_rows)
-    nm_gmv = sum((row.gmv_rub for row in nm_rows), start=Decimal("0"))
+    nm_gmv = sum((row.gmv_rub for row in nm_rows), start=Decimal(0))
     orders_match = nm_orders == day.orders
     gmv_match = abs(nm_gmv - day.gmv_rub) <= gmv_epsilon
     passed = orders_match and gmv_match
