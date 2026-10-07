@@ -25,3 +25,16 @@ Same `allowlist` + `hard_exclude` are authoritative for:
 - `/opsx-meta-update-snapshot` (central publish of committed allowlisted tree)
 
 Do not maintain a second path list inside command bodies.
+
+## Provider-run guard (fail-closed)
+
+`opsx_provider_run_guard.py` — verify INDEPENDENT_REAUDIT fingerprints before
+any authorized provider pytest (`AUTHORIZE_ONE_LIVE_RUN`). Mismatch →
+`BLOCKED_FINGERPRINT_MISMATCH`, spawn count 0.
+
+```bash
+poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet packet.json --repo .
+poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet packet.json --dry-run
+```
+
+Unit tests: `tests/unit/opsx/test_opsx_provider_run_guard.py`.
