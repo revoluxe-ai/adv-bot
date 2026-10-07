@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from app.modules.decision_experiment_memory.domain.enums import (
     DecisionStatus,
     ExecutionState,
@@ -12,6 +14,7 @@ from app.modules.decision_experiment_memory.domain.records import (
     ExperimentRecordV1,
     ExposureModel,
 )
+from app.modules.decision_experiment_memory.domain.refs import ApplyEvidenceRef
 from app.modules.decision_experiment_memory.domain.validity import (
     abort_execution_outcome,
 )
@@ -32,6 +35,60 @@ def project_decision_status(record: DecisionMemoryRecord) -> DecisionStatus:
 def can_confirm_apply(record: DecisionMemoryRecord) -> bool:
     """Return whether decision may transition to APPLY_CONFIRMED."""
     return record.apply_evidence_ref is not None
+
+
+def validate_confirmed_exposure(
+    experiment: ExperimentRecordV1,
+    *,
+    exposure: ExposureModel,
+    apply_evidence_ref: ApplyEvidenceRef | None,
+) -> None:
+    """Fail closed when LIVE confirmed exposure lacks authoritative evidence."""
+    if not exposure.exposure_confirmed:
+        return
+    if experiment.treatment_mode == TreatmentMode.SHADOW:
+        if exposure.effective_from is not None and apply_evidence_ref is None:
+            raise ExposureInvariantError(
+                "SHADOW must not invent authoritative effective_from without apply ref"
+            )
+        return
+    if apply_evidence_ref is None:
+        raise ExposureInvariantError(
+            "LIVE confirmed exposure requires ApplyEvidenceRef"
+        )
+    if not exposure.resulting_state_token:
+        raise ExposureInvariantError(
+            "LIVE confirmed exposure requires resulting_state_token"
+        )
+    if exposure.effective_from is None:
+        raise ExposureInvariantError(
+            "LIVE confirmed exposure requires effective_from"
+        )
+
+
+def build_confirmed_exposure_model(
+    experiment: ExperimentRecordV1,
+    *,
+    apply_evidence_ref: ApplyEvidenceRef,
+    resulting_state_token: str,
+    effective_from: datetime,
+    observation_start: datetime,
+) -> ExposureModel:
+    """Construct confirmed exposure projection with LIVE gate enforcement."""
+    exposure = ExposureModel(
+        changeset_ref=experiment.exposure.changeset_ref,
+        apply_evidence_ref=apply_evidence_ref,
+        resulting_state_token=resulting_state_token,
+        effective_from=effective_from,
+        observation_start=observation_start,
+        exposure_confirmed=True,
+    )
+    validate_confirmed_exposure(
+        experiment,
+        exposure=exposure,
+        apply_evidence_ref=apply_evidence_ref,
+    )
+    return exposure
 
 
 def project_live_observing(
@@ -74,8 +131,15 @@ def with_exposure_confirmed(
     experiment: ExperimentRecordV1,
     *,
     exposure: ExposureModel,
+    apply_evidence_ref: ApplyEvidenceRef | None = None,
 ) -> ExperimentRecordV1:
-    """Update experiment exposure anchors."""
+    """Update experiment exposure anchors (enforces LIVE evidence gate)."""
+    ref = apply_evidence_ref or exposure.apply_evidence_ref
+    validate_confirmed_exposure(
+        experiment,
+        exposure=exposure,
+        apply_evidence_ref=ref,
+    )
     new_state = experiment.execution_state
     if (
         experiment.treatment_mode == TreatmentMode.LIVE

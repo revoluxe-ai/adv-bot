@@ -22,6 +22,8 @@ from app.modules.decision_experiment_memory.domain.plan import (
     ExperimentPlanBody,
     TreatmentDefinition,
     build_plan,
+)
+from app.modules.decision_experiment_memory.domain.plan_serialization import (
     plan_body_digest,
 )
 from app.modules.decision_experiment_memory.domain.records import (

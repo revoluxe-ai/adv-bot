@@ -24,7 +24,7 @@
   (not production store).
 - [x] 2.4 Unit tests: invariants (EVALUATED+INCONCLUSIVE, freeze gate, exposure gate,
   validity blocks SUCCEEDED/FAILED, observational causal level).
-- [ ] 2.5 **Vocabulary freeze sign-off** before Slice B schema.
+- [ ] 2.5 **Vocabulary freeze sign-off** before Slice B schema (pending post-repair certification).
 
 ## 3. Slice B — PostgreSQL persistence
 

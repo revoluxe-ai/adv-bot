@@ -29,6 +29,7 @@ class MemoryEventType(StrEnum):
     EXPOSURE_CONFIRMED = "EXPOSURE_CONFIRMED"
     EXECUTION_ABORTED = "EXECUTION_ABORTED"
     OUTCOME_PROJECTED = "OUTCOME_PROJECTED"
+    CONFOUNDER_DETECTED = "CONFOUNDER_DETECTED"
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,3 +88,27 @@ class ExposureConfirmedPayload:
 class OutcomeProjectedPayload:
     outcome: str
     execution_state: str
+
+
+class ConfounderCategory(StrEnum):
+    """Typed concurrent intervention / confounder categories."""
+
+    PRICE_CHANGE = "PRICE_CHANGE"
+    STOCK_AVAILABILITY = "STOCK_AVAILABILITY"
+    BUDGET_CHANGE = "BUDGET_CHANGE"
+    DRR_CPO_CHANGE = "DRR_CPO_CHANGE"
+    CAMPAIGN_ACTIVATION = "CAMPAIGN_ACTIVATION"
+    ASSORTMENT_CHANGE = "ASSORTMENT_CHANGE"
+    OVERLAPPING_EXPERIMENT = "OVERLAPPING_EXPERIMENT"
+
+
+@dataclass(frozen=True, slots=True)
+class ConfounderDetectedPayload:
+    """Structured confounder append payload (refs only)."""
+
+    category: ConfounderCategory
+    reason: str
+    settings_state_token: str | None = None
+    related_decision_id: str | None = None
+    related_experiment_id: str | None = None
+    external_fact_id: str | None = None
