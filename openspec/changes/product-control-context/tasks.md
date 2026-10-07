@@ -5,7 +5,7 @@ Planning / domain apply only. No runtime until explicit slice GO.
 ## Slice A — Domain vocabulary + ports (no PG, no runtime)
 
 - [ ] 1.1 Create `app/modules/product_control/domain/` package with module docstrings.
-- [ ] 1.2 Add `ProductRef(shop_id, nmid)`, `DrrProfile`, `ControlEnrollmentState`.
+- [ ] 1.2 Add `ProductRef(shop_id, nmid)`, `DrrProfile`, `ShopControlEnrollment`, `ProductControlMode`.
 - [ ] 1.3 Add ports: `ProductPricingReader`, `ProductSalesEconomicsReader`,
       `EffectiveControlResolver`, `ProductCpoResolver` (protocols).
 - [ ] 1.4 Add `CampaignProductBinding`, `MembershipRole`, `LegRole`, blocker reason codes.

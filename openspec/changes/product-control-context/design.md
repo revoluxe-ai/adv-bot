@@ -75,19 +75,29 @@ Planned module root (apply slices): `app/modules/product_control/` (domain + app
 - **Tenancy:** `FUTURE_MIGRATION` — today `unique(nmid)` without `shop_id`; product
   control MUST use `(shop_id, nmid)`; do not migrate in this change.
 
-## Enrollment model
+## Shop rollout and product control mode
+
+Two distinct state models (no overloading):
 
 ```text
-ControlEnrollmentState: NOT_ENROLLED | ENROLLED | BLOCKED
+ShopControlEnrollment: NOT_ENROLLED | ENROLLED | BLOCKED   # default NOT_ENROLLED
+ProductControlMode:    INHERIT_SHOP | OVERRIDE_ENABLED | BLOCKED   # default INHERIT_SHOP
 ```
 
-- **Shop** `shop_control_enrollment` default `NOT_ENROLLED`.
-- **Product** `product_control_enrollment` default `NOT_ENROLLED`.
-- Shop `ENROLLED` enables shop-level `DrrProfile` for products that are not
-  `BLOCKED` and have no product-level profile override.
-- Product `ENROLLED` + profile enables SKU tier (overrides shop profile atomically).
-- `BLOCKED` at product or shop records explicit deny / diagnostic (no silent legacy
-  when product path was explicitly enabled — see spec).
+**Shop master gate**
+
+- `NOT_ENROLLED` → entire shop `LEGACY_NOT_ENROLLED`; product `OVERRIDE_ENABLED` cannot bypass.
+- `BLOCKED` → shop-wide `PRODUCT_CONTROL_BLOCKED`; product mode cannot bypass.
+- `ENROLLED` → evaluate `ProductControlMode` per `(shop_id, nmid)`:
+
+| Product mode | Resolution |
+|--------------|------------|
+| `INHERIT_SHOP` | Shop `DrrProfile` if present; else LEGACY tier |
+| `OVERRIDE_ENABLED` + product `DrrProfile` | Product profile (atomic override) |
+| `OVERRIDE_ENABLED` without product profile | **Invalid** at write; if read → configuration-invalid / blocked |
+| `BLOCKED` | `PRODUCT_CONTROL_BLOCKED` |
+
+Full matrix: `owner-contract.md` § Effective enrollment matrix.
 
 ## DrrProfile inheritance
 
@@ -101,12 +111,20 @@ Atomic profile inheritance: if SKU has `DrrProfile` → use it; else if SHOP pro
 Invariant: `target_drr_percent` and `max_drr_percent` MUST both be present on a
 stored profile; `max_drr_percent >= target_drr_percent` (validation).
 
-## ProductCpoResolver — rounding
+## ProductCpoResolver — domain money boundary
 
-Align with existing money helpers (`promo_plan_multiplier.scale_number`):
+Canonical domain output (both fields at **0.01 RUB**, ROUND_HALF_UP):
 
-- `target_cpo_rub`: `Decimal` multiply; **ROUND_HALF_UP** to **2** decimal places (rub).
-- `max_cpo_rub`: **ROUND_HALF_UP** to **integer** rubles (matches `max_price_for_order: int`).
+```text
+DrrProfile + effective_product_price
+  → ProductCpoResolver
+  → target_cpo_rub, max_cpo_rub (Decimal / Money @ 0.01 RUB)
+  → LegacyCampaignCpoAdapter (Slice D)
+  → AdvSetting.target_price_for_order (float), max_price_for_order (int via ROUND_HALF_UP)
+```
+
+Integer max on `AdvSetting` is **legacy storage**, not a product-domain invariant.
+Future JSON/API/MCP expose canonical 0.01 RUB semantics.
 
 If `effective_product_price` is unknown/stale per pricing policy → no CPO; blocker
 `BLOCKED_BY_PRODUCT_PRICE_SOURCE` (not zero).

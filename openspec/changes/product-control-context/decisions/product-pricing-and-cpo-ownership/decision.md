@@ -19,22 +19,24 @@ for control. Read-only script `scripts/a1_sale_price_snapshot.py` documents Disc
    **`BLOCKED_BY_PRODUCT_PRICE_SOURCE`** (domain foundation still allowed).
 2. **ProductSalesEconomicsReader** — Historical orders/GMV/revenue-per-order; MAY use
    `wb_common_stat`. MUST NOT feed `ProductCpoResolver`.
-3. **ProductCpoResolver** — Single pure owner of DRR→CPO:
-   - `target_cpo_rub = effective_product_price × target_drr_percent / 100`
-   - `max_cpo_rub = effective_product_price × max_drr_percent / 100`
-   - Rounding: target → 0.01 RUB half-up; max → integer RUB half-up (align
-     `max_price_for_order` int).
-4. **No duplication** — Formula forbidden in Telegram, Excel, AI prompts, MCP, campaign
-   handlers.
-5. **Stale/unknown price** — Fail closed; no fabricated CPO; no silent fallback to
+3. **ProductCpoResolver** — Single pure owner of DRR→CPO math and **canonical domain
+   money** at 0.01 RUB (ROUND_HALF_UP for both target and max).
+4. **LegacyCampaignCpoAdapter** (Slice D) — Converts canonical `max_cpo_rub` to
+   `AdvSetting.max_price_for_order` int via ROUND_HALF_UP; legacy int is not a domain
+   invariant.
+5. **No duplication** — Formula forbidden in Telegram, Excel, AI prompts, MCP, campaign
+   handlers. Future JSON/API/MCP expose canonical 0.01 RUB values.
+6. **Stale/unknown price** — Fail closed; no fabricated CPO; no silent fallback to
    historical average order value.
+7. **Price source subdecision** — Concrete marketplace price field and multi-size
+   aggregation remain **EVIDENCE_GAP** (script evidence is not accepted SoT).
 
 ### EVIDENCE_GAP (acceptance for runtime Slice D)
 
 | Field | Current repository state |
 |-------|-------------------------|
 | CURRENT_PRICE_SOURCE | Candidate: WB Discounts & Prices `list/goods/filter` (script only); Content API cards in app **without** price DTO |
-| CURRENT_PRICE_FIELD | Script uses `sizes[].discountedPrice`; `SALE_PRICE_REFERENCE = min(discountedPrice)` across sizes when multi-size |
+| CURRENT_PRICE_FIELD | Script explores `sizes[].discountedPrice` — **not** accepted canonical semantics |
 | PRICE_SCOPE | Per `(shop_id, nmid)` via seller API credentials for cabinet |
 | PRICE_UPDATE_FREQUENCY | Not defined in runtime; script is on-demand |
 | PROMO_DISCOUNT_SEMANTICS | `discountedPrice` vs `clubDiscountedPrice` — script collects club but **does not** use as reference |

@@ -15,47 +15,53 @@ DRR-based control MUST use **current/effective product price**, not historical
   for shop defaults.
 - **WBCard**: catalog identity, WB card JSON cache, category reference — **MUST NOT**
   accumulate mutable control fields (DRR, enrollment, derived CPO).
+- **Shop rollout** — `ShopControlEnrollment`: `NOT_ENROLLED` | `ENROLLED` | `BLOCKED`
+  (default `NOT_ENROLLED`). **Master gate** for the shop.
+- **Product mode** — `ProductControlMode`: `INHERIT_SHOP` | `OVERRIDE_ENABLED` |
+  `BLOCKED` (default `INHERIT_SHOP`). **MUST NOT** overload shop enrollment or use
+  product `NOT_ENROLLED` to mean inheritance.
 - **Pricing split**:
   - `ProductPricingReader` — authoritative **current/effective** unit price for control.
   - `ProductSalesEconomicsReader` — historical orders/GMV/revenue-per-order for
     analytics/capacity; `wb_common_stat` allowed here only.
 - **DRR profile**: atomic `DrrProfile { target_drr_percent, max_drr_percent }`;
-  inheritance replaces **whole profile** at each tier (SKU → CATEGORY → SHOP → LEGACY);
-  **no** field-level mix (e.g. SKU target + SHOP max) unless future Owner decision.
+  inheritance replaces **whole profile** at each tier; **no** field-level mix.
 - **NULL / missing profile** at a tier means **inherit**; MUST NOT mean zero.
-- **DRR→CPO** (when price available):
-  - `target_cpo_rub = effective_product_price × target_drr_percent / 100`
-  - `max_cpo_rub = effective_product_price × max_drr_percent / 100`
-  - Single domain owner (`ProductCpoResolver`); forbidden in Telegram/Excel/AI/MCP/handlers.
-- **Campaign bindings**: `CampaignProductBinding` transport-independent; PRIMARY MUST NOT
-  be inferred from `ComplexAdv.main_nmid` or `sorted(nmids)[0]`.
-- **Multi-nmid fail-closed**: V1 product-derived CPO MUST NOT run when a campaign complex
-  has multiple nmIDs without authoritative single control-product mapping; emit blocker
-  (e.g. `PRODUCT_CONTROL_MULTI_NM_AMBIGUOUS`).
-- **Enrollment**: default `NOT_ENROLLED`; deploying foundation alone MUST NOT change
-  runtime behavior. `ENROLLED` enables product-control path; `BLOCKED` is explicit
-  safety/diagnostic state.
-- **Legacy**: `AdvSetting.target_price_for_order` / `max_price_for_order` remain
-  authority for `LEGACY_NOT_ENROLLED` and when no effective DRR profile applies.
-- **Blocked vs legacy**: when product control is **explicitly enabled** and a safety
-  condition fires (ambiguous multi-nm, missing price), MUST **NOT** silently fall back
-  to legacy (`PRODUCT_CONTROL_BLOCKED` ≠ `LEGACY_NOT_ENROLLED`).
+- **DRR→CPO** (when price available): single `ProductCpoResolver`; canonical money at
+  **0.01 RUB** for target and max; legacy int max via `LegacyCampaignCpoAdapter` only.
+- **Campaign bindings**: PRIMARY MUST NOT be inferred from `main_nmid` or `sorted(nmids)[0]`.
+- **Multi-nmid fail-closed**: `PRODUCT_CONTROL_MULTI_NM_AMBIGUOUS` when no single
+  control product is proven.
+- **OVERRIDE_ENABLED** without product `DrrProfile`: invalid at write time; if read,
+  fail closed (configuration-invalid / blocked) — MUST NOT silently equal `INHERIT_SHOP`.
+- **Legacy vs blocked**: see effective enrollment matrix below.
+
+### Effective enrollment matrix
+
+| Shop enrollment | Product mode | Profiles | Runtime outcome |
+|-----------------|--------------|----------|-----------------|
+| NOT_ENROLLED | INHERIT_SHOP | any | `LEGACY_NOT_ENROLLED` |
+| NOT_ENROLLED | OVERRIDE_ENABLED | product profile present | `LEGACY_NOT_ENROLLED` (no bypass) |
+| NOT_ENROLLED | BLOCKED | any | `LEGACY_NOT_ENROLLED` |
+| ENROLLED | INHERIT_SHOP | shop P | effective DRR = P |
+| ENROLLED | INHERIT_SHOP | no shop, no product profile | LEGACY tier (campaign CPO) |
+| ENROLLED | OVERRIDE_ENABLED | product P | effective DRR = P |
+| ENROLLED | OVERRIDE_ENABLED | no product profile | invalid write; if read → blocked |
+| ENROLLED | BLOCKED | any | `PRODUCT_CONTROL_BLOCKED` |
+| BLOCKED | any | any | `PRODUCT_CONTROL_BLOCKED` |
+
+No product mode may override shop `NOT_ENROLLED` or shop `BLOCKED`.
+
 - **Category**: precedence `PRODUCT > CATEGORY > SHOP` documented; **no** category
-  runtime in this change (`WBCategory` name-local ID not durable taxonomy SoT).
+  runtime in this change.
 
 ## Out of scope
 
-- Attribution-facts implementation, decision-experiment-memory, ChangeSet Apply Authority.
-- Shop-wide campaign collection changes, campaign-settings-history implementation.
-- MCP transport, production deploy, AutoShelfBidControlSettings migration.
-- Runtime code, Alembic/DDL, shop-runner adapter (later slices).
+- Attribution-facts, decision-experiment-memory, ChangeSet Apply Authority, MCP deploy,
+  runtime code, migrations, AutoShelf migration.
 
 ## Owner acceptance
 
-1. OpenSpec package + three decisions exist and pass planning gates.
-2. Scenario plan covers enrollment, inheritance, multi-nm fail-closed, price gap, and
-   Auto/Search leg separation.
-3. Slice A–F documented; first behavior-changing slice identified as Slice D.
-4. Current product price authority documented with honest `BLOCKED_BY_PRODUCT_PRICE_SOURCE`
-   for runtime DRR→CPO until `ProductPricingReader` is implemented against an accepted
-   WB price source.
+1. OpenSpec change validates strict; enrollment matrix and money boundary documented.
+2. Scenario plan covers shop gate, override invalid, LEGACY tier without profiles.
+3. Slice D blocked until price SoT accepted; slices A–C not blocked.

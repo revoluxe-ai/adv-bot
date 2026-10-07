@@ -16,9 +16,13 @@ control. WBCard exists as catalog cache with global `nmid` uniqueness. Owner req
 1. **Catalog authority** — `WBCard` (+ Content API ingestion) owns product identity and
    cached WB metadata only.
 2. **Mutable product control** — `ProductControlSettings` keyed `(shop_id, nmid)` owns
-   product-level DRR profiles, product enrollment, and future product control fields.
+   `ProductControlMode` (`INHERIT_SHOP` | `OVERRIDE_ENABLED` | `BLOCKED`, default
+   `INHERIT_SHOP`), product-level `DrrProfile` when override is enabled, and future
+   product control fields.
 3. **Shop defaults** — `ShopControlSettings` keyed `shop_id` owns shop-level DRR
-   profile and shop enrollment.
+   profile and `ShopControlEnrollment` (`NOT_ENROLLED` | `ENROLLED` | `BLOCKED`).
+   Shop enrollment is the **master rollout gate**; product modes cannot bypass
+   `NOT_ENROLLED` or `BLOCKED` shop state.
 4. **Execution boundary** — `AdvSetting` / `ComplexAdv` remain campaign execution
    entities (bids, keywords, legs, legacy CPO until adapter + enrollment).
 5. **Category** — `CategoryControlSettings` deferred; precedence slot documented only.
