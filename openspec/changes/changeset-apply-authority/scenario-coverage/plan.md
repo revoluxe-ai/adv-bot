@@ -177,6 +177,60 @@ SCENARIO_EVIDENCE_ROW:
   SLICE: A
   ROW_PLAN: required
 
-SCENARIOS_TOTAL: 20
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S21
+  REQUIREMENT: Trusted invocation context
+  SLICE: A
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S22
+  REQUIREMENT: Idempotent replay authorization
+  SLICE: A, B
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S23
+  REQUIREMENT: Receipt consumed
+  SLICE: B, C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S24
+  REQUIREMENT: Pre-write receipt not consumed
+  SLICE: B, C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S25
+  REQUIREMENT: Attempt vs evidence immutability
+  SLICE: B, C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S26
+  REQUIREMENT: PG atomicity settings+evidence
+  SLICE: C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S27
+  REQUIREMENT: UNKNOWN_INTERNAL_COMMIT
+  SLICE: C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S28
+  REQUIREMENT: Authz vs capability
+  SLICE: A, C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S29
+  REQUIREMENT: Legacy bypass acknowledgment
+  SLICE: A (doc), C
+  ROW_PLAN: required
+
+SCENARIOS_TOTAL: 29
 LIFECYCLE_GAPS: none at planning
 SPEC_SCENARIO_MISSING: none

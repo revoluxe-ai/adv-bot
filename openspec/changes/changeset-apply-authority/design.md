@@ -66,135 +66,243 @@ Checklist:
 ## Authority boundary
 
 ```text
-AI / MCP / REST / Telegram  →  ApplyRequestV1 (intent)
-Dry-run                     →  DryRunReceiptV1 (informative, non-authoritative)
+AI / MCP / REST / Telegram  →  ApplyRequestV1 (client semantic intent only)
+Trusted transport adapter   →  ApplyInvocationContext (server-resolved principal + shop authz)
+Dry-run subsystem           →  DryRunReceiptV1 (server-issued, persisted; non-write authority)
 Apply Authority             →  validate + authz + plan + writers + verify + evidence
-Writer adapters             →  protocol translation only
+Writer adapters             →  execution translation only
 ```
 
-Forbidden: MCP/REST/LLM → WB writer; dry-run OK → write; transport-owned domain fields.
+Forbidden: MCP/REST/LLM → WB writer; dry-run OK → write; client JSON as auth SoT;
+transport-specific Apply semantics.
 
-## ApplyRequestV1 field classes
+**Sole gate scope (V1):** Apply Authority is the only allowed production write path
+for **in-scope `ChangeSetV1` apply protocol** operations. It is **not** yet global
+exclusivity for all campaign settings mutations (Excel/Telegram/shop-runner legacy
+paths remain until migrated).
+
+## ApplyRequestV1 vs ApplyInvocationContext
+
+Domain API (transport-independent types; trusted context is a **parameter**, not
+client payload):
+
+```text
+ApplyAuthorityService.apply(
+    request: ApplyRequestV1,
+    context: ApplyInvocationContext,
+) -> ApplyOutcomeV1
+```
+
+### ApplyRequestV1 — client intent (untrusted for identity/authz)
 
 | Field | Class |
 |-------|--------|
-| `contract_version` (`apply_v1`) | authoritative input |
-| `idempotency_key` | authoritative input |
-| `changeset` (`ChangeSetV1` full body) | authoritative input |
-| `dry_run_binding.dry_run_receipt_id` | reference (must resolve server-side) |
-| `dry_run_binding.semantic_digest` | reference — server recomputes `sd1`, must match |
-| `dry_run_binding.preview_digest` | reference — server recomputes `pd1`, must match |
-| `dry_run_binding.dry_run_status` | reference — must be `OK` |
-| `actor` (`PrincipalRefV1` + `transport_channel` audit label) | authoritative input |
-| `authorization` (`capability_grants`, `shop_access_proof` opaque ref) | authoritative input — revalidated |
-| `semantic_digest`, `preview_digest`, `state_token`, `capability_digest` on receipt | **server-owned** on persist |
-| `ApplyPlanV1`, `ApplyEvidenceV1` | server-owned outputs |
+| `contract_version` (`apply_v1`) | client intent |
+| `idempotency_key` | client intent |
+| `changeset` (`ChangeSetV1` full body) | client intent |
+| `dry_run_receipt_id` | reference id only (must resolve server row) |
+| optional `binding_hints` (`semantic_digest`, `preview_digest`) | **non-authoritative** — server recomputes and compares; mismatch → reject |
 
-Do not trust client-supplied tokens/digests without recompute.
+**MUST NOT appear on ApplyRequestV1 as authoritative:** `principal_ref`,
+`shop_access_proof`, `capability_grants`, `session_proof`. Fabrication of receipt
+id or digests MUST NOT grant authority.
+
+### ApplyInvocationContext — server-resolved (trusted adapter boundary)
+
+| Field | Source |
+|-------|--------|
+| `principal_ref` | authenticated session (Telegram user → WB user/cabinet linkage, API subject, service account) |
+| `shop_authorization` | server policy: principal may act on `request.changeset.scope.shop_id` |
+| `permission_grants` | server-resolved mutation permissions for apply (distinct from domain capability tri-state) |
+| `transport_channel` | audit label only (`ui` \| `telegram` \| `mcp` \| `api` \| `internal`) |
+| `auth_proof_ref` | opaque internal handle (session id / token jti), never client-supplied proof bytes |
+
+Transports differ in authentication mechanism; **domain types are shared**.
+
+### Server-owned outputs
+
+`ApplyAttemptRecord` (mutable lifecycle), `ApplyPlanV1`, `ApplyEvidenceV1` (immutable
+terminal projection), receipt rows, idempotency rows.
 
 ## preview_digest (`pd1`)
 
-Canonical hash (new; not yet in code) over:
+Canonical hash (new; not yet in code) — binds **reviewed preview**, not auth.
 
 ```json
 {
   "version": "pd1",
   "status": "OK",
   "semantic_digest": "<sd1_…>",
-  "plan_effects": "<canonical PlanV1.effects normalized mutations>",
-  "diffs": "<actionable SemanticDiffEntryV1 list>"
+  "state_tokens": { "<resource_id>": "<st1_…>" },
+  "capability_projection_digest": "<cpd1_… domain tri-state only, no client grants>",
+  "plan_effects": "<canonical PlanV1.effects with resource_id + normalized mutations>",
+  "diffs": "<actionable SemanticDiffEntryV1 incl. resource_id, field_path, normalized>"
 }
 ```
 
-Use `kernel/canonical_json.canonical_sha256` with prefix `pd1_`.
+`expected_current_value` preconditions are already bound via `sd1` operation
+projection; do not duplicate. Use `kernel/canonical_json.canonical_sha256` with
+prefix `pd1_`. `capability_projection_digest` (`cpd1_`) hashes per-resource
+`evaluate_capabilities` outputs only — **separate** from `permission_grants`.
 
-## Dry-run binding
+## DryRunReceiptV1 ownership (no circular Apply-only invention)
+
+| Role | Owner |
+|------|--------|
+| Issue receipt after successful server `dry_run` → `OK` | **Dry-run subsystem** (`wb_sky_control_plane` dry-run port; same module family as `kernel/pipeline.dry_run`) |
+| Persist `DryRunReceiptV1` rows | **Slice B** `DryRunReceiptStore` (PG); prerequisite for production apply, **not** for Slice A types |
+| Consume / lifecycle | **Apply Authority** updates receipt state during apply attempt |
+
+Receipt is created **only** from server `DryRunResultV1` + resolved snapshots at
+issue time. Apply MUST NOT mint a receipt from client JSON. Client supplies
+`dry_run_receipt_id` only.
+
+Immutable receipt fields at issue: `receipt_id`, `issued_at`, `expires_at`, `scope`,
+`changeset_id`, `semantic_digest`, `preview_digest`, `state_tokens`, `capability_projection_digest`,
+`dry_run_status`.
+
+**Slice A:** vocabulary + ports + in-memory fake store. **Not blocked** by PG persistence.
+
+### Receipt lifecycle
+
+| State | Meaning |
+|-------|---------|
+| `ISSUED` | valid for new apply if not expired |
+| `CLAIMED` | bound to in-flight `apply_attempt_id` (short lease) |
+| `CONSUMED` | successful `VERIFIED` apply committed |
+| `EXPIRED` | past `expires_at` |
+| `INVALIDATED` | superseded (e.g. new dry-run for same intent policy) |
+
+**Consumption point:** atomically with successful apply transaction commit
+(`CONSUMED`). **Claim** before writer phase; release claim on pre-write `REJECTED`/`FAILED` rollback.
+
+Cases:
+
+- **A** validation reject before claim/commit → receipt stays `ISSUED` (or claim released).
+- **B** stale `st1` → reject; receipt remains unusable for changed state (new dry-run required).
+- **C** verified apply → `CONSUMED`; cannot authorize second distinct apply.
+- **D** `UNKNOWN_*` terminal → receipt `CONSUMED` or `INVALIDATED` (no fresh independent retry on same receipt).
+- **E** idempotent replay → return prior `ApplyEvidenceV1` via **idempotency store**, not by reusing an open receipt.
+
+## Dry-run binding (apply validation)
 
 Apply MUST:
 
-1. Load `DryRunReceiptV1` by id; reject missing/expired/consumed (unless idempotent replay).
+1. Load server `DryRunReceiptV1` by id; enforce lifecycle + expiry.
 2. Recompute `sd1` from `changeset`; reject mismatch (`CHANGESET_DIGEST_MISMATCH`).
-3. Re-run `dry_run` or `validate_changeset` after authoritative resolve; recompute `pd1`; reject mismatch (`PREVIEW_DIGEST_MISMATCH`).
-4. Reject `dry_run_status != OK` and `NO_OP` apply (`APPLY_REQUIRES_ACTIONABLE_PREVIEW`).
-5. Re-evaluate capabilities; compare `capability_digest` to receipt if present (`CAPABILITY_DRIFT`).
-6. Compare fresh `st1` to each operation `preconditions.state_token`; reject `STALE_STATE`.
+3. Re-run `dry_run` / `validate_changeset`; recompute `pd1` + `cpd1`; reject mismatch.
+4. Reject `dry_run_status != OK` and `NO_OP` apply.
+5. Re-evaluate domain capabilities; compare `cpd1` to receipt (`CAPABILITY_DRIFT`).
+6. Compare fresh `st1` to operation preconditions (`STALE_STATE`).
 7. Re-check `expected_current_value` when present.
+8. Authorize `context` against `scope` (`UNAUTHORIZED` — distinct from capability drift).
 
 No silent re-plan of a materially different ChangeSet inside Apply.
 
 ## Concurrency
 
-V1: optimistic `st1` per `cmp_*` resource + shop-scoped serialization
-(PG advisory lock or equivalent) + row locks on underlying `AdvSetting` during
-apply transaction. No distributed lock product. Unknown lock state → fail closed.
+| Mechanism | Role |
+|-----------|------|
+| `st1` per resource | optimistic stale-plan detection vs reviewed precondition |
+| `SELECT … FOR UPDATE` on touched `AdvSetting` rows | serialize apply txn vs other Apply attempts on same rows |
+| shop advisory lock | **optional V1** — omit unless profiling shows multi-resource ordering gaps; **does not** coordinate legacy writers |
+
+**Legacy writer race:** Excel/Telegram/shop-runner may mutate `AdvSetting` without
+participating in Apply locks → residual race until migration. Apply detects via
+`st1` mismatch (`STALE_STATE`) at apply time, not global exclusion.
 
 ## Idempotency
 
-Store: `(scope.shop_id, idempotency_key)` → `semantic_digest` + terminal outcome + `apply_id`.
+**Store key:** `(scope.shop_id, idempotency_key)`
+
+**Fingerprint (must match for replay):** `apply_contract_version` + `semantic_digest`
++ `preview_digest` (not `semantic_digest` alone).
 
 | Case | Behavior |
 |------|----------|
-| same key + same `semantic_digest` + completed success | replay `ApplyEvidenceV1`; no write |
-| same key + different `semantic_digest` | `IDEMPOTENCY_CONFLICT`; no write |
-| same key + in-flight | `APPLY_IN_PROGRESS` (deterministic) |
-| failed before commit | retry allowed; failed after ambiguous commit | `UNKNOWN_INTERNAL_COMMIT` / `UNKNOWN_EXTERNAL_STATE` — no auto-retry write |
+| same key + same fingerprint + `VERIFIED` | replay immutable `ApplyEvidenceV1`; no write |
+| same key + different fingerprint | `IDEMPOTENCY_CONFLICT` |
+| same key + in-flight attempt | `APPLY_IN_PROGRESS` |
+| failed before commit | retry allowed with same receipt if still `ISSUED` |
 
-## Transaction boundary (topology)
+**Replay authorization:** idempotent hit MUST still authenticate `context` and
+authorize shop/evidence read. Same key + same fingerprint + **unauthorized**
+principal → `UNAUTHORIZED`, **no** evidence disclosure.
 
-| Phase | V1 PG-only | Future WB slice |
-|-------|------------|-----------------|
-| A. Validation + authz | in-memory / read-only PG+WB read | same |
-| B. PG settings commit | **single DB transaction** (all plan steps) | PG txn separate from WB |
-| C. External WB | **not in V1** | **not atomically joined** with PG |
-| D. Verification readback | after commit, same session or new read | required |
-| E. Audit / evidence persist | append in same txn as commit when possible; if audit fails after commit → `VERIFIED` settings but `EVIDENCE_PERSISTENCE_FAILED` (fail closed for *client success* — see spec) |
+## V1 PG transaction model (normative)
 
-No claimed distributed atomicity across PG + WB.
+Single PostgreSQL transaction — **no** “when possible” split:
 
-## Apply lifecycle
+```text
+BEGIN
+  → insert/update ApplyAttemptRecord (in-flight)
+  → claim idempotency slot / detect conflict
+  → claim DryRunReceipt (CLAIMED)
+  → FOR UPDATE touched AdvSetting rows
+  → revalidate authoritative projection (st1, capabilities, domain validation)
+  → apply all bounded PG mutations
+  → read back same locked rows (transaction-local verification)
+  → verify normalized intended fields
+  → compute post_state_tokens from resulting projection
+  → insert immutable ApplyEvidenceV1 row + terminal idempotency outcome
+  → mark receipt CONSUMED
+  → mark attempt VERIFIED
+COMMIT
+```
 
-Non-terminal: `RECEIVED` → `VALIDATING` → `AUTHORIZED` → `APPLYING` → `VERIFYING`
+Client-visible success (`VERIFIED` + evidence) **only after COMMIT**.
 
-Terminal: `REJECTED`, `FAILED`, `VERIFIED`, `UNKNOWN_INTERNAL_COMMIT`, `UNKNOWN_EXTERNAL_STATE`
+`UNKNOWN_INTERNAL_COMMIT` — **only** when commit outcome is ambiguous (e.g.
+connection dropped after possible commit). Ordinary SQL errors → rollback →
+`FAILED` / `REJECTED`, not UNKNOWN.
 
-Invariant: `WRITE_ACCEPTED` (driver returned) ≠ `STATE_VERIFIED`. Client success only on `VERIFIED`.
+External WB (Slice D): PG txn **not** atomic with WB; separate evidence fields.
 
-## ApplyEvidenceV1 (immutable)
+## ApplyAttemptRecord vs ApplyEvidenceV1
 
-`apply_id`, `schema_version`, `scope`, `actor_ref`, `idempotency_key`, `changeset_id`,
-`semantic_digest`, `preview_digest`, `dry_run_receipt_id`, `pre_state_tokens`,
-`post_state_tokens`, `capability_digest`, `intended_mutations` (normalized),
-`execution_status`, `writer_result_refs`, `failure_code`, `started_at`, `completed_at`.
+| Artifact | Mutability |
+|----------|------------|
+| `ApplyAttemptRecord` | durable lifecycle (`RECEIVED` … `VERIFYING` → terminal) |
+| `ApplyEvidenceV1` | **immutable** row inserted once at terminal success (`VERIFIED`) or terminal failure snapshot where required; never updated |
 
-Append-only; no updates except linkage fields forbidden.
+Do not mutate evidence rows through lifecycle states.
+
+## Terminal outcomes (status vs reason_code)
+
+| Terminal status | Typical reason_code |
+|-----------------|---------------------|
+| `REJECTED` | `VALIDATION_REJECTED`, `UNAUTHORIZED`, `STALE_STATE`, `CHANGESET_DIGEST_MISMATCH`, `PREVIEW_DIGEST_MISMATCH`, `CAPABILITY_DRIFT`, `RECEIPT_INVALID` |
+| `FAILED` | `WRITER_REJECTED`, `VERIFICATION_MISMATCH`, `TRANSACTION_ROLLED_BACK` |
+| `VERIFIED` | — |
+| `UNKNOWN_INTERNAL_COMMIT` | commit acknowledgement lost |
+| `UNKNOWN_EXTERNAL_STATE` | Slice D WB ambiguity only |
 
 ## Post-apply verification
 
-Re-resolve snapshots; recompute `st1`; compare normalized desired fields from plan
-to `local_policy` projection (`read/local_policy.py`). Mismatch → `VERIFICATION_MISMATCH`
-(not `VERIFIED`). Emit new `post_state_token` only on `VERIFIED`.
+Verification uses **transaction-local** read of locked rows before COMMIT (PG SoT).
+`WRITE_ACCEPTED` (ORM flush) ≠ `STATE_VERIFIED` until field-level compare passes.
 
-## Capability revalidation
+`post_state_tokens` MUST be recomputed from the post-mutation projection used for
+`st1`. Because `st1` includes the mutated policy subtree for the operation kind,
+any successful semantic mutation in that subtree MUST yield a different `st1` unless
+the normalized desired value equals prior (then apply should have been `NO_OP` at
+dry-run). Do not assert token difference without subtree coverage.
 
-Use `evaluate_capabilities` at apply time. `TriStateCapability.UNKNOWN` and
-`INELIGIBLE` → fail closed. Record `capability_digest` = canonical hash of
-per-resource capability projection + grant set.
+## Authorization vs domain capability
 
-## Actor / authorization
+| Concern | Mechanism |
+|---------|-----------|
+| **Authorization** | `ApplyInvocationContext.shop_authorization` + `permission_grants` (server) |
+| **Domain capability** | `evaluate_capabilities` tri-state + `cpd1` digest |
 
-`PrincipalRefV1`: stable WB Sky principal (`wb_user_id` or service id) — transport
-maps Telegram `from_user.id` / API subject to this ref via existing cabinet linkage
-(pattern: `get_wb_user_cabinet_for_adv_and_telegram` family).
-
-`capability_grants: frozenset[str]` — same catalog as dry-run preflight
-(`KNOWN_CAPABILITIES` in `mutation_policy`). Possession of `preview_digest` alone
-does **not** grant authority.
+`UNAUTHORIZED` ≠ `CAPABILITY_DRIFT`. Unknown/ineligible domain capability → fail closed.
 
 ## Transport parity
 
 ```text
 REST ─┐
-      ├→ ApplyAuthorityService.apply(ApplyRequestV1)
+      ├→ build ApplyInvocationContext (trusted)
+      ├→ ApplyAuthorityService.apply(request, context)
 MCP ──┘
 ```
 
@@ -208,20 +316,20 @@ atomic all-or-nothing. No `PARTIALLY_APPLIED` success in V1.
 
 Fail closed codes include: `STALE_STATE`, `CAPABILITY_DRIFT`, `IDEMPOTENCY_CONFLICT`,
 `UNAUTHORIZED`, `UNSUPPORTED_OPERATION`, `VALIDATION_REJECTED`, `WRITER_REJECTED`,
-`VERIFICATION_MISMATCH`, `UNKNOWN_EXTERNAL_STATE`, `EVIDENCE_PERSISTENCE_FAILED`.
+`VERIFICATION_MISMATCH`, `UNKNOWN_EXTERNAL_STATE`, `UNKNOWN_INTERNAL_COMMIT`.
 
 No automatic WB retry on unknown external outcome.
 
 ## Implementation slices (not authorized here)
 
-| Slice | Content |
-|-------|---------|
-| A | Domain types, ports, pure idempotency/concurrency tests |
-| B | PG ledger / receipt / idempotency tables |
-| C | PG policy writer + txn + verification |
-| D | WB writer behind authority (narrow op class) |
-| E | REST/MCP → same service |
-| F | History / decision-memory cross-links |
+| Slice | Boundary |
+|-------|----------|
+| A | `ApplyRequestV1`, `ApplyInvocationContext`, ports, `pd1`/`cpd1` pure functions, idempotency decision logic, lifecycle enums, receipt lifecycle rules, unit tests — **no PG, no writers, no receipt PG** |
+| B | PG: `ApplyAttemptRecord`, idempotency, `ApplyEvidenceV1`, **`DryRunReceiptStore`** |
+| C | PG policy writer + **single-txn** apply + in-txn verification + atomic evidence |
+| D | External WB writer + `UNKNOWN_EXTERNAL_STATE` |
+| E | REST/MCP adapters → `apply(request, context)` |
+| F | History / decision-memory reference links |
 
 ## Open Questions
 

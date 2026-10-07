@@ -50,5 +50,5 @@ BASELINE_SHA: record at verify — `origin/stage` at branch cut
 ## Scenario coverage
 
 SCENARIO_PLAN: `scenario-coverage/plan.md`
-SCENARIOS_TOTAL: 20 (S01–S20)
+SCENARIOS_TOTAL: 29 (S01–S29)
 IMPLEMENTATION_SLICES: A–F (see design.md)

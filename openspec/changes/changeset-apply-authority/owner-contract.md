@@ -3,9 +3,11 @@
 ## Что хотим получить
 
 Единый **transport-independent** контракт применения `ChangeSetV1`: клиент
-(UI, Telegram, MCP, REST, automation) передаёт **`ApplyRequestV1`**, который
-**детерминированно привязан** к ранее просмотренному dry-run (`DryRunReceiptV1`
-+ `preview_digest` + `semantic_digest` `sd1_`). **WB Sky Apply Authority**
+(UI, Telegram, MCP, REST, automation) передаёт **`ApplyRequestV1`** (семантический intent) и вызывает
+`ApplyAuthorityService.apply(request, context)` с **server-resolved**
+`ApplyInvocationContext` (principal, shop authz — не из недоверенного JSON).
+Запрос **детерминированно привязан** к server-issued `DryRunReceiptV1`
+(`pd1` + `sd1_`). **WB Sky Apply Authority**
 повторно валидирует, проверяет права, сравнивает `st1` `state_token`,
 выполняет запись **только** через writer adapters, перечитывает authoritative
 state, выдаёт **неизменяемое** `ApplyEvidenceV1`. Dry-run `OK` **не** является
@@ -51,5 +53,8 @@ main dry-run spec.
 - V1 Apply: **PG-only**, три bounded policy ops, **одна транзакция** на shop scope.
 - Transport parity: REST и MCP вызывают **один** `ApplyAuthorityService` (будущие
   slices), не writers напрямую.
-- Receipt/evidence owner — Apply Authority PG ledger + `ApplyEvidenceV1`, не
-  Decision Experiment Memory (может ссылаться позже).
+- Dry-run receipt — выдаёт dry-run subsystem, хранит `DryRunReceiptStore` (Slice B);
+  Apply потребляет и меняет lifecycle, не создаёт receipt из клиента.
+- Execution evidence — immutable `ApplyEvidenceV1` + mutable `ApplyAttemptRecord`;
+  не Decision Experiment Memory (может ссылаться позже).
+- V1 PG: settings mutation + evidence **одна транзакция**; client success только после COMMIT.

@@ -9,8 +9,8 @@ mutation domain.
 
 #### Scenario: Unauthorized actor does not invoke writer (S06)
 
-- **GIVEN** an `ApplyRequestV1` whose principal lacks shop/campaign authorization
-- **WHEN** Apply Authority processes the request
+- **GIVEN** an `ApplyInvocationContext` whose server-resolved principal lacks shop authorization
+- **WHEN** Apply Authority processes `apply(request, context)`
 - **THEN** execution status MUST be `REJECTED` with `UNAUTHORIZED`
 - **AND** no production writer adapter MUST be invoked
 
@@ -224,3 +224,114 @@ reject apply without writer invocation.
 - **WHEN** Apply Authority validates
 - **THEN** status MUST be `REJECTED`
 - **AND** no writer MUST be invoked
+
+### Requirement: Trusted invocation context
+
+Client `ApplyRequestV1` MUST NOT carry authoritative principal, shop access proof,
+or permission grants. Transports MUST supply `ApplyInvocationContext` built from
+authenticated session. Fabricated principal or grants in request JSON MUST NOT
+authorize apply.
+
+#### Scenario: Untrusted request fields cannot self-authorize (S21)
+
+- **GIVEN** an `ApplyRequestV1` embedding forged `principal_ref` or `capability_grants`
+- **WHEN** Apply Authority validates using only server `ApplyInvocationContext`
+- **THEN** forged fields MUST be ignored for authorization
+- **AND** apply MUST fail closed unless real context authorizes the shop
+
+### Requirement: Idempotent replay authorization
+
+Returning stored `ApplyEvidenceV1` for an idempotency hit MUST require current
+caller authorization to the shop and evidence; unauthorized replay MUST NOT disclose
+prior evidence.
+
+#### Scenario: Idempotent replay requires authorization (S22)
+
+- **GIVEN** a prior `VERIFIED` apply for `(shop_id, idempotency_key)`
+- **AND** a new call with the same fingerprint but an unauthorized `ApplyInvocationContext`
+- **WHEN** Apply Authority handles the request
+- **THEN** status MUST be `UNAUTHORIZED`
+- **AND** MUST NOT return the prior `ApplyEvidenceV1` payload
+
+### Requirement: Dry-run receipt lifecycle
+
+`DryRunReceiptV1` MUST be server-issued from dry-run execution, persisted by
+`DryRunReceiptStore`, and lifecycle-managed independently of transport.
+
+#### Scenario: Consumed receipt cannot authorize second apply (S23)
+
+- **GIVEN** a `DryRunReceiptV1` in `CONSUMED` state after a verified apply
+- **WHEN** a new distinct apply is attempted with the same receipt id
+- **THEN** status MUST be `REJECTED` with `RECEIPT_INVALID`
+- **AND** no writer MUST be invoked
+
+#### Scenario: Pre-write rejection does not consume receipt (S24)
+
+- **GIVEN** a receipt in `ISSUED` state
+- **WHEN** apply fails with `STALE_STATE` before mutation commit
+- **THEN** receipt MUST NOT transition to `CONSUMED`
+- **AND** a new dry-run remains required for changed state
+
+### Requirement: Attempt lifecycle separate from immutable evidence
+
+`ApplyAttemptRecord` MAY transition through non-terminal states. `ApplyEvidenceV1`
+MUST be insert-only at terminal `VERIFIED` and MUST NOT be updated in place across
+lifecycle states.
+
+#### Scenario: Evidence immutability vs attempt lifecycle (S25)
+
+- **GIVEN** an apply moving from `APPLYING` to `VERIFYING`
+- **WHEN** lifecycle state updates occur
+- **THEN** no existing `ApplyEvidenceV1` row MAY be mutated
+- **AND** evidence insertion MUST occur only at terminal commit boundary
+
+### Requirement: PG settings and evidence atomicity (V1)
+
+For V1 PG-only apply, settings mutations, verification, idempotency terminal
+state, receipt consumption, and `ApplyEvidenceV1` persistence MUST commit in one
+PostgreSQL transaction. Client-visible `VERIFIED` MUST NOT be returned before
+COMMIT succeeds.
+
+#### Scenario: Settings and evidence commit atomically (S26)
+
+- **GIVEN** a successful in-txn verification
+- **WHEN** the database transaction commits
+- **THEN** both policy mutations and `ApplyEvidenceV1` MUST be durable
+- **AND** partial durability (settings without evidence) MUST NOT be labeled `VERIFIED`
+
+### Requirement: Unknown internal commit
+
+`UNKNOWN_INTERNAL_COMMIT` MUST be reserved for ambiguous commit acknowledgement,
+not ordinary rolled-back validation or writer errors.
+
+#### Scenario: Lost commit acknowledgement (S27)
+
+- **GIVEN** a PG apply where commit outcome is unknown after connection loss
+- **WHEN** Apply Authority cannot determine whether the transaction committed
+- **THEN** status MUST be `UNKNOWN_INTERNAL_COMMIT`
+- **AND** automatic duplicate mutation MUST NOT be attempted without idempotency reconciliation
+
+### Requirement: Authorization distinct from domain capability
+
+Unauthorized principals MUST receive `UNAUTHORIZED`. Ineligible or unknown domain
+capabilities MUST receive `CAPABILITY_DRIFT` without conflating the two.
+
+#### Scenario: Authorization vs capability distinction (S28)
+
+- **GIVEN** an authorized principal for the shop
+- **AND** a required domain capability evaluates to `UNKNOWN` at apply time
+- **WHEN** Apply Authority validates
+- **THEN** status MUST be `REJECTED` with `CAPABILITY_DRIFT`
+- **AND** MUST NOT be classified as `UNAUTHORIZED`
+
+### Requirement: Legacy writer bypass acknowledgment
+
+Until legacy settings writers migrate, architecture MUST acknowledge residual races
+with non-Apply mutation paths.
+
+#### Scenario: Legacy bypass race acknowledged (S29)
+
+- **GIVEN** concurrent legacy `AdvSetting` mutation outside Apply Authority
+- **WHEN** apply runs with stale `st1` relative to reviewed receipt
+- **THEN** Apply MUST reject with `STALE_STATE`
+- **AND** global sole write gate for all settings paths MUST NOT be claimed

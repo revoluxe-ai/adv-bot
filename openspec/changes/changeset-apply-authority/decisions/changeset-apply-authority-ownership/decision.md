@@ -19,8 +19,9 @@ Telegram `AdvSetting` handlers, shop-runner WB writers.
 
 ## Decision
 
-**WB Sky Apply Authority** is the sole production-write gate for in-scope
-`ChangeSetV1` apply operations.
+**WB Sky Apply Authority** is the sole production-write gate for **in-scope
+`ChangeSetV1` apply protocol** operations. It is **not** global exclusivity for all
+campaign settings mutations until legacy Excel/Telegram/shop-runner paths migrate.
 
 | Layer | Owner |
 |-------|--------|
@@ -53,7 +54,9 @@ Writer adapters MUST NOT contain business policy (capabilities, tokens, authz).
 
 ## Allowed
 
-- Shop-scoped PG advisory lock + `SELECT … FOR UPDATE` on touched `AdvSetting` rows.
+- `SELECT … FOR UPDATE` on touched `AdvSetting` rows during apply transaction.
+- Optional shop advisory lock only if proven necessary (not required for V1 default).
+- `ApplyAuthorityService.apply(request, context)` with server-built `ApplyInvocationContext`.
 - Post-apply re-read via existing `resolve_changeset_snapshots` / local policy projection.
 - Audit append-only events referencing `ApplyEvidenceV1.apply_id`.
 

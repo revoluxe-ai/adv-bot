@@ -27,8 +27,10 @@ dry-run.
   (single transaction); **no WB HTTP writes** in V1.
 - Proposed ADR **`changeset-apply-authority-ownership`** (placement, forbidden
   bypass paths).
-- Scenario coverage plan **S01–S20** mapped to implementation slices (planning
+- Scenario coverage plan **S01–S29** mapped to implementation slices (planning
   evidence only).
+- Owner contract review repairs: `ApplyInvocationContext`, receipt ownership,
+  atomic PG+evidence txn, attempt vs evidence split.
 
 ## Capabilities
 
