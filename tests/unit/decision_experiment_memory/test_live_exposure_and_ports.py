@@ -202,3 +202,16 @@ def test_reader_ports_factual_and_similar() -> None:
         shop_id="shop-1",
     )
     assert len(similar) == 1
+
+
+def test_assignment_event_taxonomy_includes_treatment_intended() -> None:
+    assert MemoryEventType.TREATMENT_INTENDED == "TREATMENT_INTENDED"
+
+
+def test_get_experiment_plan_defaults_to_latest_revision() -> None:
+    repo = InMemoryDecisionMemoryRepository()
+    experiment_id = _register_live_experiment(repo)
+    plan_v1 = repo.get_plan_revision(experiment_id, 1)
+    assert plan_v1 is not None
+    assert repo.get_experiment_plan(experiment_id) == plan_v1
+    assert repo.get_experiment_plan(experiment_id, plan_revision=1) == plan_v1

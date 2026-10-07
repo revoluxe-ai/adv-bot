@@ -28,6 +28,12 @@ class DecisionMemoryReader(Protocol):
 
     def get_experiment(self, experiment_id: str) -> ExperimentRecordV1 | None: ...
 
+    def get_experiment_plan(
+        self,
+        experiment_id: str,
+        plan_revision: int | None = None,
+    ) -> ExperimentPlan | None: ...
+
     def list_plan_revisions(
         self,
         experiment_id: str,

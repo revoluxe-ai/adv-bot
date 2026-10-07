@@ -42,6 +42,7 @@ class Interpretation:
     factual_result_id: str | None
     narrative: str
     recorded_at: datetime
+    is_post_hoc: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,9 @@ class EvaluationProvenance:
     producer: str
     producer_version: str
     evaluation_run_digest: str
+    ai_package_id: str | None = None
+    ai_package_digest: str | None = None
+    dry_run_evidence_ref: ApplyEvidenceRef | None = None
     extra_refs: dict[str, Any] | None = None
 
 

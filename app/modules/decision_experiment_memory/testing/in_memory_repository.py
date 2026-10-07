@@ -119,6 +119,18 @@ class InMemoryDecisionMemoryRepository(DecisionMemoryRepository):
     def get_experiment(self, experiment_id: str) -> ExperimentRecordV1 | None:
         return self._experiments.get(experiment_id)
 
+    def get_experiment_plan(
+        self,
+        experiment_id: str,
+        plan_revision: int | None = None,
+    ) -> ExperimentPlan | None:
+        if plan_revision is not None:
+            return self.get_plan_revision(experiment_id, plan_revision)
+        revisions = self.list_plan_revisions(experiment_id)
+        if not revisions:
+            return None
+        return revisions[-1]
+
     def get_plan_revision(
         self,
         experiment_id: str,
