@@ -1,0 +1,19 @@
+openspec/specs/campaign-settings-changeset-contract/spec.md
+  s_81678e100663a6::t_d69bb161038478 1-211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c956e167393ab5258af5833336207cd5a339830d",
+  "prompts": {},
+  "sessions": {
+    "s_81678e100663a6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "82504eef-d8ad-4f79-921d-8c8a07c5377c",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
