@@ -194,7 +194,9 @@ def test_reader_ports_factual_and_similar() -> None:
     )
     repo.store_factual_result(result)
     assert repo.get_factual_result("fr-1") == result
-    sig = repo.get_experiment(experiment_id).intervention_signature_digest
+    experiment = repo.get_experiment(experiment_id)
+    assert experiment is not None
+    sig = experiment.intervention_signature_digest
     similar = repo.find_similar_experiments(
         intervention_signature_digest=sig,
         shop_id="shop-1",
