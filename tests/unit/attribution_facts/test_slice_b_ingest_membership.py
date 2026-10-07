@@ -170,7 +170,7 @@ async def test_physical_adv_ids_remain_separate_in_batch() -> None:
         (
             HistorySnapshotView(
                 snapshot_id="h1",
-                observed_at=datetime(2026, 9, 7, 12, 0, tzinfo=UTC),
+                observed_at=datetime(2026, 9, 7, 12, 0),  # noqa: DTZ001
                 payload_json=_payload([837395782, 111]),
             ),
         )

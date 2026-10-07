@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import hashlib
 from collections import defaultdict
-from datetime import datetime, timezone
+from collections.abc import Mapping
+from datetime import date, datetime, timezone
 from decimal import Decimal
+from typing import Any
 
 from app.modules.attribution_facts.domain.classification import classify_ordered_nm
 from app.modules.attribution_facts.domain.coverage import evaluate_window_coverage
 from app.modules.attribution_facts.domain.enums import (
-    AttributionCoverageStatus,
+    AttributionReasonCode,
     SourceFamily,
 )
 from app.modules.attribution_facts.domain.ingest_models import (
@@ -23,6 +25,7 @@ from app.modules.attribution_facts.domain.models import (
     AttributionMetrics,
     CampaignDayTotals,
     DateWindow,
+    DayReconciliationResult,
     NmDayContribution,
     ObservationProvenance,
 )
@@ -50,7 +53,7 @@ def _observation_id(
 async def build_ingest_batch_from_raw_items(
     *,
     shop_id: str,
-    raw_items: tuple[dict[str, object], ...],
+    raw_items: tuple[Mapping[str, Any], ...],
     resolver: MembershipSnapshotResolver,
     source_revision: int = 1,
 ) -> AttributionIngestBatch:
@@ -74,9 +77,9 @@ async def build_ingest_batch_from_raw_items(
     ingested_at = datetime.now(tz=timezone.utc)
     facts: list[AttributionCommerceFact] = []
     partial_fallback = False
-    reason_acc: list = []
+    reason_acc: list[AttributionReasonCode] = []
 
-    membership_by_date: dict = {}
+    membership_by_date: dict[date, MembershipResolveResult] = {}
     for row in nm_rows:
         if row.event_date not in membership_by_date:
             resolved: MembershipResolveResult = await resolver.resolve(row.event_date)
@@ -84,7 +87,7 @@ async def build_ingest_batch_from_raw_items(
             if resolved.partial_fallback:
                 partial_fallback = True
             reason_acc.extend(resolved.reason_codes)
-        resolved_day = membership_by_date[row.event_date]
+        resolved_day: MembershipResolveResult = membership_by_date[row.event_date]
         attr_class = classify_ordered_nm(
             row.ordered_nm_id,
             resolved_day.snapshot,
@@ -136,7 +139,7 @@ async def build_ingest_batch_from_raw_items(
                 row.gmv_rub,
             )
         )
-    reconciliations: list = []
+    reconciliations: list[DayReconciliationResult] = []
     all_passed = True
     for day in day_rows:
         contributions = tuple(

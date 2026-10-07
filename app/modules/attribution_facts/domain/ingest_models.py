@@ -7,7 +7,6 @@ from datetime import date
 from decimal import Decimal
 
 from app.modules.attribution_facts.domain.enums import (
-    AttributionClass,
     AttributionCoverageStatus,
     AttributionReasonCode,
 )

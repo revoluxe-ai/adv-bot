@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Protocol
+from typing import Protocol, cast
 
 from app.modules.attribution_facts.ports.shop_campaign_inventory import (
     ShopCampaignInventoryNmPort,
@@ -53,11 +53,14 @@ class ShopCampaignInventoryNmAdapter(ShopCampaignInventoryNmPort):
         if not isinstance(nm_ids_raw, (list, tuple)):
             return None
         result: list[int] = []
-        for item in nm_ids_raw:
-            if isinstance(item, bool):
+        nm_seq = cast(Sequence[object], nm_ids_raw)
+        for item_obj in nm_seq:
+            if isinstance(item_obj, bool):
+                continue
+            if not isinstance(item_obj, (int, str, float)):
                 continue
             try:
-                result.append(int(item))
+                result.append(int(item_obj))
             except (TypeError, ValueError):
                 continue
         return tuple(result) if result else None

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 
 from app.modules.attribution_facts.ingest.pipeline import (
     build_ingest_batch_from_raw_items,
@@ -63,15 +63,15 @@ def get_last_ingest_batch() -> object | None:
 
 def _fullstats_item_to_dict(item: object) -> dict[str, object]:
     if isinstance(item, dict):
-        return item
+        return cast(dict[str, object], item)
     to_dict = getattr(item, "to_dict", None)
     if callable(to_dict):
         raw = to_dict()
         if isinstance(raw, dict):
-            return raw
+            return cast(dict[str, object], raw)
     additional = getattr(item, "additional_properties", None)
     if isinstance(additional, dict):
-        return additional
+        return cast(dict[str, object], additional)
     return {}
 
 

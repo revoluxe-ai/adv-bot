@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 from app.modules.attribution_facts.domain.ingest_models import (
     RawCampaignDayRow,
@@ -66,26 +66,30 @@ def fullstats_item_to_raw_rows(
     days_raw = item.get("days")
     if not isinstance(days_raw, list):
         return ()
+    days_list = cast(list[object], days_raw)
     rows: list[RawNmContributionRow] = []
-    for day in days_raw:
-        if not isinstance(day, dict):
+    for day_obj in days_list:
+        if not isinstance(day_obj, dict):
             continue
+        day = cast(dict[str, Any], day_obj)
         event_date = _parse_event_date(day.get("date"))
         if event_date is None:
             continue
-        apps = day.get("apps")
-        if not isinstance(apps, list):
+        apps_obj = day.get("apps")
+        if not isinstance(apps_obj, list):
             continue
-        for app in apps:
-            if not isinstance(app, dict):
+        for app_obj in cast(list[object], apps_obj):
+            if not isinstance(app_obj, dict):
                 continue
+            app = cast(dict[str, Any], app_obj)
             app_type = _read_int(app, "appType", "app_type")
-            nms = app.get("nms")
-            if not isinstance(nms, list):
+            nms_obj = app.get("nms")
+            if not isinstance(nms_obj, list):
                 continue
-            for nm in nms:
-                if not isinstance(nm, dict):
+            for nm_obj in cast(list[object], nms_obj):
+                if not isinstance(nm_obj, dict):
                     continue
+                nm = cast(dict[str, Any], nm_obj)
                 ordered_nm_id = _read_int(nm, "nmId", "nm_id", "nm")
                 if ordered_nm_id <= 0:
                     continue
@@ -114,9 +118,10 @@ def fullstats_items_to_campaign_day_rows(
         days_raw = item.get("days")
         if physical_adv_id <= 0 or not isinstance(days_raw, list):
             continue
-        for day in days_raw:
-            if not isinstance(day, dict):
+        for day_obj in cast(list[object], days_raw):
+            if not isinstance(day_obj, dict):
                 continue
+            day = cast(dict[str, Any], day_obj)
             event_date = _parse_event_date(day.get("date"))
             if event_date is None:
                 continue

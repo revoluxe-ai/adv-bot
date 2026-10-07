@@ -40,7 +40,7 @@ def adv_setting_id_for_physical_adv(
     return None
 
 
-@asynccontextmanager
+@asynccontextmanager  # pyright: ignore[reportDeprecated]
 async def attribution_ingest_for_fetch(
     *,
     shop_id: str,

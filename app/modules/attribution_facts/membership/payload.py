@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-
-from app.modules.attribution_facts.domain.enums import AttributionReasonCode
+from typing import Any, cast
 
 
 def promoted_nm_ids_from_payload(payload_json: str) -> frozenset[int] | None:
@@ -15,19 +14,21 @@ def promoted_nm_ids_from_payload(payload_json: str) -> frozenset[int] | None:
         frozenset nm ids или None при parse/structure ошибке.
     """
     try:
-        data = json.loads(payload_json)
+        data_obj: object = json.loads(payload_json)
     except json.JSONDecodeError:
         return None
-    if not isinstance(data, dict):
+    if not isinstance(data_obj, dict):
         return None
-    campaign = data.get("campaign")
-    if not isinstance(campaign, dict):
+    data = cast(dict[str, Any], data_obj)
+    campaign_obj = data.get("campaign")
+    if not isinstance(campaign_obj, dict):
         return None
-    nmids = campaign.get("nmids")
-    if not isinstance(nmids, list):
+    campaign = cast(dict[str, Any], campaign_obj)
+    nmids_obj = campaign.get("nmids")
+    if not isinstance(nmids_obj, list):
         return None
     result: set[int] = set()
-    for item in nmids:
+    for item in cast(list[object], nmids_obj):
         if isinstance(item, bool) or not isinstance(item, (int, str, float)):
             continue
         try:

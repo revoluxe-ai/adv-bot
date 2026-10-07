@@ -39,17 +39,17 @@ async def test_history_as_of_selects_latest_before_event_day_end() -> None:
     rows = (
         HistorySnapshotView(
             snapshot_id="early",
-            observed_at=datetime(2026, 9, 6, 23, 0),
+            observed_at=datetime(2026, 9, 6, 23, 0),  # noqa: DTZ001
             payload_json='{"campaign":{"nmids":[1]}}',
         ),
         HistorySnapshotView(
             snapshot_id="late",
-            observed_at=datetime(2026, 9, 7, 18, 0),
+            observed_at=datetime(2026, 9, 7, 18, 0),  # noqa: DTZ001
             payload_json='{"campaign":{"nmids":[2]}}',
         ),
         HistorySnapshotView(
             snapshot_id="future",
-            observed_at=datetime(2026, 9, 8, 1, 0),
+            observed_at=datetime(2026, 9, 8, 1, 0),  # noqa: DTZ001
             payload_json='{"campaign":{"nmids":[3]}}',
         ),
     )
