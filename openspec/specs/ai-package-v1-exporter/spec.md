@@ -5,7 +5,9 @@
 Bounded read-only AI Package v1: export accumulated shop datasets for a period
 into a versioned artifact bundle (domain contract independent of ZIP encoding).
 Synced from change `ai-package-v1-contract` (archived 2026-10-01).
+
 ## Requirements
+
 ### Requirement: Export input and shop scope
 
 The exporter MUST accept `shop_id` and a bounded period `[period_start, period_end]`
@@ -321,3 +323,33 @@ with deterministic content for identical export inputs.
 - **WHEN** full ZIP is validated
 - **THEN** `PACKAGE_FAMILY_GAPS.json` sha256 MUST match manifest entry
 
+### Requirement: Analytical views are domain payloads
+
+Экспорт полного пакета MUST прикладывать аналитический контракт, инструкцию чтения и витрины окон, посчитанные доменным слоем до кодирования архива. Эти документы MUST входить в манифест с контрольными суммами. Экспорт MUST NOT считать формулы внутри кодировщика архива.
+
+#### Scenario: Manifest lists analysis contract
+
+- **WHEN** полный пакет с аналитическим слоем собран
+- **THEN** манифест MUST ссылаться на аналитический контракт и витрины окон
+- **AND** подмена байтов контракта MUST ломать проверку пакета
+
+### Requirement: Analysis read range follows windows
+
+Чтение фактов для аналитических окон MUST покрывать номинальные границы этих окон до границы пакета и MUST NOT ограничиваться узким периодом вызывающей стороны, если источник хранит более длинную историю. Граница пакета MUST NOT объявляться полнотой источника. Период вызывающей стороны MUST оставаться отдельным полем. Ключевая история MUST по-прежнему не обрезаться этим периодом.
+
+#### Scenario: Narrow caller period does not clip campaign analysis
+
+- **GIVEN** вызывающий период короче 30 дней
+- **AND** дневная статистика ноги хранится дольше 30 дней
+- **WHEN** строится окно 30 дней
+- **THEN** агрегат MUST использовать дни окна в пределах доступной истории
+- **AND** MUST NOT ограничиться только вызывающим периодом
+
+### Requirement: Package schema bump when analysis is present
+
+Пакет, в котором есть аналитический слой, MUST объявлять схему пакета новее 1.0.0. Пакет без этого слоя MAY оставаться 1.0.0.
+
+#### Scenario: Analysis package is not schema 1.0.0
+
+- **WHEN** экспорт заявляет аналитические окна
+- **THEN** версия схемы пакета MUST быть не ниже минора, вводящего этот слой
