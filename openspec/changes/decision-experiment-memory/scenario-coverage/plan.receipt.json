@@ -4,19 +4,21 @@
   "CHANGE_ID": "decision-experiment-memory",
   "MODE": "plan",
   "PLAN_STATUS": "ready",
-  "PLAN_EVIDENCE_ID": "SCPV1-f31a3328d581455d",
-  "PLAN_CONTENT_HASH": "248ff092f68be2210f6c061fb67be7fa97bf7d46897d7dadc142f9dc5fe9ae04",
+  "PLAN_EVIDENCE_ID": "SCPV1-a48d03971a706909",
+  "PLAN_CONTENT_HASH": "f57a10ed834afbf688ff47aeda6046391b335caa9840e1d7ae99f99fcdf30332",
   "PLAN_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.md",
   "RECEIPT_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.receipt.json",
-  "SCENARIO_COUNT": 12,
+  "SCENARIO_COUNT": 26,
   "LIFECYCLE_COVERAGE": {
     "covered": [
-      "L1:S01,S02",
-      "L2:S03,S04",
-      "L3:S05,S06",
-      "L4:S07,S08",
-      "L5:S09,S10,S11",
-      "L6:S12"
+      "L1:S01,S02,S03,S25",
+      "L2:S04,S05,S06",
+      "L3:S07,S19",
+      "L4:S08,S09,S10",
+      "L5:S11,S21",
+      "L6:S12-S18,S20,S22",
+      "L7:S23,S24",
+      "L8:deferred_slice_F"
     ],
     "gaps": []
   },
@@ -24,30 +26,25 @@
   "INPUTS": {
     "DESIGN_REVISION": {
       "path": "openspec/changes/decision-experiment-memory/design.md",
-      "content_hash": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644"
+      "content_hash": "ba01a54c751fde8c7af39ac46c48495045cf28e36bacd144392e115cdcb6b7e4"
     },
     "SPEC_REVISION": [
       {
         "path": "openspec/changes/decision-experiment-memory/specs/decision-experiment-memory/spec.md",
-        "content_hash": "14b14a726da719512a7a0875721c8a99a94351baaa8c74995bae5b3ef72874a4"
+        "content_hash": "bb30f71770d61bd72c484c87b47d1fc475ba7a36d348c4fc71ebd32e3b357932"
       }
     ],
-    "LIFECYCLE_REVISION": {
-      "source": "openspec/changes/decision-experiment-memory/design.md#derived-lifecycle",
-      "content_hash": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644"
-    },
     "OWNER_CONTRACT_REVISION": {
       "path": "openspec/changes/decision-experiment-memory/owner-contract.md",
-      "content_hash": "94bebea9841d5fd9916c6558d82be3e360d44b5bda214a3fb9567f8aa384b57f"
+      "content_hash": "f3786646265fcce743f6174d74cae574ec02f0607ecb368f79109c5fdc969a78"
     }
   },
   "GENERATED_FROM": {
-    "DESIGN_REVISION": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644",
+    "DESIGN_REVISION": "ba01a54c751fde8c7af39ac46c48495045cf28e36bacd144392e115cdcb6b7e4",
     "SPEC_REVISION": [
-      "14b14a726da719512a7a0875721c8a99a94351baaa8c74995bae5b3ef72874a4"
+      "bb30f71770d61bd72c484c87b47d1fc475ba7a36d348c4fc71ebd32e3b357932"
     ],
-    "LIFECYCLE_REVISION": "23ac67c65b4058354d548d5289b2ece86ae039c28fcd63bb94d2553e0f9b8644",
-    "OWNER_CONTRACT_REVISION": "94bebea9841d5fd9916c6558d82be3e360d44b5bda214a3fb9567f8aa384b57f"
+    "OWNER_CONTRACT_REVISION": "f3786646265fcce743f6174d74cae574ec02f0607ecb368f79109c5fdc969a78"
   },
   "MATERIALIZATION_STATUS": "COMMITTED"
 }

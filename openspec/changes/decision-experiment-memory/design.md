@@ -1,214 +1,539 @@
 ## Context
 
-Planning-only change. Reuse `ChangeSetV1` metadata hooks (`decision_id`,
-`experiment_id` distinct). Memory module absent on `origin/stage`. Apply audit
-tables planned in `changeset-apply-authority` (store + future change) — **not**
-a dependency for Slice A domain vocabulary.
+WB Sky separates **settings facts**, **ChangeSet dry-run**, and (planned) **Apply
+Authority**. Decision-experiment memory is the **AI-readable semantic layer**:
+WHY / EXPECT / OUTCOME / validity / causal design — never production write authority.
+
+**Methodology addendum (planning repair):** experiments require a frozen
+**ExperimentPlan**, orthogonal **execution_state** vs **outcome**, explicit
+exposure anchoring, versioned metrics, data validity gates, factual vs interpretive
+results, and structured retrieval (`experiment_memory_index`).
+
+### Related architecture (not overridden)
+
+| Authority | Role |
+|-----------|------|
+| `campaign-settings-history` | WHAT settings existed / changed (`state_token`, snapshots) |
+| Apply Authority (future) | WHAT was validated / applied / rejected |
+| `attribution-facts-contract` (in flight) | Authoritative attribution fact refs (see dependency section) |
+| A/B Hold ADLs | Product hold experiment execution; memory may reference only |
+
+### Repository evidence (updated)
+
+- `ChangeSetMetadataV1`: optional `decision_id` / `experiment_id` (non-semantic).
+- Dry-run: `DryRunResultV1`; durable receipt store — **gap**.
+- Apply receipt product type — **gap** on current `stage` baseline.
+- **`attribution-facts-contract`**: project change exists; Slice A implemented on
+  branch `cursor/attribution-facts-contract-slice-a`; **PR #456** may not be merged
+  into current `stage`. Treat as **known future evidence dependency**, not a
+  hard runtime prerequisite for decision-memory Slice A vocabulary.
 
 ## Goals / Non-Goals
 
-**Goals:**
+**Goals:** first-class `ExperimentPlan`, dual state machines, exposure model,
+design-type semantics, validity model, intervention signature, provenance,
+post-hoc boundary, strengthened AI read model.
 
-- Canonical domain types: `DecisionMemoryRecord`, `ExperimentRecordV1`,
-  `ExperimentPlanV1`, refs (`ApplyEvidenceRef`, settings/attribution/package refs).
-- Plan registration/freeze, protocol deviations, execution_state vs outcome.
-- Reader ports (transport-independent); revised implementation slices A–E.
-
-**Non-Goals:**
-
-- PostgreSQL in Slice A; WB/CH/PG writes; MCP; promoting ADR to accepted registry
-  in this planning PR.
+**Non-Goals:** switchback engine, sequential testing engine, PG migrations in
+planning, ADL promotion, attribution-facts implementation, vector DB (optional
+secondary retrieval only).
 
 ## Architecture Decision References
 
-- `openspec/decisions/campaign-settings-contract-ownership/decision.md` — settings
-  SoT; evidence via `state_hash` / registry.
-- `openspec/decisions/ai-package-v1-exporter-ownership/decision.md` — Slice E
-  read-only export boundary.
-- `openspec/changes/archive/2026-10-07-campaign-settings-changeset-contract/` —
-  ChangeSetV1 + dry-run ownership.
-- `openspec/changes/archive/2026-10-05-campaign-settings-history/` — history grain.
-- **Proposed (not promoted):**
-  `openspec/changes/decision-experiment-memory/decisions/decision-experiment-memory-ownership/decision.md`
+- `campaign-settings-contract-ownership`, `ai-package-v1-exporter-ownership`,
+  `shop-data-source-strategy`
+- `openspec/decisions/decision-experiment-memory-ownership/decision.md` (Accepted)
 
 ## Ownership & Placement
 
-| Layer | Owner |
-|-------|--------|
-| Decision/experiment domain, events vocabulary, reader port | `app/modules/decision_experiment_memory/` |
-| PG event store + projections (Slice B) | same module `persistence/` |
-| Ingest adapters ChangeSet/dry-run/apply/history (Slice C) | `decision_experiment_memory/ingest/` |
-| Deterministic evaluator (Slice D) | `decision_experiment_memory/evaluation/` |
-| AI Package datasets (Slice E) | `app/modules/ai_package_v1/decision_memory/` |
+| Concern | Owner | Memory layer |
+|---------|-------|----------------|
+| Settings snapshots | `campaign_settings_history` | Ref only |
+| ChangeSet body | `wb_sky_control_plane` | `changeset_id` + semantic digest |
+| Apply truth | Apply Authority | `ApplyEvidenceRef` (id + optional digest; no payload) |
+| Attribution facts | `attribution-facts-contract` (future) | `attribution_fact_set_ref` optional |
+| Experiment plan & outcomes | **decision-experiment-memory** | ExperimentPlan + evaluations |
 
-**Forbidden:** `campaign_settings_history` (link only), `wb_sky_control_plane` as
-memory owner, `shop_runner`, any production writer.
-
-Checklist:
-
-- [x] context-first decision lookup performed
-- [x] relevant decisions cited
-- [x] new decision proposed (status Proposed, not promoted)
-- [x] implementation layer matches proposed decision
+Checklist: context-first lookup done; proposed ADL cited; implementation deferred.
 
 ---
 
-## Identity model
+## Architecture locks (final contract repair)
 
-| Entity | Primary key | Links |
-|--------|-------------|--------|
-| `DecisionMemoryRecord` | `decision_id` | optional many `experiment_id` via FK on experiment |
-| `ExperimentRecordV1` | `experiment_id` | required `decision_id` (parent decision semantics) |
+### IDENTITY_MODEL
 
-**DECISION_EXPERIMENT_CARDINALITY:** Decision 1 → 0..N Experiments.
+| Aggregate | Primary key | Parent |
+|-----------|-------------|--------|
+| **DecisionMemoryRecord** | `decision_id` | — |
+| **ExperimentRecordV1** | `experiment_id` | `decision_id` (required FK) |
 
-**V1_CARDINALITY_RESTRICTION:** Creation API **MAY** reject a second experiment
-for the same `decision_id` with `EXPERIMENT_LIMIT_V1` until multi-experiment UX
-exists; storage schema and reader contracts **MUST** allow multiple rows per
-`decision_id`.
+- `decision_id` and `experiment_id` are **independent** opaque ids.
+- **`experiment_id = decision_id` MUST NOT** be a domain invariant, default, or
+  encoding shortcut.
+- `ChangeSetMetadataV1` may carry both ids; either may be present without implying
+  equality.
 
-**MUST NOT:** `experiment_id = decision_id` as domain invariant or default merge.
+Planning prose may say `DecisionRecord` / `ExperimentRecord`; canonical identity
+names above are normative for contracts and persistence.
 
----
+### DECISION_EXPERIMENT_CARDINALITY
 
-## EXPERIMENT_DESIGN_MODEL
+- **Domain:** one `DecisionMemoryRecord` → **0..N** `ExperimentRecordV1`.
+- Each experiment references exactly one decision; a decision MAY have zero experiments.
 
-How evidence is produced (causal / observational design):
+### V1_CARDINALITY_RESTRICTION
 
-| `experiment_design` | Meaning |
-|---------------------|---------|
-| `RANDOMIZED_AB` | Randomized assignment when platform supports it |
-| `SWITCHBACK` | Alternating windows / legs |
-| `CONTROLLED_BEFORE_AFTER` | Controlled pre/post with explicit control arm definition |
-| `BEFORE_AFTER_OBSERVATIONAL` | Observational pre/post without randomized control |
+- **V1 product/API MAY restrict creation** to **0..1** experiment per decision for
+  implementation simplicity.
+- Domain types, event envelopes, reader shapes, and future PG schema MUST remain
+  **1:N compatible** (no unique constraint implying 1:1 at the contract level).
 
----
+### EXPERIMENT_DESIGN_MODEL (`experiment_design`)
 
-## TREATMENT_MODE_MODEL
+Causal / statistical design only (unchanged):
 
-Whether production settings are mutated:
+`RANDOMIZED_AB` | `SWITCHBACK` | `CONTROLLED_BEFORE_AFTER` |
+`BEFORE_AFTER_OBSERVATIONAL`
 
-| `treatment_mode` | Meaning |
-|------------------|---------|
-| `LIVE` | Intended production intervention; `effective_from` requires `ApplyEvidenceRef` BOUND |
-| `SHADOW` | Counterfactual / dry observation; no LIVE exposure claims |
+Drives `evidence_design` and `causal_evidence_level`. **Not** production apply mode.
 
-**MUST NOT** encode `SHADOW` under `experiment_design`.
+### TREATMENT_MODE_MODEL (`treatment_mode`)
 
----
+Separate axis on `ExperimentRecordV1` / plan:
 
-## EXPERIMENT_PLAN_MODEL (`ExperimentPlanV1`)
+| Value | Meaning |
+|-------|---------|
+| `LIVE` | Intended production treatment (requires apply + exposure evidence for confirmed exposure) |
+| `SHADOW` | Counterfactual / dry-run / non-applied observation path; no production mutation claim |
 
-Embedded in `ExperimentRecordV1` but typed separately for freeze semantics:
+SHADOW is **not** an `experiment_design` and does not change causal evidence level by itself.
 
-- `registered_at`, hypothesis (non-identity text)
-- `primary_metric_ids[]`, `secondary_metric_ids[]`, `guardrail_metric_ids[]`
-- `baseline_window`, `observation_window`, `burn_in`, `burn_out`, `timezone`
-- `minimum_effect_of_interest`, `success_criteria[]`, `failure_criteria[]`
-- `stopping_rule`, `analysis_method` (+ version)
+### APPLY_EVIDENCE_ABSTRACTION
 
-**intervention_signature:** stable hash of `intervention_class` + normalized intent
-(op kinds/target fields/direction) — not hypothesis text.
-
----
-
-## PLAN_FREEZE_MODEL
-
-- Event `PLAN_REGISTERED` binds `(experiment_id, plan_revision, plan_digest)`.
-- `plan_digest = hash(canonical_json(ExperimentPlanV1 without revision fields))`.
-- After register: plan fields for that revision are immutable; change →
-  `PLAN_AMENDED` → `plan_revision++` → new digest.
-- `protocol_deviations[]` append-only coded events (`ProtocolDeviationV1`).
-
----
-
-## EXECUTION_STATE_MODEL (experiment)
-
-Orthogonal to **outcome**. Suggested enum:
-
-`PLANNED` → `PREREGISTERED` → `INTERVENTION_BOUND` → `EXPOSURE_PENDING` →
-`OBSERVING` → `EVALUATION_DUE` → `EVALUATED` | `TERMINATED`
-
-**Decision execution_state** (lighter): `DRAFT` → `READY` → `CHANGESET_LINKED` →
-`DRY_RUN_RECORDED` → `APPLY_CONFIRMED` (only with BOUND Apply ref) → `CLOSED`.
-
-**Invariants (examples MUST hold):**
-
-- `(execution_state=EVALUATED, outcome=INVALID)` — valid (evaluated but invalid protocol/data).
-- `(execution_state=EVALUATED, outcome=INCONCLUSIVE)` — valid.
-- `(execution_state=OBSERVING, outcome=SUCCEEDED)` — **invalid** (premature outcome).
-- `treatment_mode=LIVE` + `EXPOSURE_PENDING` without BOUND Apply → cannot enter
-  `OBSERVING` with LIVE exposure claim.
-
----
-
-## OUTCOME_MODEL
-
-`SUCCEEDED` | `FAILED` | `INCONCLUSIVE` | `INVALID` | `ABORTED` | (`NOT_APPLICABLE`
-for decision-only).
-
-Derived deterministically from criteria + validity; AI narrative non-authoritative.
-
----
-
-## VALIDITY_MODEL
-
-`validity_status`: `VALID` | `DEGRADED` | `INVALID` + `validity_reason_codes[]`.
-`INVALID` validity forces experiment `outcome=INVALID` (not FAILED).
-
----
-
-## APPLY_EVIDENCE_ABSTRACTION
+Apply Authority receipt payload **does not exist** in repo yet. Slice A defines only:
 
 ```text
-ApplyEvidenceRefV1:
-  authority: "changeset_apply_audit"   # extensible string, no payload here
-  apply_receipt_id: str | null        # opaque when bound
-  evidence_digest: str | null         # optional stable digest when known
-  binding_status: UNBOUND | BOUND | STALE
+ApplyEvidenceRef (alias ApplyReceiptRef)
+  apply_evidence_id: str          # opaque id from future authority
+  evidence_digest: str | None     # optional until authority publishes digest rules
+  authority_kind: "APPLY_AUTHORITY"  # versioned literal for forward compat
 ```
 
-**Without BOUND authoritative Apply evidence:**
+No receipt body fields in decision-memory domain. Linkage events MAY carry `ApplyEvidenceRef`
+when ingested later.
 
-- Decision **MUST NOT** reach `APPLY_CONFIRMED`.
-- Experiment **MUST NOT** set factual LIVE `effective_from` from Apply.
-- Experiment **MUST NOT** claim valid LIVE exposure.
+**Invariants**
 
-Slice C binds concrete receipt type when Apply Authority lands; Slice A defines
-ref + invariants only.
+- No `ApplyEvidenceRef` → decision MUST NOT claim `APPLY_CONFIRMED`; experiment MUST NOT
+  treat production apply as proven.
+- No authoritative effective-state evidence → MUST NOT confirm **LIVE** exposure /
+  `OBSERVING` as valid production evidence.
+- **`treatment_effective_from` MUST NOT be guessed** (inferred only from linked evidence
+  or remain unset / validity `UNKNOWN`).
 
-**SLICE_A_BLOCKED_BY_APPLY:** **NO**
+### SLICE_A_BLOCKED_BY_APPLY
+
+**`SLICE_A_BLOCKED_BY_APPLY = NO`**
+
+Slice A uses `ApplyEvidenceRef` types and invariants only. Concrete Apply receipt
+integration is Slice C+; vocabulary and unit tests do not require Apply Authority.
+
+### SLICE_A_BOUNDARY
+
+Slice A is **domain-first**:
+
+| In Slice A | Out of Slice A |
+|------------|----------------|
+| Pure domain vocabulary + invariants | PostgreSQL, migrations |
+| Reader / repository **protocols** | Apply ingest integration |
+| **Test-only** in-memory fake implementing protocols | Evaluator runtime |
+| Unit tests against fake | AI Package / MCP |
+
+### SLICE_A_IN_MEMORY_MEANING
+
+“In-memory event store” in Slice A means a **testing fake** (e.g. `InMemoryDecisionMemoryRepository`)
+for unit tests — not a production persistence tier, not durable across processes.
 
 ---
 
-## OWNERSHIP_BOUNDARY (ADR summary)
+## Domain aggregates
 
-**OWNS:** decision semantics; preregistered experiment plan; experiment lifecycle
-semantics; validity/evaluation semantics; result history; interpretation/provenance
-linkage (refs only).
+### DecisionMemoryRecord (`DecisionRecord` in narrative)
 
-**DOES NOT OWN:** campaign settings truth; catalog truth; Apply execution truth;
-metric source truth; attribution truth — immutable refs/digests only.
+Actor, scope, semantics (observation, rationale, intended action), evidence refs,
+**decision-level** ChangeSet/dry-run/`ApplyEvidenceRef` linkage, `decision_fingerprint`
+(coarse intent class — **not** experiment similarity).
 
----
+A decision MAY exist without any experiment.
 
-## REVISED_IMPLEMENTATION_SLICES
+Decision status (proposal track, separate from experiment execution):
 
-| Slice | Scope |
+`RECORDED` | `VALIDATED` | `REJECTED` | `APPLY_CONFIRMED` | `APPLY_FAILED` |
+`WITHDRAWN` | `SUPERSEDED`
+
+### ExperimentRecordV1 (experiment shell)
+
+Independent `experiment_id`; required `decision_id` parent. Holds:
+
+- `treatment_mode`: `LIVE` | `SHADOW`
+- `execution_state` (orthogonal machine)
+- `outcome` (orthogonal machine)
+- `active_plan_revision` + `frozen_plan_digest` (after freeze)
+- `registration_kind`: `PREREGISTERED_CONFIRMATORY` | `POST_HOC_EXPLORATORY`
+- `evidence_design` + `causal_evidence_level` (derived from plan design type)
+- `intervention_signature` (deterministic; see below)
+- `exposure` sub-model (assignment / apply / observation anchors)
+- Latest `data_validity` projection
+- Refs to `FactualResult` and optional `Interpretation` records (by id)
+
+**Invariant:** `ExperimentRecord` MUST NOT exist without at least one registered
+`ExperimentPlan` revision.
+
+### ExperimentPlan (immutable first-class object)
+
+Not embedded as a replaceable `evaluation_contract` blob. Each revision is an
+immutable value object/event payload:
+
+| Field | Notes |
 |-------|--------|
-| **A** | Pure domain + `ExperimentPlanV1` + ports + invariants + unit tests (**no PG**) |
-| **B** | PostgreSQL append event store + projections + repository |
-| **C** | ChangeSet / dry-run / Apply / settings-history linkage ingest |
-| **D** | Deterministic evaluator + validity + outcomes + late metrics + corrections |
-| **E** | AI Package / MCP read exposure (transport adapter out of scope) |
+| `experiment_id` | Parent |
+| `plan_revision` | Monotonic int, starts at 1 |
+| `plan_digest` | `sha256(canonical_json(plan_body))` |
+| `registered_at` | Timestamp |
+| `registration_kind` | PREREGISTERED_CONFIRMATORY / POST_HOC_EXPLORATORY |
+| `hypothesis` | Structured + optional narrative |
+| `treatment_definition` | Normalized intended change semantics |
+| `control_definition` | Explicit counterfactual (see below) |
+| `experiment_design` | Enum (see EXPERIMENT_DESIGN_MODEL) |
+| `treatment_mode` | `LIVE` \| `SHADOW` (orthogonal to design) |
+| `primary_metrics[]` | Versioned metric defs |
+| `secondary_metrics[]` | Optional |
+| `guardrail_metrics[]` | Optional |
+| `window_model` | Baseline, observation, burn-in/out, cutoff, timezone |
+| `minimum_meaningful_effect` | Optional structured threshold |
+| `success_criteria` | Deterministic predicate tree |
+| `failure_criteria` | Optional |
+| `analysis_method` | e.g. `FIXED_HORIZON_DIFF`, `RATIO_VS_BASELINE` |
+| `analysis_config_version` | Version id for evaluator config |
+| `stopping_rule` | `FIXED_HORIZON` \| `FIXED_SAMPLE` \| `SEQUENTIAL_RESERVED` |
+| `required_data_validity_conditions` | Gates before SUCCEEDED/FAILED |
+| `switchback_schedule` | Optional reserved struct (no engine in V1) |
+
+**Plan freeze model**
+
+- Event `PLAN_REGISTERED` appends a revision.
+- Event `PLAN_FROZEN` MUST occur before any `OUTCOME_INSPECTED` / factual evaluation
+  that feeds preregistered outcome. `frozen_plan_digest` = that revision's digest.
+- Later changes: new `plan_revision` **or** `PROTOCOL_DEVIATION` event (explicit;
+  does not rewrite prior revision bytes).
+- **Forbidden:** in-place edit of a registered plan revision.
+
+**Plan revision model**
+
+- Revisions are append-only; readers select by `plan_revision` or `frozen_plan_digest`.
+- POST_HOC plans use `POST_HOC_EXPLORATORY`; they cannot retroactively become
+  preregistered for the same evaluation run.
 
 ---
 
-## Derived lifecycle (scenario coverage)
+## Orthogonal state machines
 
-- L1 Decision record created (semantics, evidence refs)
-- L2 Experiment plan registered / frozen
-- L3 Intervention bound (ChangeSet digest) without Apply
-- L4 Apply evidence bound (LIVE) or SHADOW observe path
-- L5 Evaluation window complete → EVALUATED + outcome
-- L6 Correction / supersede / follow-up experiment (new `experiment_id`)
+### execution_state (experiment)
+
+```
+PLANNED → REGISTERED → APPLY_PENDING → APPLIED → OBSERVING → EVALUATABLE → EVALUATED
+                                                              ↘ ABORTED (from several states)
+```
+
+| State | Meaning |
+|-------|---------|
+| `PLANNED` | Experiment shell created; plan may still be drafted |
+| `REGISTERED` | Plan revision registered (and frozen if confirmatory) |
+| `APPLY_PENDING` | ChangeSet linked; apply not confirmed |
+| `APPLIED` | Apply receipt proves mutation (future authority) |
+| `OBSERVING` | Exposure established; observation window active |
+| `EVALUATABLE` | Window + validity pre-checks allow evaluation run |
+| `EVALUATED` | At least one deterministic evaluation run completed |
+| `ABORTED` | Stopped before normal completion |
+
+**Invariant:** `EVALUATED` means "evaluation executed", **not** success.
+
+### outcome (experiment)
+
+`PENDING` | `SUCCEEDED` | `FAILED` | `INCONCLUSIVE` | `INVALID`
+
+| outcome | When |
+|---------|------|
+| `PENDING` | Before first terminal evaluation |
+| `SUCCEEDED` / `FAILED` | Validity gates pass + criteria met / failed |
+| `INCONCLUSIVE` | Insufficient coverage/window/data |
+| `INVALID` | Validity hard-fail (e.g. exposure integrity, metric mismatch) |
+
+**Invariant:** `execution_state=EVALUATED` AND `outcome=INCONCLUSIVE` is valid.
+
+**Abort projection (V1):** `execution_state=ABORTED` before terminal evaluation →
+`outcome=PENDING` (no `outcome=ABORTED` enum).
+
+**Rule:** If required validity gates fail → MUST NOT emit `SUCCEEDED` or `FAILED`;
+use `INCONCLUSIVE` or `INVALID` per `OUTCOME_MAPPING_VERSION` in spec
+(`demem_outcome_v1`).
+
+---
+
+## Assignment / apply / exposure model
+
+Separate concepts (decision ≠ assignment ≠ apply ≠ exposure):
+
+| Concept | Fields |
+|---------|--------|
+| **Intended treatment** | Normalized ops from plan `treatment_definition` |
+| **ChangeSet ref** | `changeset_id`, `changeset_semantic_digest` |
+| **Apply evidence ref** | `ApplyEvidenceRef` (typed id + optional digest; no payload) |
+| **Authoritative post-state** | `resulting_state_token` / snapshot ref |
+| **effective_from** | When treatment state authoritative |
+| **observation_start** | `max(effective_from, burn_in_end)` in plan timezone |
+
+**effective_from model**
+
+- Derived from Apply receipt + settings history confirmation when available.
+- If exposure cannot be established authoritatively → MUST NOT enter `OBSERVING`
+  as valid evidence (remain `APPLIED` or `APPLY_PENDING` with validity `UNKNOWN`).
+
+Event types: `TREATMENT_INTENDED`, `CHANGESET_LINKED`, `APPLY_LINKED`,
+`EXPOSURE_CONFIRMED` (carries `effective_from`, `observation_start`).
+
+---
+
+## Experiment design types & causal evidence
+
+| experiment_design | causal_evidence_level (ordered) | Notes |
+|-------------------|-----------------------------------|--------|
+| `RANDOMIZED_AB` | `HIGH_RANDOMIZED` | Strongest in catalog |
+| `SWITCHBACK` | `MEDIUM_SWITCHBACK` | Schedule/bucket fields reserved |
+| `CONTROLLED_BEFORE_AFTER` | `MEDIUM_CONTROLLED` | Explicit control arm |
+| `BEFORE_AFTER_OBSERVATIONAL` | `LOW_OBSERVATIONAL` | **Must not** be narrated as proof of causation |
+
+`evidence_design` equals `experiment_design` for AI manifest stability.
+
+Switchback reserved (no engine): `schedule`, `assignment_time_bucket`, `timezone`,
+`burn_in`, `burn_out`, `carryover_policy`.
+
+---
+
+## Control / counterfactual model
+
+`control_definition` MUST be explicit in every `ExperimentPlan`:
+
+- `RANDOMIZED_CONTROL_ARM`
+- `PRIOR_CONFIGURATION` (ref `state_token` / snapshot)
+- `MATCHED_ENTITY` (cmp/id set + match rule id)
+- `HISTORICAL_BASELINE` (baseline window only)
+- `SWITCHBACK_CONTROL_WINDOW` (reserved)
+
+Comparison semantics MUST NOT be implicit in prose.
+
+---
+
+## Data validity model
+
+`data_validity_status`: `VALID` | `PARTIAL` | `INVALID` | `UNKNOWN`
+
+**Reason codes** (multi-valued): `SOURCE_INCOMPLETE`, `SOURCE_COMPLETE_THROUGH_GAP`,
+`ATTRIBUTION_COVERAGE_LOW`, `RECONCILIATION_FAILED`, `METRIC_DEFINITION_MISMATCH`,
+`EXPOSURE_INTEGRITY_FAIL`, `MISSING_REQUIRED_INPUT`, `OBSERVATION_WINDOW_INCOMPLETE`,
+`CONCURRENT_INTERVENTION`, `STALE_OR_REVISED_SOURCE`.
+
+Evaluator MUST record validity snapshot on each evaluation run.
+
+---
+
+## Metric definition versioning
+
+Metrics in plans and results reference **MetricSpecRef**:
+
+- `metric_id`, `metric_definition_version`
+- `source_family` (CH / PG / export leg / future attribution-facts)
+- `grain`, `scope`
+- `numerator_semantics`, `denominator_semantics`
+- `coverage_requirements`
+- `analysis_window` (may point into `window_model`)
+- `evaluation_cutoff`, `source_complete_through`
+
+**FactualResult** stores metric values keyed by `(metric_id, metric_definition_version)`.
+
+Comparability rule: two values comparable only if same id+version+grain+scope.
+
+---
+
+## Window model
+
+Structured `ExperimentWindowModel` (timezone-aware):
+
+- `baseline_start`, `baseline_end`
+- `treatment_effective_from` (mirrors exposure)
+- `burn_in_end`, `burn_out_start` (optional)
+- `observation_start`, `observation_end`
+- `evaluation_cutoff`
+- `source_complete_through`
+- `evaluated_at` (set on run)
+- `timezone` (IANA)
+
+**Forbidden:** deriving observation windows from `DecisionRecord.created_at` alone.
+
+---
+
+## Concurrent interventions / confounders
+
+Append-only `CONFOUNDER_DETECTED` events with structured refs:
+
+- `PRICE_CHANGE`, `STOCK_AVAILABILITY`, `BUDGET_CHANGE`, `DRR_CPO_CHANGE`,
+  `CAMPAIGN_ACTIVATION`, `ASSORTMENT_CHANGE`, `OVERLAPPING_EXPERIMENT`, etc.
+
+Refs: `settings_state_token`, `decision_id`, `experiment_id`, or external fact id.
+
+Confounders do not auto-invalidate; they feed validity (`CONCURRENT_INTERVENTION`)
+and AI index `confounder_flags[]`.
+
+---
+
+## Intervention signature & similar experiment retrieval
+
+**intervention_signature** (deterministic canonical JSON hashed):
+
+- normalized `setting_keys[]`
+- `old_values` / `new_values` or deltas (typed)
+- `scope` (shop, cmp ids, nm ids)
+- `control_mode` if applicable
+- `changeset_semantic_digest` when available
+
+Free text MUST NOT be signature input.
+
+**Similar retrieval**
+
+1. Primary: exact or prefix match on `intervention_signature` / digest.
+2. Secondary (optional): vector similarity — **non-authoritative**, labeled `RETRIEVAL_HINT`.
+
+`decision_fingerprint` remains coarse decision-class similarity only.
+
+---
+
+## Analysis method & stopping rule
+
+Captured in `ExperimentPlan` (frozen):
+
+- `analysis_method`, `analysis_config_version`
+- `stopping_rule`: `FIXED_HORIZON` (V1 default), `FIXED_SAMPLE`, `SEQUENTIAL_RESERVED`
+- `target_duration` / `min_sample` when applicable
+- `minimum_meaningful_effect`
+
+AI MUST NOT alter stopping criteria after results exist; changes require new plan
+revision or `PROTOCOL_DEVIATION`.
+
+---
+
+## Factual result vs interpretation
+
+| Aggregate | Authority | Writable by |
+|-----------|-----------|-------------|
+| **FactualResult** | Deterministic evaluator + metric readers | System evaluator only |
+| **Interpretation** | Narrative, hypothesis refinement, follow-ups | AI/human append events |
+
+**Boundary:** Interpretation events MUST NOT overwrite factual metric values,
+validity status, deterministic outcome, or provenance refs. Separate ids:
+`factual_result_id`, `interpretation_id`.
+
+---
+
+## Provenance / reproducibility
+
+Each evaluation run carries `EvaluationProvenance`:
+
+- memory `schema_version`
+- `frozen_plan_digest`
+- `ai_package_id` / digest
+- source snapshot refs, `settings_state_token`
+- `changeset_semantic_digest`, dry-run / apply receipt refs
+- metric definition versions used
+- `analysis_config_version`
+- `evaluation_input_refs[]` (dataset slice ids)
+- `producer` + `producer_version`
+- `evaluation_run_digest`
+
+Prefer refs/digests over payload duplication.
+
+---
+
+## Post-hoc analysis model
+
+`PostHocAnalysisRecord`:
+
+- `analysis_kind`: `EXPLORATORY` | `POST_HOC`
+- links `experiment_id`, optional new metrics **not** in frozen plan
+- **Cannot** modify frozen `ExperimentPlan` bytes or preregistered outcome
+- conclusions stored as `Interpretation` with `is_post_hoc=true`
+
+---
+
+## Attribution-facts dependency
+
+| State | Planning stance |
+|-------|-----------------|
+| Change `attribution-facts-contract` | Known project artifact |
+| Slice A branch | `cursor/attribution-facts-contract-slice-a` |
+| PR #456 | May be open / not on `stage` |
+| Decision memory Slice A | **No hard dependency** on runtime attribution availability |
+| Evaluation Slice | MAY reference `attribution_fact_set_ref` when deployed version supports it; validity `UNKNOWN` if missing |
+
+---
+
+## Reader port (extended)
+
+`DecisionMemoryReader` adds:
+
+- `get_experiment_plan(experiment_id, plan_revision?)`
+- `get_factual_result(factual_result_id)`
+- `find_similar_experiments(intervention_signature_digest, shop_id, ...)`
+- `get_experiment_memory_index(scope)` → compact index entries
+
+---
+
+## AI Package future contract (`decision_memory_v1`)
+
+```json
+{
+  "schema_version": "decision_memory_v1",
+  "recent_decisions": [],
+  "active_experiments": [],
+  "recent_experiment_results": [],
+  "experiment_memory_index": []
+}
+```
+
+**experiment_memory_index** entry (compact, structured — not prose-primary):
+
+- `experiment_id`, `decision_id`, `intervention_signature_digest`
+- `experiment_design`, `causal_evidence_level`, `registration_kind`
+- `execution_state`, `outcome`, `data_validity_status`
+- `similar_prior_experiment_ids[]` (signature match)
+- `immutable_refs`: plan digest, apply receipt, evaluation_run_digest
+
+---
+
+## Revised implementation slices
+
+| Slice | Content | Notes |
+|-------|---------|-------|
+| **A** | Domain vocabulary, invariants, protocols, **test-only in-memory fake** + unit tests | **No PG**; `SLICE_A_BLOCKED_BY_APPLY=NO` |
+| **B** | PostgreSQL append-only persistence + projections | After A accepted |
+| **C** | Exposure / assignment / apply receipt ingest | Apply Authority + exposure rules |
+| **D** | Deterministic evaluator, validity, factual result, provenance | Metric catalog; soft attribution refs |
+| **E** | Post-hoc analysis records + interpretation append | |
+| **F** | AI Package `decision_memory_v1` + index | `ai_package_v1` read-only |
+
+Do not freeze physical schema before Slice A vocabulary sign-off.
+
+## Risks
+
+- Premature PG schema before plan freeze semantics → mitigated by Slice A-first.
+- Observational designs misread as causal → `causal_evidence_level` + AI index fields.
+- Attribution not on stage → validity UNKNOWN, not blocking vocabulary work.

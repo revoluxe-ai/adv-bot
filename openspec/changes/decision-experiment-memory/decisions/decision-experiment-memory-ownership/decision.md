@@ -1,82 +1,103 @@
-# Decision: decision-experiment-memory-ownership
+# Decision: Decision and experiment memory ownership
 
 ## Status
 
-Proposed
-
-> **Not promoted** to `openspec/decisions/` until Owner Contract Review GO.
+Accepted (promoted to `openspec/decisions/decision-experiment-memory-ownership/decision.md`)
 
 ## Context
 
-WB Sky needs durable, transport-independent memory of decision semantics and
-experiment outcomes. Settings history, Apply audit, attribution facts, and metric
-pipelines each own different truths. A new module must own decision/experiment
-**semantics and result history** without becoming a write authority or duplicating
-foreign payloads.
+WB Sky separates settings snapshots (`campaign-settings-history`), ChangeSet
+validation (`wb_sky_control_plane` dry-run), and (planned) Apply Authority.
+`ChangeSetMetadataV1` already carries optional `decision_id` / `experiment_id` but
+no durable semantic store exists. AI Package and future MCP agents need a single
+read contract for WHY / EXPECT / OUTCOME without becoming mutation authority.
+
+No accepted decision in `openspec/decisions/` assigns this ownership today.
 
 ## Decision
 
-**Owner:** `app/modules/decision_experiment_memory/` for:
+1. **Decision-experiment memory** is a dedicated domain module
+   `app/modules/decision_experiment_memory/` (Slice A+: vocabulary first).
 
-- decision semantics (`DecisionMemoryRecord`);
-- preregistered experiment plan (`ExperimentPlanV1`, freeze/deviation semantics);
-- experiment lifecycle semantics (`ExperimentRecordV1`, execution_state);
-- validity and evaluation semantics (outcome vocabulary, deterministic rules);
-- result history and provenance linkage (refs/digests only);
-- reader ports and (Slice B+) PostgreSQL event/projections.
+### Owns (semantic memory authority)
 
-**AI Package exposure (Slice E):** `app/modules/ai_package_v1/decision_memory/`
-read-only assembler calling the reader port (`READ_ONLY_NO_MUTATION` per
-`ai-package-v1-exporter-ownership`).
+- Decision semantics (`DecisionMemoryRecord` / `decision_id`)
+- Preregistered **`ExperimentPlan`** revisions and freeze/deviation semantics
+- Experiment lifecycle semantics (`ExperimentRecordV1` / `experiment_id`, execution vs outcome)
+- `treatment_mode` (`LIVE` | `SHADOW`) distinct from `experiment_design`
+- Evaluation and **data validity** semantics
+- **Factual** experiment-result history (`FactualResult`)
+- **Interpretation** records and **provenance** linkage (refs/digests, not source payloads)
+- Append-only memory events and `DecisionMemoryReader` projections
+
+### Does not own (reference only)
+
+- Campaign / settings truth → `campaign-settings-history`, settings registry
+- Product / catalog truth → respective domain authorities
+- **Apply execution truth** → future Apply Authority (`ApplyEvidenceRef` only in memory)
+- **Factual source metric truth** → CH/PG/export metric authorities (`MetricSpecRef`)
+- **Attribution truth** → `attribution-facts-contract` when deployed
+
+No authoritative payload duplication in memory SoT.
+
+2. It is **not** write authority for campaign settings, WB API, or Apply. It MAY
+   append metadata events only; Apply Authority remains sole production mutation
+   truth.
+3. It MUST reference — not copy — authoritative payloads:
+   - settings: `state_token` / history snapshot ids (`campaign-settings-history`);
+   - intent: `changeset_id` + `semantic_digest` (`ChangeSetV1`);
+   - validation: `dry_run_receipt_id` + digest;
+   - execution: `ApplyEvidenceRef` (`apply_evidence_id` + optional digest; no receipt body);
+   - attribution: `attribution_fact_set_ref` when `attribution-facts-contract`
+     is deployed (optional; validity degrades if missing).
+4. **PostgreSQL** is the V1 authoritative store for events and projections;
+   ClickHouse MAY receive derived analytics later but MUST NOT be SoT for memory.
+5. AI Package export (`ai_package_v1`) MAY consume `DecisionMemoryReader` in a
+   separate change; exporter MUST stay `READ_ONLY_NO_MUTATION`.
+6. Card A/B Hold durable state remains owned by A/B Hold decisions; memory MAY
+   store optional opaque `product_experiment_ref` but MUST NOT re-implement hold
+   write-path or epoch lifecycle.
 
 ## Applies to
 
-- AI-first control loop memory;
-- future ChatGPT/API/MCP read surfaces;
-- ingest adapters from ChangeSet metadata, dry-run, Apply audit, settings history.
+- AI/human/system decision capture and experiment outcome recording.
+- Future Apply receipt ingest hooks.
+- AI Package `decision_memory_v1` block (future slice).
 
 ## Allowed
 
-- Append-only events + projections in PostgreSQL (Slice B+).
-- Optional `ApplyEvidenceRef` in domain without concrete Apply payload (Slice A).
-- Multiple `experiment_id` per `decision_id` in storage; V1 API may limit creates.
-- Separate `experiment_design` and `treatment_mode` axes.
+- Decision without experiment.
+- Append-only correction events and superseding records.
+- Deterministic `intervention_signature` for experiment similarity; `decision_fingerprint`
+  for coarse decision-class hints only.
+- LLM narrative only in `Interpretation` / decision prose fields (not factual outcome).
+- Frozen `ExperimentPlan` with `PLAN_FROZEN` before confirmatory outcome inspection.
 
 ## Forbidden
 
-- Treating decision/experiment records as Apply permission.
-- Owning campaign settings truth (reference `campaign_settings_history` / contract).
-- Owning Apply execution truth (reference Apply audit).
-- Owning attribution or raw metric SoT (reference external bundles).
-- Copying full ChangeSet bodies or settings payloads when digest/id suffices.
-- Placing memory owner in `wb_sky_control_plane`, `campaign_settings_history`,
-  `shop_runner`, or shop-runner write paths.
-- Equating `experiment_id` and `decision_id` as invariant.
-- Encoding `SHADOW` as `experiment_design`.
+- Using decision memory to authorize apply or bypass Apply Authority.
+- Duplicating campaign settings history rows or ChangeSet bodies as canonical memory.
+- Labeling apply confirmed or LIVE exposure without `ApplyEvidenceRef` / effective-state evidence.
+- Enforcing `experiment_id = decision_id` as identity invariant.
+- Shop-runner or WB API calls from reader/export paths.
+- Silent UPDATE of historical reasoning events.
 
 ## Examples
 
-**Good:** `ExperimentRecordV1` stores `changeset_semantic_digest` + `ApplyEvidenceRef`
-with `binding_status=BOUND` after Slice C ingest.
+Good:
 
-**Bad:** `DecisionMemoryRecord` triggers `validate_changeset` apply or WB PATCH.
+- Record decision with hypothesis + link dry-run receipt → status `VALIDATED`.
+- Experiment concludes `INCONCLUSIVE` when metric coverage below `min_coverage`.
 
-**Bad:** `experiment_id` defaulted to `decision_id` in schema primary key.
+Bad:
 
-## Related specs
+- Storing full AdvSetting JSON in decision row as authority for current settings.
+- Creating second decision on duplicate apply receipt id.
 
-- `openspec/changes/decision-experiment-memory/specs/decision-experiment-memory/spec.md`
+## References
 
-## Related changes
-
-- `decision-experiment-memory` (this change)
-- `changeset-apply-authority` (future linkage consumer)
-- `campaign-settings-changeset-contract` (ChangeSet metadata reuse)
-
-## Review checklist
-
-- [ ] Existing decisions searched before implementation.
-- [ ] Relevant decisions cited by path in design.md.
-- [ ] Ownership and placement match this decision.
-- [ ] No forbidden layer performs memory ownership.
-- [ ] Slice A ships without PostgreSQL and without Apply payload types.
+- `openspec/specs/campaign-settings-history/spec.md`
+- `openspec/specs/campaign-settings-changeset-contract/spec.md`
+- `openspec/decisions/campaign-settings-contract-ownership/decision.md`
+- `openspec/decisions/ai-package-v1-exporter-ownership/decision.md`
+- `openspec/changes/decision-experiment-memory/design.md`

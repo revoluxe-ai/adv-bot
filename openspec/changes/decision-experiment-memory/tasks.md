@@ -1,51 +1,57 @@
-# Tasks: decision-experiment-memory
+## 1. Planning gate
 
-Planning + phased implementation. **No production deploy in this change until
-explicit Owner GO per slice.**
+- [x] 1.1 Initial planning package.
+- [x] 1.2 Methodology addendum repair.
+- [x] 1.2b Final architecture locks.
+- [x] 1.3 Owner contract review — architecture accepted.
+- [x] 1.4 Scenario coverage plan + receipt (`scenario-coverage/`).
+- [x] 1.5 Spec repair: INVALID/INCONCLUSIVE mapping, `experiment_design`, abort projection.
+- [ ] 1.6 `/opsx-planning-review change=decision-experiment-memory` PASS.
+- [x] 1.7 ADL promoted to `openspec/decisions/decision-experiment-memory-ownership/`.
+- [ ] 1.4 ADL promotion deferred until Owner accepts planning + post-review.
 
-SCENARIO_PLAN_RECEIPT: openspec/changes/decision-experiment-memory/scenario-coverage/plan.receipt.json
+## 2. Slice A — domain vocabulary only (no PG, no Apply runtime)
 
-## 0. Planning gates (this PR)
+**`SLICE_A_BLOCKED_BY_APPLY = NO`** — `ApplyEvidenceRef` types + invariants only.
 
-- [x] 0.1 `owner-contract.md`, `design.md`, delta spec, proposed ADR, `tasks.md`
-- [x] 0.2 `scenario-coverage/plan.md` + `plan.receipt.json`
-- [x] 0.3 `poetry run check-openspec` + `git diff --check`
+- [ ] 2.1 Domain types: `DecisionMemoryRecord`, `ExperimentRecordV1`, `ExperimentPlan`,
+  `treatment_mode`, `ApplyEvidenceRef`, WindowModel, MetricSpecRef, ExposureModel,
+  FactualResult, Interpretation, PostHocAnalysisRecord, ValiditySnapshot,
+  EvaluationProvenance, InterventionSignature.
+- [ ] 2.2 Event taxonomy + projection rules (execution_state, outcome, plan freeze);
+  cardinality 0..N compatible, V1 writer may enforce 0..1.
+- [ ] 2.3 `DecisionMemoryReader` + repository protocols; **test-only in-memory fake**
+  (not production store).
+- [ ] 2.4 Unit tests: invariants (EVALUATED+INCONCLUSIVE, freeze gate, exposure gate,
+  validity blocks SUCCEEDED/FAILED, observational causal level).
+- [ ] 2.5 **Vocabulary freeze sign-off** before Slice B schema.
 
-## 1. Slice A — pure domain (no PostgreSQL)
+## 3. Slice B — PostgreSQL persistence
 
-- [ ] 1.1 Types: `DecisionMemoryRecord`, `ExperimentRecordV1`, `ExperimentPlanV1`,
-  refs (`ApplyEvidenceRef`, settings/package/attribution pointers)
-- [ ] 1.2 Enums: `experiment_design`, `treatment_mode`, `execution_state`, `outcome`,
-  `validity_status`, protocol deviation codes
-- [ ] 1.3 Plan registration/freeze: `plan_revision`, `plan_digest`, `PLAN_REGISTERED` /
-  `PLAN_AMENDED` semantics (pure functions)
-- [ ] 1.4 Invariants: independent ids; 1:N storage; APPLY_CONFIRMED requires BOUND
-  Apply ref; LIVE exposure rules; execution_state ⊥ outcome
-- [ ] 1.5 Reader port protocols (no IO)
-- [ ] 1.6 Unit tests: cardinality, two-axis state, plan freeze, Apply-unbound paths
+- [ ] 3.1 Forward-only event tables + projections (after A freeze).
+- [ ] 3.2 Idempotency indexes on receipt and evaluation digests.
 
-## 2. Slice B — persistence
+## 4. Slice C — assignment / apply / exposure ingest
 
-- [ ] 2.1 Event model + Alembic forward-only tables (after Slice A GO)
-- [ ] 2.2 Projections + repository implementing reader port
-- [ ] 2.3 Idempotency keys per design (integration tests)
+- [ ] 4.1 `EXPOSURE_CONFIRMED` from apply receipt + settings history.
+- [ ] 4.2 ChangeSet metadata linkage.
 
-## 3. Slice C — linkage ingest
+## 5. Slice D — evaluation + validity + factual results
 
-- [ ] 3.1 ChangeSet / dry-run receipt adapters
-- [ ] 3.2 Apply audit → `ApplyEvidenceRef` binding (when apply-authority exists)
-- [ ] 3.3 Settings history snapshot refs on decision/experiment timeline
+- [ ] 5.1 Deterministic evaluator (fixed horizon V1).
+- [ ] 5.2 Optional `attribution_fact_set_ref` when contract deployed.
+- [ ] 5.3 Confounder event ingest hooks.
 
-## 4. Slice D — evaluation
+## 6. Slice E — post-hoc + interpretation append
 
-- [ ] 4.1 Deterministic evaluator + validity assessment
-- [ ] 4.2 Outcome recording, late metrics, correction events
+- [ ] 6.1 PostHocAnalysisRecord distinct from preregistered outcomes.
 
-## 5. Slice E — AI Package read exposure
+## 7. Slice F — AI Package `decision_memory_v1`
 
-- [ ] 5.1 Datasets `recent_decisions`, `active_experiments`, `experiment_results`
-- [ ] 5.2 Manifest schema version bump + contract tests (no MCP server)
+- [ ] 7.1 `recent_decisions`, `active_experiments`, `recent_experiment_results`,
+  `experiment_memory_index`.
 
-## 6. ADR promotion (separate Owner GO)
+## 8. Verification (implementation phase)
 
-- [ ] 6.1 Promote `decision-experiment-memory-ownership` to `openspec/decisions/` Accepted
+- [ ] 8.1 `openspec validate --change decision-experiment-memory --strict`
+- [ ] 8.2 Adjacent unit/integration per slice.

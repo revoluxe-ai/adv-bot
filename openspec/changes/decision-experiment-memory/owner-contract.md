@@ -2,61 +2,46 @@
 
 ## Что хотим получить
 
-Transport-independent память WB Sky о **семантике решений** и **фактических
-экспериментах**: наблюдение, гипотеза, preregistered plan, intervention linkage,
-validity, результаты и outcome. Две сущности с **независимыми** идентичностями:
-
-- `DecisionMemoryRecord` (`decision_id`)
-- `ExperimentRecordV1` (`experiment_id`, `decision_id` FK)
-
-Кардинальность: одно решение → **0..N** экспериментов (ретест, switchback,
-follow-up). V1 API **может** ограничить создание одним экспериментом на решение,
-но контракт хранения **не** запрещает 1:N.
-
-Отдельно фиксируются:
-
-- **experiment_design** — как производится доказательство (causal/observational design);
-- **treatment_mode** — применяется ли LIVE-вмешательство в прод (`LIVE` | `SHADOW`).
-
-Запись решения/эксперимента **никогда** не является разрешением на production write.
-Apply Authority остаётся единственным write gate.
+Канонический контракт памяти решений и экспериментов WB Sky: почему предлагалось
+изменение, на каких фактах оно основано, какой ChangeSet связан, было ли применение
+подтверждено отдельным Apply-контуром, и чем закончилась проверка гипотезы.
+Будущие ChatGPT / API / MCP агенты смогут отвечать на вопросы «что решили», «почему»,
+«что ожидали», «применили ли», «сработало ли», «пробовали ли похожее раньше».
 
 ## Зачем
 
-AI-контур должен отвечать: что решили, на каких evidence, какой ChangeSet,
-был ли apply, что ожидали, что измерили, succeeded/failed/inconclusive/invalid.
-Settings history отвечает «что изменилось в настройках»; Apply audit — «что
-выполнили»; attribution — «экономические факты». Этот change — «почему и какой
-смысл/результат эксперимента».
+Сейчас есть снимки настроек, dry-run ChangeSet и отдельные контуры экспериментов
+(A/B Hold), но нет единого семантического слоя «решение → ожидание → результат».
+Без него AI повторяет гипотезы и не может аудировать прошлые рассуждения.
 
 ## Что должно остаться неизменным
 
-- PostgreSQL — authority текущих настроек; CH `campaign_settings_history` — timeline
-  settings (`snapshot_id`, `state_hash`).
-- `wb_sky_control_plane` — ChangeSet dry-run; link only, not owner memory.
-- `keyword_decisions` / `bid_decision_log` — bid telemetry, **не** decision memory.
-- Product `card_ab_hold` epoch — отдельный продукт; только optional cross-ref.
+- `campaign-settings-history` остаётся authority «какие настройки были / менялись».
+- Apply Authority (будущий) остаётся единственным authority production mutation.
+- A/B Hold lifecycle и write-path — отдельный продуктовый контур; эта память только
+  ссылается на него, не подменяет.
+- AI Package export остаётся read-only; новые поля — только после отдельного slice.
 
 ## Чего сейчас не делаем
 
-Нет миграций, production write, deploy, MCP transport, копирования authoritative
-payloads (только IDs/digests/refs). Нет промоушена ADR в registry до Owner GO.
-Нет блокировки Slice A на появление ApplyReceipt — только optional
-`ApplyEvidenceRef`.
+- Реализацию, миграции, production writes.
+- MCP transport и расширение ZIP AI Package (slice F).
+- Слияние с campaign-settings-history, attribution-facts, shop-wide collection.
+- LLM как единственный судья успеха эксперимента.
 
 ## Как поймём, что получилось
 
-**Planning (этот пакет):** согласованные `owner-contract.md`, `design.md`, delta
-spec, proposed ADR, `tasks.md`, scenario-coverage plan + receipt, `check-openspec`
-PASS.
+- Принят spec + design + proposed architecture decision с явными границами ownership.
+- Описаны lifecycle, append-only corrections, idempotency и reader port.
+- Implementation slices A–F согласованы с фактическим состоянием репозитория
+  (dry-run есть, Apply evidence — gap; AI Package — slice F).
 
-**После implementation (отдельные GO):** Slice A unit-тесты инвариантов без PG;
-позже Slice B+ персистенция и ingest.
+## Решения Owner
 
-## Решения Owner (planning)
-
-- Independent `decision_id` / `experiment_id`; **MUST NOT** equate them.
-- SHADOW — `treatment_mode`, не `experiment_design`.
-- `execution_state` и `outcome` — ортогональные оси.
-- Without authoritative Apply evidence: no `APPLY_CONFIRMED`; no factual LIVE
-  `effective_from`; no valid LIVE exposure claims.
+- Память решений — семантический слой WHY / EXPECT / OUTCOME; не write authority.
+- `decision_id` и `experiment_id` — разные идентичности (1 решение → 0..N экспериментов
+  в контракте; в V1 можно ограничить 0..1 на создании).
+- `treatment_mode` (LIVE/SHADOW) отдельно от `experiment_design`; Apply — только
+  через `ApplyEvidenceRef`, без payload; Slice A не ждёт Apply Authority.
+- attribution-facts — будущий authoritative evidence слой (контракт в проекте,
+  может быть не на stage); память решений не блокируется его отсутствием на Slice A.
