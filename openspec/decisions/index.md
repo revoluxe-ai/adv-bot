@@ -89,6 +89,11 @@ architecture decisions belong here.
   - Scope: canonical campaign settings field registry ownership; fail-closed
     classification for history and Excel projections; PostgreSQL remains
     current-settings authority.
+- [campaign-settings-changeset-ownership](campaign-settings-changeset-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `ChangeSetV1`, dry-run validation, `sd1`/`st1`, and `wb_sky_control_plane`
+    ownership; no production writes from dry-run; registry reuse only from
+    `campaign_settings_contract`.
 - [shop-runner-shop-wide-collection](shop-runner-shop-wide-collection/decision.md)
   - Status: Accepted
   - Scope: shop-wide campaign ad data collection executor is shop-runner only;

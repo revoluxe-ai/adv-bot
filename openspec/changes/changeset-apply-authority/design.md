@@ -41,9 +41,8 @@ removal, promoted ADR merge (proposed only).
 
 - `openspec/decisions/campaign-settings-contract-ownership/decision.md`
 - `openspec/specs/campaign-settings-changeset-contract/spec.md`
+- `openspec/decisions/campaign-settings-changeset-ownership/decision.md` (Accepted)
 - Proposed: `decisions/changeset-apply-authority-ownership/decision.md`
-- Archive (changeset ownership not in registry index yet):
-  `openspec/changes/archive/2026-10-07-campaign-settings-changeset-contract/decisions/campaign-settings-changeset-ownership/decision.md`
 
 ## Ownership & Placement
 
@@ -163,26 +162,36 @@ Immutable receipt fields at issue: `receipt_id`, `issued_at`, `expires_at`, `sco
 
 **Slice A:** vocabulary + ports + in-memory fake store. **Not blocked** by PG persistence.
 
-### Receipt lifecycle
+### Receipt lifecycle (one-shot reviewed evidence)
 
-| State | Meaning |
-|-------|---------|
-| `ISSUED` | valid for new apply if not expired |
-| `CLAIMED` | bound to in-flight `apply_attempt_id` (short lease) |
-| `CONSUMED` | successful `VERIFIED` apply committed |
-| `EXPIRED` | past `expires_at` |
-| `INVALIDATED` | superseded (e.g. new dry-run for same intent policy) |
+Terminal receipt states: `CONSUMED`, `EXPIRED`, `INVALIDATED`, `BLOCKED_RECONCILIATION`.
+Non-terminal: `ISSUED`, `CLAIMED` (lease).
 
-**Consumption point:** atomically with successful apply transaction commit
-(`CONSUMED`). **Claim** before writer phase; release claim on pre-write `REJECTED`/`FAILED` rollback.
+**ABA safety:** once `INVALIDATED`, a receipt **never** returns to `ISSUED` even if
+authoritative state later matches the original `st1` / field values (A→B→A does not
+resurrect reviewed evidence). No monotonic global version required in Slice A.
 
-Cases:
+#### Transition table
 
-- **A** validation reject before claim/commit → receipt stays `ISSUED` (or claim released).
-- **B** stale `st1` → reject; receipt remains unusable for changed state (new dry-run required).
-- **C** verified apply → `CONSUMED`; cannot authorize second distinct apply.
-- **D** `UNKNOWN_*` terminal → receipt `CONSUMED` or `INVALIDATED` (no fresh independent retry on same receipt).
-- **E** idempotent replay → return prior `ApplyEvidenceV1` via **idempotency store**, not by reusing an open receipt.
+| Apply outcome / event | Receipt transition | New apply on same receipt? |
+|----------------------|--------------------|---------------------------|
+| `ISSUED` + TTL elapsed | → `EXPIRED` | No |
+| Successful `VERIFIED` COMMIT | → `CONSUMED` (atomic with evidence) | No |
+| `STALE_STATE` | → `INVALIDATED` (permanent) | No — fresh dry-run |
+| `PREVIEW_DIGEST_MISMATCH` | → `INVALIDATED` | No |
+| `CAPABILITY_DRIFT` | → `INVALIDATED` | No |
+| `CHANGESET_DIGEST_MISMATCH` (wrong body vs receipt) | **unchanged** | No — reject bad request only |
+| `UNAUTHORIZED` | **unchanged** | No — no burn on auth failure |
+| Pre-write `REJECTED`/`FAILED` (other, txn rolled back) | `CLAIMED` → `ISSUED` (release claim) | Yes if still `ISSUED` + not expired |
+| `UNKNOWN_INTERNAL_COMMIT` | → `BLOCKED_RECONCILIATION` | No blind retry until reconciliation |
+| `UNKNOWN_EXTERNAL_STATE` (Slice D) | → `BLOCKED_RECONCILIATION` | No blind retry until reconciliation |
+| Authorized idempotent replay (fingerprint hit) | unchanged (may already be `CONSUMED`) | N/A — returns existing evidence, no mutation |
+
+**Claim:** `ISSUED` → `CLAIMED` at start of writer transaction; release to `ISSUED` on
+rolled-back pre-commit failures except rows that mandate `INVALIDATED`.
+
+**Idempotent replay:** uses idempotency store + authorization; does not re-execute
+mutation or consume an already `CONSUMED` receipt again.
 
 ## Dry-run binding (apply validation)
 
@@ -223,7 +232,7 @@ participating in Apply locks → residual race until migration. Apply detects vi
 | same key + same fingerprint + `VERIFIED` | replay immutable `ApplyEvidenceV1`; no write |
 | same key + different fingerprint | `IDEMPOTENCY_CONFLICT` |
 | same key + in-flight attempt | `APPLY_IN_PROGRESS` |
-| failed before commit | retry allowed with same receipt if still `ISSUED` |
+| failed before commit (claim released) | retry allowed if receipt still `ISSUED` and not invalidated |
 
 **Replay authorization:** idempotent hit MUST still authenticate `context` and
 authorize shop/evidence read. Same key + same fingerprint + **unauthorized**
@@ -271,7 +280,7 @@ Do not mutate evidence rows through lifecycle states.
 
 | Terminal status | Typical reason_code |
 |-----------------|---------------------|
-| `REJECTED` | `VALIDATION_REJECTED`, `UNAUTHORIZED`, `STALE_STATE`, `CHANGESET_DIGEST_MISMATCH`, `PREVIEW_DIGEST_MISMATCH`, `CAPABILITY_DRIFT`, `RECEIPT_INVALID` |
+| `REJECTED` | `VALIDATION_REJECTED`, `UNAUTHORIZED`, `STALE_STATE`, `CHANGESET_DIGEST_MISMATCH`, `PREVIEW_DIGEST_MISMATCH`, `CAPABILITY_DRIFT`, `RECEIPT_INVALID`, `IDEMPOTENCY_CONFLICT`, `RECEIPT_BLOCKED_RECONCILIATION` |
 | `FAILED` | `WRITER_REJECTED`, `VERIFICATION_MISMATCH`, `TRANSACTION_ROLLED_BACK` |
 | `VERIFIED` | — |
 | `UNKNOWN_INTERNAL_COMMIT` | commit acknowledgement lost |
@@ -333,7 +342,6 @@ No automatic WB retry on unknown external outcome.
 
 ## Open Questions
 
-- Promote archived `campaign-settings-changeset-ownership` into `openspec/decisions/`.
 - Receipt TTL default (e.g. 15m / 24h).
 - Exact `APPLY_IN_PROGRESS` visibility timeout for clients.
 - Whether audit must be same-txn mandatory or compensating job acceptable.

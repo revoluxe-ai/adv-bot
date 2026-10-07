@@ -57,9 +57,7 @@ dry-run.
 - Merged foundation: `openspec/specs/campaign-settings-changeset-contract/spec.md`
 - `openspec/decisions/campaign-settings-contract-ownership/decision.md` (PG current
   settings authority)
-- Archived decision evidence:
-  `openspec/changes/archive/2026-10-07-campaign-settings-changeset-contract/decisions/campaign-settings-changeset-ownership/decision.md`
-  (**not yet** in `openspec/decisions/index.md` — see design evidence gaps)
+- `openspec/decisions/campaign-settings-changeset-ownership/decision.md` (promoted in this PR)
 
 ## Evidence Gaps (planning)
 
@@ -67,6 +65,6 @@ dry-run.
 |-----|--------|
 | `preview_digest` (`pd1`) helper in repo | **Missing** — normative in this change only |
 | Apply / receipt persistence tables | **Missing** — by design until Slice B |
-| Promoted `campaign-settings-changeset-ownership` ADR in registry | **Missing** — use archive + main spec until promotion |
+| Promoted `campaign-settings-changeset-ownership` ADR in registry | **Addressed** in this PR |
 | Decision Experiment Memory product module | **Not found** in repo — boundary documented conceptually |
 | Canonical domain `PrincipalRef` type | **Missing** — reuse `LogicalScopeV1` + new `PrincipalRefV1` in apply contract |

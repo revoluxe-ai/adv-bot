@@ -231,6 +231,42 @@ SCENARIO_EVIDENCE_ROW:
   SLICE: A (doc), C
   ROW_PLAN: required
 
-SCENARIOS_TOTAL: 29
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S30
+  REQUIREMENT: Stale receipt permanent invalidation
+  SLICE: B, C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S31
+  REQUIREMENT: ABA receipt safety
+  SLICE: A, B
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S32
+  REQUIREMENT: Unauthorized preserves receipt
+  SLICE: A, C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S33
+  REQUIREMENT: Digest mismatch preserves receipt
+  SLICE: A
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S34
+  REQUIREMENT: Commit unknown blocks retry
+  SLICE: B, C
+  ROW_PLAN: required
+
+SCENARIO_EVIDENCE_ROW:
+  SCENARIO_ID: S35
+  REQUIREMENT: Idempotent replay no mutation
+  SLICE: B, C
+  ROW_PLAN: required
+
+SCENARIOS_TOTAL: 35
 LIFECYCLE_GAPS: none at planning
 SPEC_SCENARIO_MISSING: none

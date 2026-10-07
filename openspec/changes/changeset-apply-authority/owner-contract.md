@@ -42,7 +42,8 @@ main dry-run spec.
   `state_token` + immutable evidence.
 - Stale token / capability drift / digest mismatch / unauthorized actor →
   **fail closed**, writer не вызывается (или rollback до writer).
-- Idempotency: повтор с тем же ключом и тем же semantic request → тот же
+- Idempotency: повтор с тем же `(shop_id, idempotency_key)` и тем же fingerprint
+  (`apply_contract_version` + `sd1` + `pd1`) у авторизованного principal → тот же
   evidence, без второй записи.
 - `UNKNOWN_EXTERNAL_STATE` никогда не отображается как успех (V1: reserved for
   Slice D WB; PG-only path uses `FAILED` / `UNKNOWN_INTERNAL_COMMIT`).

@@ -67,21 +67,24 @@ before write.
 
 ### Requirement: Idempotency
 
-Apply MUST persist idempotency keyed by `(scope.shop_id, idempotency_key)` and
-`semantic_digest`.
+Apply MUST persist idempotency keyed by `(scope.shop_id, idempotency_key)`.
+Replay fingerprint MUST be `apply_contract_version` + `semantic_digest` (`sd1`) +
+`preview_digest` (`pd1`). Same key with different fingerprint MUST conflict.
 
 #### Scenario: Same idempotency key and same request replays evidence (S03)
 
-- **GIVEN** a completed `VERIFIED` apply for `(shop, key)` and `sd1_X`
-- **WHEN** an identical `ApplyRequestV1` is submitted again
+- **GIVEN** a completed `VERIFIED` apply for `(shop, key)` with fingerprint F
+  (`apply_v1` + `sd1_X` + `pd1_X`)
+- **WHEN** an authorized caller submits the same fingerprint F again
 - **THEN** Apply Authority MUST return the existing `ApplyEvidenceV1`
 - **AND** MUST NOT perform a duplicate PG write
 
 #### Scenario: Same key different semantic request conflicts (S04)
 
-- **GIVEN** a prior apply record for `(shop, key)` bound to `sd1_X`
-- **WHEN** a new request arrives with the same key and `sd1_Y` where `Y ≠ X`
-- **THEN** status MUST be `IDEMPOTENCY_CONFLICT`
+- **GIVEN** a prior apply record for `(shop, key)` bound to fingerprint F1
+- **WHEN** a new request arrives with the same key and fingerprint F2 where `F2 ≠ F1`
+  (including different `sd1` or `pd1` or `apply_contract_version`)
+- **THEN** terminal status MUST be `REJECTED` with reason `IDEMPOTENCY_CONFLICT`
 - **AND** no write MUST occur
 
 ### Requirement: Capability revalidation at apply
@@ -250,7 +253,7 @@ prior evidence.
 - **GIVEN** a prior `VERIFIED` apply for `(shop_id, idempotency_key)`
 - **AND** a new call with the same fingerprint but an unauthorized `ApplyInvocationContext`
 - **WHEN** Apply Authority handles the request
-- **THEN** status MUST be `UNAUTHORIZED`
+- **THEN** terminal status MUST be `REJECTED` with reason `UNAUTHORIZED`
 - **AND** MUST NOT return the prior `ApplyEvidenceV1` payload
 
 ### Requirement: Dry-run receipt lifecycle
@@ -268,9 +271,9 @@ prior evidence.
 #### Scenario: Pre-write rejection does not consume receipt (S24)
 
 - **GIVEN** a receipt in `ISSUED` state
-- **WHEN** apply fails with `STALE_STATE` before mutation commit
+- **WHEN** apply fails with a rolled-back pre-write error other than stale/drift/mismatch invalidation
 - **THEN** receipt MUST NOT transition to `CONSUMED`
-- **AND** a new dry-run remains required for changed state
+- **AND** claim MUST be released back to `ISSUED` when applicable
 
 ### Requirement: Attempt lifecycle separate from immutable evidence
 
@@ -335,3 +338,76 @@ with non-Apply mutation paths.
 - **WHEN** apply runs with stale `st1` relative to reviewed receipt
 - **THEN** Apply MUST reject with `STALE_STATE`
 - **AND** global sole write gate for all settings paths MUST NOT be claimed
+
+### Requirement: Stale receipt permanent invalidation
+
+When apply detects `STALE_STATE` relative to reviewed receipt, the receipt MUST
+transition to `INVALIDATED` permanently and MUST NOT be reused even if state later
+matches the original snapshot.
+
+#### Scenario: Stale receipt invalidates permanently (S30)
+
+- **GIVEN** a dry-run receipt issued for state generation `st1_A`
+- **WHEN** apply detects authoritative `st1_B` and returns `STALE_STATE`
+- **THEN** receipt MUST become `INVALIDATED`
+- **AND** a subsequent return to `st1_A` MUST NOT resurrect the receipt to `ISSUED`
+
+### Requirement: ABA receipt safety
+
+Invalidated receipts MUST NOT become usable again solely because authoritative state
+returns to a value that appears identical to the reviewed snapshot (A→B→A).
+
+#### Scenario: ABA does not resurrect receipt (S31)
+
+- **GIVEN** a receipt `INVALIDATED` after `STALE_STATE` at generation B
+- **AND** authoritative state later returns to generation A matching the original dry-run token
+- **WHEN** a client attempts apply with the old receipt id
+- **THEN** status MUST be `REJECTED` with `RECEIPT_INVALID`
+- **AND** a fresh dry-run MUST be required
+
+### Requirement: Unauthorized apply does not burn receipt
+
+Authorization failure MUST NOT transition a valid receipt to `INVALIDATED` or `CONSUMED`.
+
+#### Scenario: Unauthorized caller preserves receipt (S32)
+
+- **GIVEN** a valid `ISSUED` receipt and a mismatched unauthorized `ApplyInvocationContext`
+- **WHEN** Apply Authority rejects with `UNAUTHORIZED`
+- **THEN** receipt state MUST remain `ISSUED`
+- **AND** no writer MUST be invoked
+
+### Requirement: ChangeSet digest mismatch does not burn receipt
+
+Submitting a wrong `ChangeSet` body against a valid receipt MUST reject the request
+without invalidating the receipt that belongs to the originally reviewed ChangeSet.
+
+#### Scenario: Digest mismatch preserves receipt (S33)
+
+- **GIVEN** receipt R bound to `sd1_X` for ChangeSet body X
+- **WHEN** apply is called with body Y where `sd1_Y ≠ sd1_X` but the same receipt id
+- **THEN** status MUST be `CHANGESET_DIGEST_MISMATCH`
+- **AND** receipt R MUST remain `ISSUED` (not `INVALIDATED`)
+
+### Requirement: Commit-unknown blocks blind retry
+
+`UNKNOWN_INTERNAL_COMMIT` MUST block fresh apply on the same receipt until reconciliation
+determines committed vs rolled back.
+
+#### Scenario: Commit unknown blocks receipt reuse (S34)
+
+- **GIVEN** an apply attempt ended in `UNKNOWN_INTERNAL_COMMIT`
+- **WHEN** a client retries apply with the same receipt without reconciliation
+- **THEN** terminal status MUST be `REJECTED` with reason `RECEIPT_BLOCKED_RECONCILIATION`
+- **AND** automatic duplicate mutation MUST NOT occur
+
+### Requirement: Authorized idempotent replay without re-execution
+
+Idempotent replay MUST return existing evidence without writer execution or receipt re-consumption.
+
+#### Scenario: Idempotent replay no mutation (S35)
+
+- **GIVEN** a completed `VERIFIED` apply for `(shop_id, idempotency_key)` and fingerprint F
+- **AND** an authorized `ApplyInvocationContext`
+- **WHEN** apply is invoked again with the same fingerprint F
+- **THEN** existing `ApplyEvidenceV1` MUST be returned
+- **AND** PG policy writers MUST NOT be invoked again
