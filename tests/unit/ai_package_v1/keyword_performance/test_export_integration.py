@@ -9,6 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.domain.enums import DatasetId
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.export.export_service import ExportService
@@ -87,6 +90,7 @@ async def test_default_export_keyword_enabled(fake_deps: FakeKeywordDeps) -> Non
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=MagicMock(),
         keyword_assembler=build_fake_assembler(fake_deps),
     )
@@ -136,6 +140,7 @@ async def test_datamap_tamper_fails(fake_deps: FakeKeywordDeps) -> None:
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=MagicMock(),
         keyword_assembler=assembler,
     )
@@ -178,6 +183,7 @@ async def test_default_export_service_no_wb(fake_deps: FakeKeywordDeps) -> None:
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=MagicMock(),
         keyword_assembler=build_fake_assembler(fake_deps),
     )
@@ -199,6 +205,7 @@ async def test_default_export_service_no_writes(fake_deps: FakeKeywordDeps) -> N
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=MagicMock(),
         keyword_assembler=build_fake_assembler(fake_deps),
     )

@@ -11,6 +11,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.domain.campaign_settings_snapshot_v1 import SCHEMA_VERSION
 from app.modules.ai_package_v1.domain.enums import Coverage, DatasetId, PrimarySource
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
@@ -83,6 +86,7 @@ def _export_service(
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=assembler,
         keyword_assembler=keyword,
     )
