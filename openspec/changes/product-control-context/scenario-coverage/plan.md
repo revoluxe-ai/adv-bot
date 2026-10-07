@@ -3,10 +3,36 @@
 CHANGE_ID: product-control-context
 MODE: plan
 PLAN_STATUS: ready
-PLAN_EVIDENCE_ID: PCC-SCP-20261007-002
+PLAN_EVIDENCE_ID: SCPV1-f69ac65248391a28
 LIFECYCLE_STATUS: DERIVED
 
 Planning evidence only — does not assert apply/archive PASS.
+
+## Lifecycle coverage
+
+Derived from reviewed `owner-contract.md` enrollment matrix and design slices
+(shop gate → product mode → DRR inheritance → pricing → adapter → bindings):
+
+- L1 Control anchor and catalog vs control separation
+- L2 Shop enrollment master gate (`NOT_ENROLLED` / `ENROLLED` / `BLOCKED`)
+- L3 Product mode and atomic DRR profile inheritance
+- L4 Pricing boundary and DRR→CPO resolution
+- L5 Campaign adapter outcomes (legacy vs blocked; no silent fallback)
+- L6 Campaign–product binding projection and multi-nm policy
+
+LIFECYCLE_COVERAGE:
+
+- L1 → S03, S16 — covered
+- L2 → S06, S13, S18, S19, S20 — covered
+- L3 → S07, S08, S09, S10, S21 — covered
+- L4 → S11, S12, S16, S22 — covered
+- L5 → S04, S14, S15, S06 — covered
+- L6 → S01, S02, S05, S17 — covered
+
+Steady-state / deploy-safe: S13 (zero shop `ENROLLED` → legacy path unchanged).
+
+UNRESOLVED_GAPS: none (Slice D price SoT remains `EVIDENCE_GAP` in ADR C, not a
+missing Spec Scenario).
 
 ## Architecture Decision References
 
@@ -193,3 +219,14 @@ AND LegacyCampaignCpoAdapter alone converts max to AdvSetting int
 
 - Spec: `specs/product-control-context/spec.md`
 - Tasks: Slice A = S03,S07,S09,S10,S16,S19-S21,S22; B = S01,S02,S05,S17; C = S13,S18,S21; D = S04,S06,S11,S12,S14,S15,S19,S20,S22; E = S08
+
+## GENERATED_FROM
+
+Reproduce receipt integrity:
+
+```bash
+poetry run python openspec/changes/product-control-context/evidence/verify_plan_evidence.py
+```
+
+Authoritative `PLAN_EVIDENCE_ID`, `PLAN_CONTENT_HASH`, and INPUT hashes:
+`scenario-coverage/plan.receipt.json` only.

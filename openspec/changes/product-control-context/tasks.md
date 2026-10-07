@@ -47,6 +47,6 @@ Planning / domain apply only. No runtime until explicit slice GO.
 ## Planning / governance (this change)
 
 - [x] P.1 OpenSpec change artifacts + decisions
-- [x] P.2 Scenario coverage plan
-- [ ] P.3 `/opsx-planning-review` before Slice A apply GO
+- [x] P.2 Scenario coverage plan (`scenario-coverage/plan.receipt.json` SCPV1-f69ac65248391a28)
+- [x] P.3 `/opsx-planning-review` PASS (2026-10-07; durable plan evidence CURRENT)
 - [ ] P.4 Promote decisions to `openspec/decisions/` on archive

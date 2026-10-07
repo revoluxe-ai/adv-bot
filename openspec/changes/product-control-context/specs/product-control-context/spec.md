@@ -140,28 +140,11 @@ for control for `(shop_id, nmid)`.
 - **THEN** system MUST NOT compute DRR-derived CPO from `orders_sum/orders`
 - **AND** MUST emit `BLOCKED_BY_PRODUCT_PRICE_SOURCE`
 
-### Requirement: ProductCpoResolver single owner and domain money
+### Requirement: ProductCpoResolver single owner
 
 DRR→CPO calculation SHALL exist only in `ProductCpoResolver` (domain/application).
-
-Formula when price and profile are available:
-
-- `target_cpo_rub = effective_product_price × target_drr_percent / 100`
-- `max_cpo_rub = effective_product_price × max_drr_percent / 100`
-
-Canonical domain output MUST use money semantics at **0.01 RUB** precision:
-
-- `target_cpo_rub`: ROUND_HALF_UP to 0.01 RUB
-- `max_cpo_rub`: ROUND_HALF_UP to 0.01 RUB
-
-Integer ruble `max_price_for_order` on `AdvSetting` is a legacy storage constraint.
-`LegacyCampaignCpoAdapter` (Slice D) MUST perform deterministic ROUND_HALF_UP to
-integer RUB when writing legacy fields.
-
 Telegram, Excel, AI Package prompts, MCP, and campaign handlers MUST NOT embed
 duplicate formulas.
-
-Future JSON/API/MCP MUST expose canonical domain money values, not legacy int limits.
 
 #### Scenario: Missing price blocks derived CPO
 
@@ -170,6 +153,21 @@ Future JSON/API/MCP MUST expose canonical domain money values, not legacy int li
 - **WHEN** `ProductCpoResolver` is invoked
 - **THEN** result MUST be blocked with `BLOCKED_BY_PRODUCT_PRICE_SOURCE`
 - **AND** MUST NOT fabricate zero CPO
+
+### Requirement: Domain money and legacy adapter boundary
+
+When price and profile are available, `ProductCpoResolver` SHALL compute
+`target_cpo_rub` and `max_cpo_rub` per `design.md` (DRR percent × effective
+price) with ROUND_HALF_UP at **0.01 RUB**. `LegacyCampaignCpoAdapter` alone MAY
+map canonical `max_cpo_rub` to integer `AdvSetting.max_price_for_order`.
+Future JSON/API/MCP MUST expose canonical domain money, not legacy int limits.
+
+#### Scenario: Domain money vs legacy int storage
+
+- **GIVEN** effective product price and `DrrProfile` are available
+- **WHEN** `ProductCpoResolver` runs
+- **THEN** `target_cpo_rub` and `max_cpo_rub` MUST be rounded to 0.01 RUB
+- **AND** only `LegacyCampaignCpoAdapter` MAY convert max to legacy int on `AdvSetting`
 
 ### Requirement: Zero default rollout behavior
 
