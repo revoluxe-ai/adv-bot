@@ -11,6 +11,9 @@ from app.modules.decision_experiment_memory.domain.plan_body_types import (
     TreatmentDefinition,
 )
 from app.modules.decision_experiment_memory.domain.refs import MetricSpecRef
+from app.modules.decision_experiment_memory.domain.switchback_schedule import (
+    SwitchbackScheduleV1,
+)
 from app.modules.decision_experiment_memory.domain.window import ExperimentWindowModel
 
 
@@ -66,6 +69,24 @@ def _treatment_projection(treatment: TreatmentDefinition) -> dict[str, Any]:
     }
 
 
+def _switchback_projection(
+    schedule: SwitchbackScheduleV1 | None,
+) -> dict[str, Any] | None:
+    if schedule is None:
+        return None
+    projected = {
+        "schedule": schedule.schedule,
+        "assignment_time_bucket": schedule.assignment_time_bucket,
+        "timezone": schedule.timezone,
+        "burn_in": schedule.burn_in,
+        "burn_out": schedule.burn_out,
+        "carryover_policy": schedule.carryover_policy,
+    }
+    if all(value is None for value in projected.values()):
+        return None
+    return projected
+
+
 def _control_projection(control: ControlDefinition) -> dict[str, Any]:
     return {
         "kind": control.kind,
@@ -95,6 +116,7 @@ def plan_body_canonical_projection(body: ExperimentPlanBody) -> dict[str, Any]:
         "analysis_config_version": body.analysis_config_version,
         "stopping_rule": body.stopping_rule,
         "required_data_validity_conditions": list(body.required_data_validity_conditions),
+        "switchback_schedule": _switchback_projection(body.switchback_schedule),
     }
 
 

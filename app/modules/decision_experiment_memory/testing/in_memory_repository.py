@@ -28,6 +28,7 @@ from app.modules.decision_experiment_memory.domain.records import (
 from app.modules.decision_experiment_memory.domain.refs import ApplyEvidenceRef
 from app.modules.decision_experiment_memory.events import (
     ConfounderDetectedPayload,
+    ExposureConfirmedPayload,
     MemoryEvent,
     MemoryEventType,
 )
@@ -392,6 +393,14 @@ class InMemoryDecisionMemoryRepository(DecisionMemoryRepository):
             apply_evidence_ref=apply_evidence_ref,
         )
         self.upsert_experiment_projection(updated)
+        exposure_payload = ExposureConfirmedPayload(
+            effective_from=effective_from,
+            observation_start=observation_start,
+            resulting_state_token=state_token,
+            apply_evidence_id=apply_evidence_ref.apply_evidence_id,
+            evidence_digest=apply_evidence_ref.evidence_digest,
+            authority_kind=apply_evidence_ref.authority_kind,
+        )
         self.append_event(
             MemoryEvent(
                 event_id=str(uuid4()),
@@ -399,8 +408,12 @@ class InMemoryDecisionMemoryRepository(DecisionMemoryRepository):
                 occurred_at=datetime.now(tz=timezone.utc),
                 experiment_id=experiment_id,
                 payload={
-                    "effective_from": effective_from.isoformat(),
-                    "observation_start": observation_start.isoformat(),
+                    "effective_from": exposure_payload.effective_from.isoformat(),
+                    "observation_start": exposure_payload.observation_start.isoformat(),
+                    "resulting_state_token": exposure_payload.resulting_state_token,
+                    "apply_evidence_id": exposure_payload.apply_evidence_id,
+                    "evidence_digest": exposure_payload.evidence_digest,
+                    "authority_kind": exposure_payload.authority_kind,
                 },
             )
         )

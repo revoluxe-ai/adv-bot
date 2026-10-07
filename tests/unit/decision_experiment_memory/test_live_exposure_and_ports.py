@@ -136,7 +136,7 @@ def test_live_confirm_exposure_with_apply_ref_succeeds() -> None:
     apply_ref = ApplyEvidenceRef(
         apply_evidence_id="apply-1",
         evidence_digest="digest-1",
-        authority_kind="APPLY_AUTHORITY_V1",
+        authority_kind="APPLY_AUTHORITY",
     )
     updated = repo.confirm_exposure(
         experiment_id,
@@ -147,6 +147,12 @@ def test_live_confirm_exposure_with_apply_ref_succeeds() -> None:
     )
     assert updated.execution_state == ExecutionState.OBSERVING
     assert updated.exposure.apply_evidence_ref == apply_ref
+    events = [e for e in repo.list_events(experiment_id=experiment_id) if e.event_type.value == "EXPOSURE_CONFIRMED"]
+    assert len(events) == 1
+    payload = events[0].payload or {}
+    assert payload["apply_evidence_id"] == "apply-1"
+    assert payload["resulting_state_token"] == "st-live"
+    assert payload["authority_kind"] == "APPLY_AUTHORITY"
 
 
 def test_confounder_detected_append_and_index() -> None:

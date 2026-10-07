@@ -12,7 +12,7 @@ class ApplyEvidenceRef:
 
     apply_evidence_id: str
     evidence_digest: str | None = None
-    authority_kind: str = "APPLY_AUTHORITY_V1"
+    authority_kind: str = "APPLY_AUTHORITY"
 
 
 @dataclass(frozen=True, slots=True)

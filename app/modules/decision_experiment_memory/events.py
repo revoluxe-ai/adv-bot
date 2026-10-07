@@ -82,6 +82,9 @@ class ExposureConfirmedPayload:
     effective_from: datetime
     observation_start: datetime
     resulting_state_token: str
+    apply_evidence_id: str
+    evidence_digest: str | None = None
+    authority_kind: str = "APPLY_AUTHORITY"
 
 
 @dataclass(frozen=True, slots=True)

@@ -28,6 +28,9 @@ from app.modules.decision_experiment_memory.domain.refs import (
     MetricAnalysisWindowRef,
     MetricSpecRef,
 )
+from app.modules.decision_experiment_memory.domain.switchback_schedule import (
+    SwitchbackScheduleV1,
+)
 from app.modules.decision_experiment_memory.domain.window import ExperimentWindowModel
 
 pytestmark = pytest.mark.unit
@@ -207,6 +210,16 @@ def test_hypothesis_key_order_invariant() -> None:
         (
             "required_validity_conditions",
             lambda b: replace(b, required_data_validity_conditions=("extra",)),
+        ),
+        (
+            "switchback_schedule",
+            lambda b: replace(
+                b,
+                switchback_schedule=SwitchbackScheduleV1(
+                    schedule="weekly",
+                    timezone="UTC",
+                ),
+            ),
         ),
     ],
 )

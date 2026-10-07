@@ -13,6 +13,9 @@ from app.modules.decision_experiment_memory.domain.enums import (
     TreatmentMode,
 )
 from app.modules.decision_experiment_memory.domain.refs import MetricSpecRef
+from app.modules.decision_experiment_memory.domain.switchback_schedule import (
+    SwitchbackScheduleV1,
+)
 from app.modules.decision_experiment_memory.domain.window import ExperimentWindowModel
 
 
@@ -59,3 +62,4 @@ class ExperimentPlanBody:
     analysis_config_version: str = "v1"
     stopping_rule: StoppingRule = StoppingRule.FIXED_HORIZON
     required_data_validity_conditions: tuple[str, ...] = ()
+    switchback_schedule: SwitchbackScheduleV1 | None = None
