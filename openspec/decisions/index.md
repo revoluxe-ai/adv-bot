@@ -34,42 +34,6 @@ architecture decisions belong here.
   - Scope: migration topology — parallel Alembic heads MUST converge via
     a forward-only merge revision without schema/data operations; published
     history is immutable.
-
-## Change Requirements
-
-- Every change that touches ownership, layering, write paths, or domain
-  invariants must resolve decisions **context-first** (exact/
-  `artifactPaths` / index), then bounded fallback under
-  `openspec/decisions/` — not a full recursive dump of every decision file.
-- Relevant decisions must be cited by path from proposal/design artifacts and
-  implementation/verification summaries.
-- If a relevant decision is missing after context-first + bounded fallback,
-  create a proposed decision artifact before declaring the change
-  implementation-ready (or record `Architecture Decision Missing` /
-  `EVIDENCE_GAP`).
-- Passing tests are not enough when implementation placement conflicts with an
-  accepted architecture decision.
-# Architecture Decision Registry
-
-This directory is the permanent registry for architecture decisions that must
-outlive a single OpenSpec change. It is the source of truth for ownership,
-layering, write-path placement, and domain invariants that future changes must
-respect.
-
-Design files may explain how one change applies a decision, but reusable
-architecture decisions belong here.
-
-## Existing Decisions
-
-- [mode-defaults-policy-ownership](mode-defaults-policy-ownership/decision.md)
-  - Status: Accepted
-  - Scope: ownership and placement of mode-specific defaults for paid, free,
-    and common policy overlays.
-- [clickhouse-sql-database-qualification](clickhouse-sql-database-qualification/decision.md)
-  - Status: Accepted
-  - Scope: domain invariant — working-contour ClickHouse SQL MUST qualify
-    database as `default_db.<object>` in query text; SQL-contract proof
-    required (not session DB alone / not SQL_REWRITE_MOCKED_AWAY).
 - [empty-keywords-pause-write-path](empty-keywords-pause-write-path/decision.md)
   - Status: Accepted
   - Scope: ownership of empty-keywords detect → Redis intent → activity-control
@@ -110,6 +74,43 @@ architecture decisions belong here.
     TARGET_ENTITY_OR_LEG = auto-setting anchor + slot roles; ALLOWED billing
     adapters; forbid shop-runner/pause managers writing latch/AdvPayment;
     orthogonal to empty-keywords and shelf-exhausted pause write-paths.
+- [clickhouse-migration-lifecycle-ownership](clickhouse-migration-lifecycle-ownership/decision.md)
+  - Status: Accepted
+  - Scope: ownership/write-path for ClickHouse migration control plane:
+    immutable `001`–`005` corpus identity, target-side append-only ledger,
+    separate PostgreSQL advisory-lock coordinator, fail-closed unknown history,
+    schema DDL `001`–`004` only, privileged `005` separate; runtime/Alembic are forbidden owners.
+- [clickhouse-migration-corpus-006](clickhouse-migration-corpus-006/decision.md)
+  - Status: Accepted
+  - Scope: reviewed ClickHouse migration `006` enters immutable corpus
+    fingerprint `001`–`006`; unreviewed successors remain fail-closed.
+- [campaign-settings-contract-ownership](campaign-settings-contract-ownership/decision.md)
+  - Status: Accepted
+  - Scope: canonical campaign settings field registry ownership; fail-closed
+    classification for history and Excel projections; PostgreSQL remains
+    current-settings authority.
+- [shop-runner-shop-wide-collection](shop-runner-shop-wide-collection/decision.md)
+  - Status: Accepted
+  - Scope: shop-wide campaign ad data collection executor is shop-runner only;
+    temporary dual-path managed/unmanaged; scripts/Job MUST NOT be primary
+    collector.
+- [scripts-wb-api-ops-stack](scripts-wb-api-ops-stack/decision.md)
+  - Status: Accepted
+  - Scope: ownership/layering for scripts/`/opsx-scripts` Job → existing
+    `app/core/mp/wb/api` stack; `READ_ONLY_NO_MUTATION`; no raw HTTP;
+    secret-strip Owner-local archive.
+- [shop-data-source-strategy](shop-data-source-strategy/decision.md)
+  - Status: Accepted
+  - Scope: reusable invariant for shop dataset accumulation and AI Package
+    read path — source selection, grain preservation, collection modes,
+    coverage/provenance; collection vs campaign management.
+- [ai-package-v1-exporter-ownership](ai-package-v1-exporter-ownership/decision.md)
+  - Status: Accepted
+  - Scope: ownership/layering for AI Package v1 read-only export under
+    `app/modules/ai_package_v1/`; `READ_ONLY_NO_MUTATION`; forbidden WB API,
+    shop-runner orchestrator, and collector triggers on export path; CLI/Job
+    entry plus a transport-only Telegram adapter that calls
+    `PackageZipAssembler` (no second exporter).
 
 ## Change Requirements
 
