@@ -10,7 +10,7 @@
     },
     "S06": {
       "status": "PASS",
-      "evidence": "tests/unit/attribution_facts/test_slice_b_ingest_membership.py::test_s06_inventory_fallback_partial"
+      "evidence": "tests/unit/attribution_facts/test_slice_b_ingest_membership.py::test_s06_inventory_fallback_partial (resolver + ingest batch PARTIAL coverage)"
     },
     "S07": {
       "status": "PASS",

@@ -125,7 +125,8 @@ async def test_s05_history_precedence_over_inventory() -> None:
 
 @pytest.mark.asyncio
 async def test_s06_inventory_fallback_partial() -> None:
-    """S06: inventory fallback → partial_fallback + reason."""
+    """S06: inventory fallback → PARTIAL coverage (not COMPLETE)."""
+    raw = json.loads(_FIXTURE.read_text(encoding="utf-8"))
     resolver = MembershipSnapshotResolver(
         shop_id="shop-1",
         adv_setting_id=1,
@@ -138,6 +139,14 @@ async def test_s06_inventory_fallback_partial() -> None:
     assert (
         AttributionReasonCode.ATTRIBUTION_SOURCE_PARTIAL in resolved.reason_codes
     )
+    batch = await build_ingest_batch_from_raw_items(
+        shop_id="shop-1",
+        raw_items=(raw[0],),
+        resolver=resolver,
+    )
+    assert batch.partial_membership_fallback
+    assert batch.coverage.status == AttributionCoverageStatus.PARTIAL
+    assert batch.coverage.status != AttributionCoverageStatus.COMPLETE
 
 
 @pytest.mark.asyncio

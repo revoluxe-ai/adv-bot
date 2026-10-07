@@ -88,7 +88,10 @@ def coverage_for_ingest_source(
             reason_codes=(AttributionReasonCode.ATTRIBUTION_SOURCE_PARTIAL,),
         )
     if partial_membership_fallback:
-        reason_codes.append(AttributionReasonCode.ATTRIBUTION_SOURCE_PARTIAL)
+        return AttributionCoverage(
+            status=AttributionCoverageStatus.PARTIAL,
+            reason_codes=(AttributionReasonCode.ATTRIBUTION_SOURCE_PARTIAL,),
+        )
     if not all_days_reconciled:
         reason_codes.append(AttributionReasonCode.RECONCILIATION_FAILED)
         return AttributionCoverage(

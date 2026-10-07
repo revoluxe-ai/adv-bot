@@ -97,6 +97,22 @@ def test_coverage_complete_requires_reconciliation() -> None:
     assert cov.status == AttributionCoverageStatus.PARTIAL
 
 
+def test_inventory_fallback_never_complete_even_if_reconciled() -> None:
+    """Inventory fallback не может дать COMPLETE nm attribution coverage."""
+    window = DateWindow(_DAY, _DAY)
+    cov = evaluate_window_coverage(
+        has_any_facts=True,
+        all_days_reconciled=True,
+        partial_membership_fallback=True,
+        source_complete_through=_DAY,
+        window=window,
+    )
+    assert cov.status == AttributionCoverageStatus.PARTIAL
+    assert (
+        AttributionReasonCode.ATTRIBUTION_SOURCE_PARTIAL in cov.reason_codes
+    )
+
+
 def test_missing_facts_no_data_not_zero() -> None:
     """NO_DATA при отсутствии facts."""
     window = DateWindow(_DAY, _DAY)
