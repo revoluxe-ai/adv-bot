@@ -111,6 +111,11 @@ architecture decisions belong here.
     shop-runner orchestrator, and collector triggers on export path; CLI/Job
     entry plus a transport-only Telegram adapter that calls
     `PackageZipAssembler` (no second exporter).
+- [decision-experiment-memory-ownership](decision-experiment-memory-ownership/decision.md)
+  - Status: Accepted
+  - Scope: semantic ownership of decision/experiment memory (plans, lifecycle,
+    validity, factual results, interpretation linkage); refs-only for settings,
+    Apply, metrics, attribution; not production write authority.
 
 ## Change Requirements
 

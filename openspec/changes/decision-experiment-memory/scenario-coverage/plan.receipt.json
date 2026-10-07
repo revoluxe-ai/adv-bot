@@ -1,0 +1,50 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "decision-experiment-memory",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-a48d03971a706909",
+  "PLAN_CONTENT_HASH": "f57a10ed834afbf688ff47aeda6046391b335caa9840e1d7ae99f99fcdf30332",
+  "PLAN_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 26,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S01,S02,S03,S25",
+      "L2:S04,S05,S06",
+      "L3:S07,S19",
+      "L4:S08,S09,S10",
+      "L5:S11,S21",
+      "L6:S12-S18,S20,S22",
+      "L7:S23,S24",
+      "L8:deferred_slice_F"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/decision-experiment-memory/design.md",
+      "content_hash": "ba01a54c751fde8c7af39ac46c48495045cf28e36bacd144392e115cdcb6b7e4"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/decision-experiment-memory/specs/decision-experiment-memory/spec.md",
+        "content_hash": "bb30f71770d61bd72c484c87b47d1fc475ba7a36d348c4fc71ebd32e3b357932"
+      }
+    ],
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/decision-experiment-memory/owner-contract.md",
+      "content_hash": "f3786646265fcce743f6174d74cae574ec02f0607ecb368f79109c5fdc969a78"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "ba01a54c751fde8c7af39ac46c48495045cf28e36bacd144392e115cdcb6b7e4",
+    "SPEC_REVISION": [
+      "bb30f71770d61bd72c484c87b47d1fc475ba7a36d348c4fc71ebd32e3b357932"
+    ],
+    "OWNER_CONTRACT_REVISION": "f3786646265fcce743f6174d74cae574ec02f0607ecb368f79109c5fdc969a78"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}
