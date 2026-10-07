@@ -22,6 +22,12 @@ from app.core.mp.wb.api.domain_managers.promotion.promotion_manager import (
 from app.core.mp.wb.api.generated.promotion.v2.marketing_and_promotions_client.models import (
     GetAdvertsAdvertsItem,
 )
+from app.modules.attribution_facts.membership.history_ch_adapter import (
+    CampaignSettingsHistoryAsOfAdapter,
+)
+from app.modules.attribution_facts.membership.inventory_ch_adapter import (
+    ShopCampaignInventoryNmAdapter,
+)
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
@@ -33,8 +39,8 @@ from app.modules.shop_runner.shop_wide_collection.unmanaged_orchestrator import 
 )
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
 from app.settings import settings
-from app.utils.click_house.client import get_clickhouse_client
 from app.utils.click_house.clickhouse_protocol import ClickHouseClientProtocol
+from app.utils.click_house.client import get_clickhouse_client
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +132,8 @@ async def run_shop_wide_unmanaged_tick(
 
     async with get_clickhouse_client() as ch_client:
         ch_adapter = _ClickHouseShopWideClient(ch_client)
+        history_port = CampaignSettingsHistoryAsOfAdapter(ch_client)
+        inventory_nm_port = ShopCampaignInventoryNmAdapter(ch_adapter)
         result = await collect_unmanaged_campaign_advertising(
             shop_id=shop_id,
             loader_complex_advs=loader_complex_advs,
@@ -135,6 +143,8 @@ async def run_shop_wide_unmanaged_tick(
             full_adv_stat_fetcher=fetcher,
             full_adv_stat_writer=writer,
             threshold_dates=settings.FULL_STAT_THRESHOLD_DATES,
+            attribution_history_port=history_port,
+            attribution_inventory_port=inventory_nm_port,
         )
 
     logger.info(

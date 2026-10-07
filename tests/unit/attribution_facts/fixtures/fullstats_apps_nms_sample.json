@@ -1,0 +1,67 @@
+[
+  {
+    "advertId": 39900256,
+    "views": 10,
+    "clicks": 1,
+    "orders": 3,
+    "sum_price": 300.0,
+    "days": [
+      {
+        "date": "2026-09-07",
+        "views": 10,
+        "clicks": 1,
+        "orders": 3,
+        "sum_price": 300.0,
+        "apps": [
+          {
+            "appType": 1,
+            "nms": [
+              {
+                "nmId": 837395782,
+                "orders": 2,
+                "sum_price": 200.0,
+                "atbs": 1,
+                "shks": 2
+              },
+              {
+                "nmId": 14824677,
+                "orders": 1,
+                "sum_price": 100.0
+              }
+            ]
+          },
+          {
+            "appType": 2,
+            "nms": [
+              {
+                "nmId": 837395782,
+                "orders": 0,
+                "sum_price": 0.0
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "advertId": 39900999,
+    "views": 5,
+    "clicks": 0,
+    "orders": 1,
+    "sum_price": 50.0,
+    "days": [
+      {
+        "date": "2026-09-07",
+        "orders": 1,
+        "sum_price": 50.0,
+        "apps": [
+          {
+            "appType": 1,
+            "nms": [{ "nmId": 111, "orders": 1, "sum_price": 50.0 }]
+          }
+        ]
+      }
+    ]
+  }
+]

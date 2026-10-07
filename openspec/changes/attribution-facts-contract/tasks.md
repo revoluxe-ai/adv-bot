@@ -3,7 +3,7 @@
 Planning artifact. Implementation via `/opsx-apply` after Owner implementation GO.
 
 ```text
-TASKS_STATUS: SLICE_A_COMPLETE
+TASKS_STATUS: SLICE_B_COMPLETE
 PLANNING_READY: yes
 APPLY_READY: slice_a_applied
 OWNER_CONTRACT_STATUS: ACCEPTED (Owner GO Slice A)
@@ -31,12 +31,12 @@ ChangeSet Apply; unrelated collectors; production deployment.
 
 ## Slice B — Source adapter + membership resolver
 
-- [ ] B.1 ADR `attribution-facts-collector-ownership` accepted at apply start
-- [ ] B.2 Raw fullstats apps/nms normalizer (before collapsed mapper)
-- [ ] B.3 `MembershipSnapshotResolver` (history → inventory fallback → provenance)
-- [ ] B.4 Wire ingest hook from shop-runner fullstats fetch seam (no spend duplication)
-- [ ] B.5 Unit tests with fixture payloads (`wb_a1_associated_conversions` shape)
-- [ ] B.6 Integration test: history repository read + resolver as-of (if CH/PG fixtures exist)
+- [x] B.1 ADR `attribution-facts-collector-ownership` accepted at apply start
+- [x] B.2 Raw fullstats apps/nms normalizer (before collapsed mapper)
+- [x] B.3 `MembershipSnapshotResolver` (history → inventory fallback → provenance)
+- [x] B.4 Wire ingest hook from shop-runner fullstats fetch seam (no spend duplication)
+- [x] B.5 Unit tests with fixture payloads (`wb_a1_associated_conversions` shape)
+- [x] B.6 Integration test: history repository read + resolver as-of (if CH/PG fixtures exist)
 
 **Gate:** ingest produces observations; mapper-only path cannot mark COMPLETE
 
