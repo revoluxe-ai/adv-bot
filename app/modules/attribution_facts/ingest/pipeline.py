@@ -159,8 +159,6 @@ async def build_ingest_batch_from_raw_items(
             contributions,
         )
         reconciliations.append(result)
-        if not result.passed:
-            all_passed = False
 
     if not used_raw:
         coverage = coverage_for_ingest_source(
