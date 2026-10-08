@@ -61,7 +61,7 @@ _RAW_SHA256_BY_FILENAME: dict[str, str] = {
         "064772c5448a9824731cc8483a653e60b0c6a11f90937594b9ffd70a511479ab"
     ),
     "008_create_attribution_facts.sql": (
-        "5e54946441b3a2f93db3cc51d532bbf61af9bb225aef72de52d996b9c56786fb"
+        "6b0edcb3a7a23a15b8d9b273552c476ca5d79052f6a4d47f2b8728fdb4ce0356"
     ),
 }
 

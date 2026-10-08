@@ -30,6 +30,8 @@ def test_008_exact_hash_and_schema_contract_are_reviewed() -> None:
     assert "CREATE TABLE IF NOT EXISTS default_db.attribution_fact_observations" in sql
     assert "CREATE TABLE IF NOT EXISTS default_db.attribution_day_reconciliation" in sql
     assert "attributed_gmv_rub" in sql
+    assert "attributed_orders Nullable" in sql
+    assert "attributed_gmv_rub Nullable" in sql
     assert "spend_rub" not in sql.lower()
     assert "ENGINE = MergeTree()" in sql
     assert " ON CLUSTER " not in sql.upper()

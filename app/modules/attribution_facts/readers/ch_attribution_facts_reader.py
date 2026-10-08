@@ -7,9 +7,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, cast
 
-from app.modules.attribution_facts.domain.coverage import (
-    all_reconciliations_passed,
-    evaluate_window_coverage,
+from app.modules.attribution_facts.domain.coverage import evaluate_window_coverage
+from app.modules.attribution_facts.domain.window_reconciliation_coverage import (
+    assess_reconciliation_grid,
 )
 from app.modules.attribution_facts.domain.enums import (
     AttributionCoverageStatus,
@@ -36,47 +36,86 @@ SELECT
     event_date,
     app_type,
     ordered_nm_id,
-    argMax(source_family, (source_revision, ingested_at)) AS source_family,
-    argMax(observation_id, (source_revision, ingested_at)) AS observation_id,
-    argMax(source_revision, (source_revision, ingested_at)) AS source_revision,
-    argMax(ingested_at, (source_revision, ingested_at)) AS ingested_at,
-    argMax(attribution_class, (source_revision, ingested_at)) AS attribution_class,
-    argMax(attributed_orders, (source_revision, ingested_at)) AS attributed_orders,
-    argMax(attributed_gmv_rub, (source_revision, ingested_at)) AS attributed_gmv_rub,
-    argMax(attributed_atc, (source_revision, ingested_at)) AS attributed_atc,
-    argMax(attributed_units_shks, (source_revision, ingested_at)) AS attributed_units_shks,
-    argMax(membership_snapshot_id, (source_revision, ingested_at)) AS membership_snapshot_id,
-    argMax(partial_membership_fallback, (source_revision, ingested_at)) AS partial_membership_fallback
-FROM {_OBS_TABLE}
-WHERE shop_id = %(shop_id)s
-  AND event_date >= %(start_date)s
-  AND event_date <= %(end_date)s
-  AND physical_adv_id IN %(physical_adv_ids)s
-GROUP BY
-    shop_id,
-    physical_adv_id,
-    event_date,
-    app_type,
-    ordered_nm_id
+    source_family,
+    observation_id,
+    source_revision,
+    ingested_at,
+    attribution_class,
+    attributed_orders,
+    attributed_gmv_rub,
+    attributed_atc,
+    attributed_units_shks,
+    membership_snapshot_id,
+    partial_membership_fallback
+FROM (
+    SELECT
+        shop_id,
+        physical_adv_id,
+        event_date,
+        app_type,
+        ordered_nm_id,
+        source_family,
+        observation_id,
+        source_revision,
+        ingested_at,
+        attribution_class,
+        attributed_orders,
+        attributed_gmv_rub,
+        attributed_atc,
+        attributed_units_shks,
+        membership_snapshot_id,
+        partial_membership_fallback,
+        row_number() OVER (
+            PARTITION BY
+                shop_id,
+                physical_adv_id,
+                event_date,
+                app_type,
+                ordered_nm_id
+            ORDER BY source_revision DESC, ingested_at DESC
+        ) AS _rn
+    FROM {_OBS_TABLE}
+    WHERE shop_id = %(shop_id)s
+      AND event_date >= %(start_date)s
+      AND event_date <= %(end_date)s
+      AND physical_adv_id IN %(physical_adv_ids)s
+)
+WHERE _rn = 1
 """.strip()
 
 _LATEST_RECON_SQL = f"""
 SELECT
     physical_adv_id,
     event_date,
-    argMax(passed, (source_revision, ingested_at)) AS passed,
-    argMax(nm_orders_sum, (source_revision, ingested_at)) AS nm_orders_sum,
-    argMax(day_orders, (source_revision, ingested_at)) AS day_orders,
-    argMax(nm_gmv_sum, (source_revision, ingested_at)) AS nm_gmv_sum,
-    argMax(day_gmv_rub, (source_revision, ingested_at)) AS day_gmv_rub,
-    argMax(unattributed_orders, (source_revision, ingested_at)) AS unattributed_orders,
-    argMax(reason_codes, (source_revision, ingested_at)) AS reason_codes
-FROM {_RECON_TABLE}
-WHERE shop_id = %(shop_id)s
-  AND event_date >= %(start_date)s
-  AND event_date <= %(end_date)s
-  AND physical_adv_id IN %(physical_adv_ids)s
-GROUP BY shop_id, physical_adv_id, event_date
+    passed,
+    nm_orders_sum,
+    day_orders,
+    nm_gmv_sum,
+    day_gmv_rub,
+    unattributed_orders,
+    reason_codes
+FROM (
+    SELECT
+        physical_adv_id,
+        event_date,
+        passed,
+        nm_orders_sum,
+        day_orders,
+        nm_gmv_sum,
+        day_gmv_rub,
+        unattributed_orders,
+        reason_codes,
+        row_number() OVER (
+            PARTITION BY shop_id, physical_adv_id, event_date
+            ORDER BY source_revision DESC, ingested_at DESC
+        ) AS _rn
+    FROM {_RECON_TABLE}
+    WHERE shop_id = %(shop_id)s
+      AND event_date >= %(start_date)s
+      AND event_date <= %(end_date)s
+      AND physical_adv_id IN %(physical_adv_ids)s
+)
+WHERE _rn = 1
 """.strip()
 
 
@@ -127,12 +166,16 @@ class ChAttributionFactsReader(AttributionFactsReader):
             _recon_from_row(scope.shop_id, row) for row in recon_rows
         )
         partial_fallback = any(bool(row[15]) for row in fact_rows) if fact_rows else False
-        all_passed = all_reconciliations_passed(reconciliations)
+        grid_pass, source_through = assess_reconciliation_grid(
+            reconciliations,
+            scope,
+            window,
+        )
         coverage = evaluate_window_coverage(
             has_any_facts=bool(facts),
-            all_days_reconciled=all_passed and bool(reconciliations),
+            all_days_reconciled=grid_pass,
             partial_membership_fallback=partial_fallback,
-            source_complete_through=window.end if all_passed and facts else None,
+            source_complete_through=source_through,
             window=window,
         )
         return AttributionQueryResult(

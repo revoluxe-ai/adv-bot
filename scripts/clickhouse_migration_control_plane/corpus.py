@@ -84,7 +84,7 @@ _IMMUTABLE_IDENTITY: tuple[tuple[str, str, str, str], ...] = (
         "008",
         "008_create_attribution_facts.sql",
         _SCHEMA_DDL,
-        "5e54946441b3a2f93db3cc51d532bbf61af9bb225aef72de52d996b9c56786fb",
+        "6b0edcb3a7a23a15b8d9b273552c476ca5d79052f6a4d47f2b8728fdb4ce0356",
     ),
 )
 

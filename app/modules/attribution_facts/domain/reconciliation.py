@@ -31,8 +31,38 @@ def reconcile_campaign_day(
     Returns:
         Результат с unattributed_orders при расхождении.
     """
-    nm_orders = sum(row.orders for row in nm_rows)
-    nm_gmv = sum((row.gmv_rub for row in nm_rows), start=Decimal(0))
+    if day.orders is None or day.gmv_rub is None:
+        return DayReconciliationResult(
+            physical_adv_id=day.physical_adv_id,
+            event_date=day.event_date,
+            passed=False,
+            nm_orders_sum=0,
+            day_orders=day.orders or 0,
+            nm_gmv_sum=Decimal(0),
+            day_gmv_rub=day.gmv_rub or Decimal(0),
+            unattributed_orders=0,
+            reason_codes=(AttributionReasonCode.RECONCILIATION_FAILED,),
+        )
+    if any(row.orders is None or row.gmv_rub is None for row in nm_rows):
+        return DayReconciliationResult(
+            physical_adv_id=day.physical_adv_id,
+            event_date=day.event_date,
+            passed=False,
+            nm_orders_sum=0,
+            day_orders=day.orders,
+            nm_gmv_sum=Decimal(0),
+            day_gmv_rub=day.gmv_rub,
+            unattributed_orders=day.orders,
+            reason_codes=(AttributionReasonCode.RECONCILIATION_FAILED,),
+        )
+    nm_orders = 0
+    nm_gmv = Decimal(0)
+    for row in nm_rows:
+        order_val = row.orders
+        gmv_val = row.gmv_rub
+        assert order_val is not None and gmv_val is not None
+        nm_orders += order_val
+        nm_gmv += gmv_val
     orders_match = nm_orders == day.orders
     gmv_match = abs(nm_gmv - day.gmv_rub) <= gmv_epsilon
     passed = orders_match and gmv_match

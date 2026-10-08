@@ -33,8 +33,8 @@ def observation_rows_from_batch(
                 prov.source_revision,
                 prov.ingested_at,
                 str(fact.attribution_class),
-                int(metrics.attributed_orders or 0),
-                metrics.attributed_gmv_rub or Decimal(0),
+                metrics.attributed_orders,
+                metrics.attributed_gmv_rub,
                 metrics.attributed_atc,
                 metrics.attributed_units_shks,
                 prov.membership_snapshot_id,
@@ -120,8 +120,12 @@ def fact_from_ch_row(row: Sequence[object]) -> AttributionCommerceFact:
     return AttributionCommerceFact(
         key=key,
         metrics=AttributionMetrics(
-            attributed_orders=int(cast(int, attributed_orders)),
-            attributed_gmv_rub=Decimal(str(attributed_gmv_rub)),
+            attributed_orders=int(cast(int, attributed_orders))
+            if attributed_orders is not None
+            else None,
+            attributed_gmv_rub=Decimal(str(attributed_gmv_rub))
+            if attributed_gmv_rub is not None
+            else None,
             attributed_atc=int(cast(int, attributed_atc))
             if attributed_atc is not None
             else None,
@@ -131,12 +135,18 @@ def fact_from_ch_row(row: Sequence[object]) -> AttributionCommerceFact:
         ),
         attribution_class=AttributionClass(str(attribution_class)),
         provenance=ObservationProvenance(
-            observation_id=str(observation_id),
+            observation_id=_decode_ch_string(observation_id),
             source_revision=int(cast(int, source_revision)),
             ingested_at=cast(datetime, ingested_at),
             membership_snapshot_id=str(membership_snapshot_id),
         ),
     )
+
+
+def _decode_ch_string(value: object) -> str:
+    if isinstance(value, bytes):
+        return value.decode("ascii").rstrip("\x00")
+    return str(value).strip()
 
 
 def _row_date(value: object) -> date:

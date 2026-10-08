@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections import defaultdict
 from collections.abc import Mapping
 from datetime import date, datetime, timezone
@@ -29,6 +28,9 @@ from app.modules.attribution_facts.domain.models import (
     NmDayContribution,
     ObservationProvenance,
 )
+from app.modules.attribution_facts.domain.observation_identity import (
+    semantic_observation_id,
+)
 from app.modules.attribution_facts.domain.reconciliation import reconcile_campaign_day
 from app.modules.attribution_facts.ingest.raw_fullstats import (
     fullstats_item_to_raw_rows,
@@ -38,16 +40,6 @@ from app.modules.attribution_facts.membership.resolver import (
     MembershipResolveResult,
     MembershipSnapshotResolver,
 )
-
-
-def _observation_id(
-    shop_id: str,
-    key: AttributionFactKey,
-    orders: int,
-    gmv: Decimal,
-) -> str:
-    blob = f"{shop_id}|{key}|{orders}|{gmv}"
-    return hashlib.sha256(blob.encode()).hexdigest()[:32]
 
 
 async def build_ingest_batch_from_raw_items(
@@ -105,25 +97,34 @@ async def build_ingest_batch_from_raw_items(
             if resolved_day.snapshot is not None
             else "missing"
         )
-        prov = ObservationProvenance(
-            observation_id=_observation_id(
-                shop_id, key, row.orders, row.gmv_rub
+        draft = AttributionCommerceFact(
+            key=key,
+            metrics=AttributionMetrics(
+                attributed_orders=row.orders,
+                attributed_gmv_rub=row.gmv_rub,
+                attributed_atc=row.atc,
+                attributed_units_shks=row.units_shks,
             ),
-            source_revision=source_revision,
-            ingested_at=ingested_at,
-            membership_snapshot_id=snap_id,
+            attribution_class=attr_class,
+            provenance=ObservationProvenance(
+                observation_id="pending",
+                source_revision=source_revision,
+                ingested_at=ingested_at,
+                membership_snapshot_id=snap_id,
+            ),
         )
+        obs_id = semantic_observation_id(draft)
         facts.append(
             AttributionCommerceFact(
-                key=key,
-                metrics=AttributionMetrics(
-                    attributed_orders=row.orders,
-                    attributed_gmv_rub=row.gmv_rub,
-                    attributed_atc=row.atc,
-                    attributed_units_shks=row.units_shks,
+                key=draft.key,
+                metrics=draft.metrics,
+                attribution_class=draft.attribution_class,
+                provenance=ObservationProvenance(
+                    observation_id=obs_id,
+                    source_revision=source_revision,
+                    ingested_at=ingested_at,
+                    membership_snapshot_id=snap_id,
                 ),
-                attribution_class=attr_class,
-                provenance=prov,
             )
         )
 

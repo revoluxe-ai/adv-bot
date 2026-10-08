@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -17,6 +16,9 @@ from app.modules.attribution_facts.domain.enums import (
 from app.modules.attribution_facts.domain.models import (
     AttributionScope,
     DateWindow,
+)
+from app.modules.attribution_facts.domain.observation_identity import (
+    semantic_observation_id,
 )
 from app.modules.attribution_facts.ingest.pipeline import build_ingest_batch_from_raw_items
 from app.modules.attribution_facts.membership.resolver import MembershipSnapshotResolver
@@ -132,20 +134,31 @@ async def test_correction_updates_latest_not_sums(clickhouse_client: object) -> 
         ObservationProvenance,
     )
 
-    newer = AttributionCommerceFact(
+    newer_draft = AttributionCommerceFact(
         key=fact.key,
         metrics=AttributionMetrics(
             attributed_orders=99,
             attributed_gmv_rub=Decimal("123.45"),
+            attributed_atc=fact.metrics.attributed_atc,
+            attributed_units_shks=fact.metrics.attributed_units_shks,
         ),
         attribution_class=AttributionClass.DIRECT,
         provenance=ObservationProvenance(
-            observation_id=hashlib.sha256(
-                b"restatement|99|123.45"
-            ).hexdigest()[:32],
+            observation_id="pending",
             source_revision=fact.provenance.source_revision + 1,
             ingested_at=datetime(2026, 9, 8, 1, 0, tzinfo=UTC),
             membership_snapshot_id=fact.provenance.membership_snapshot_id,
+        ),
+    )
+    newer = AttributionCommerceFact(
+        key=newer_draft.key,
+        metrics=newer_draft.metrics,
+        attribution_class=newer_draft.attribution_class,
+        provenance=ObservationProvenance(
+            observation_id=semantic_observation_id(newer_draft),
+            source_revision=newer_draft.provenance.source_revision,
+            ingested_at=newer_draft.provenance.ingested_at,
+            membership_snapshot_id=newer_draft.provenance.membership_snapshot_id,
         ),
     )
     from app.modules.attribution_facts.domain.ingest_models import AttributionIngestBatch
@@ -162,6 +175,6 @@ async def test_correction_updates_latest_not_sums(clickhouse_client: object) -> 
     await repo.append_batch(batch_v2)
     scope = AttributionScope(shop_id="shop-ch", physical_adv_ids=frozenset({39900256}))
     result = await reader.query(scope, DateWindow(_DAY, _DAY))
-    match = next(f for f in result.facts if f.key.ordered_nm_id == fact.key.ordered_nm_id)
+    match = next(f for f in result.facts if f.key == fact.key)
     assert match.metrics.attributed_orders == 99
     assert match.metrics.attributed_gmv_rub == Decimal("123.45")
