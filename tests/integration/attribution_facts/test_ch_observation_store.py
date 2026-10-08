@@ -12,9 +12,11 @@ import pytest
 from app.modules.attribution_facts.domain.enums import (
     AttributionClass,
     AttributionCoverageStatus,
-    AttributionScope,
 )
-from app.modules.attribution_facts.domain.models import DateWindow
+from app.modules.attribution_facts.domain.models import (
+    AttributionScope,
+    DateWindow,
+)
 from app.modules.attribution_facts.ingest.pipeline import build_ingest_batch_from_raw_items
 from app.modules.attribution_facts.membership.resolver import MembershipSnapshotResolver
 from app.modules.attribution_facts.persistence.clickhouse_observation_repository import (
