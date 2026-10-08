@@ -92,6 +92,7 @@ WHERE shop_id = %(shop_id)s
   AND observation_id IN %(observation_ids)s
 """.strip()
         shop_id = str(rows[0][0])
+        ch = cast(Any, self._client)
         result: Any = await ch.query(  # pyright: ignore[reportUnknownMemberType]
             query,
             parameters={

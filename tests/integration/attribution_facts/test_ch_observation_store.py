@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -139,7 +140,9 @@ async def test_correction_updates_latest_not_sums(clickhouse_client: object) -> 
         ),
         attribution_class=AttributionClass.DIRECT,
         provenance=ObservationProvenance(
-            observation_id=fact.provenance.observation_id,
+            observation_id=hashlib.sha256(
+                b"restatement|99|123.45"
+            ).hexdigest()[:32],
             source_revision=fact.provenance.source_revision + 1,
             ingested_at=datetime(2026, 9, 8, 1, 0, tzinfo=UTC),
             membership_snapshot_id=fact.provenance.membership_snapshot_id,
