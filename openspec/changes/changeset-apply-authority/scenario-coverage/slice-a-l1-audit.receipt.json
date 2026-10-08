@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "change_id": "changeset-apply-authority",
+  "scope": "slice_a_l1_only",
+  "producer": "slice-a-impl-verify",
+  "produced_at": "2026-10-08",
+  "head_note": "Slice A domain-only; not full-change certify",
+  "scenarios": {
+    "S02": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_stale_state_invalidates_permanently_aba"
+    },
+    "S04": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_idempotency.py::test_idempotency_conflict"
+    },
+    "S07": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_slice_a_scenario_evidence.py::test_digest_hint_mismatch"
+    },
+    "S20": {
+      "status": "PASS",
+      "evidence": "app/modules/wb_sky_control_plane/apply/validation.py::unsupported_contract_version"
+    },
+    "S21": {
+      "status": "PASS",
+      "evidence": "app/modules/wb_sky_control_plane/apply/models/context.py::ApplyInvocationContext"
+    },
+    "S30": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_stale_state_invalidates_permanently_aba"
+    },
+    "S31": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_stale_state_invalidates_permanently_aba"
+    },
+    "S32": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_unauthorized_preserves_issued"
+    },
+    "S33": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_changeset_mismatch_preserves_receipt"
+    },
+    "S34": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_unknown_internal_commit_blocks_reconciliation"
+    },
+    "S35": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_idempotency.py::test_unauthorized_replay_hides_evidence"
+    }
+  },
+  "deferred_scenarios": [
+    "S01",
+    "S03",
+    "S05",
+    "S06",
+    "S08",
+    "S09",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S15",
+    "S16",
+    "S17",
+    "S18",
+    "S19",
+    "S22",
+    "S23",
+    "S24",
+    "S25",
+    "S26",
+    "S27",
+    "S28",
+    "S29"
+  ],
+  "pytest_command": "pytest -m unit tests/unit/wb_sky_control_plane/apply/",
+  "full_change_cert_deferred": true
+}
