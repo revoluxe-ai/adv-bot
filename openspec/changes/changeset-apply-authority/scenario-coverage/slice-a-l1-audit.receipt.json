@@ -2,9 +2,9 @@
   "schema_version": 1,
   "change_id": "changeset-apply-authority",
   "scope": "slice_a_l1_only",
-  "producer": "slice-a-impl-verify",
+  "producer": "slice-a-evidence-repair",
   "produced_at": "2026-10-08",
-  "head_note": "Slice A domain-only; not full-change certify",
+  "head_note": "Slice A pure semantics only; no durable PG/writer certification",
   "scenarios": {
     "S02": {
       "status": "PASS",
@@ -20,11 +20,15 @@
     },
     "S20": {
       "status": "PASS",
-      "evidence": "app/modules/wb_sky_control_plane/apply/validation.py::unsupported_contract_version"
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_validation_and_trust_boundary.py::test_s20_unsupported_contract_version_fails_closed"
     },
     "S21": {
       "status": "PASS",
-      "evidence": "app/modules/wb_sky_control_plane/apply/models/context.py::ApplyInvocationContext"
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_validation_and_trust_boundary.py::test_s21_apply_request_rejects_forged_auth_fields, test_s21_invocation_context_is_distinct_trusted_type"
+    },
+    "S22": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_idempotency.py::test_unauthorized_replay_hides_evidence"
     },
     "S30": {
       "status": "PASS",
@@ -43,12 +47,9 @@
       "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_changeset_mismatch_preserves_receipt"
     },
     "S34": {
-      "status": "PASS",
-      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_unknown_internal_commit_blocks_reconciliation"
-    },
-    "S35": {
-      "status": "PASS",
-      "evidence": "tests/unit/wb_sky_control_plane/apply/test_idempotency.py::test_unauthorized_replay_hides_evidence"
+      "status": "CONTRIBUTION",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_unknown_internal_commit_blocks_reconciliation",
+      "note": "Pure lifecycle transition only; durable retry rejection deferred to Slice B"
     }
   },
   "deferred_scenarios": [
@@ -68,15 +69,15 @@
     "S17",
     "S18",
     "S19",
-    "S22",
     "S23",
     "S24",
     "S25",
     "S26",
     "S27",
     "S28",
-    "S29"
+    "S29",
+    "S35"
   ],
-  "pytest_command": "pytest -m unit tests/unit/wb_sky_control_plane/apply/",
+  "pytest_command": "poetry run pytest -m unit tests/unit/wb_sky_control_plane/apply/ tests/unit/wb_sky_control_plane/",
   "full_change_cert_deferred": true
 }

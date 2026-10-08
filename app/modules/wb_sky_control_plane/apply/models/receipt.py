@@ -13,7 +13,7 @@ from app.modules.wb_sky_control_plane.models.enums import DryRunStatus
 _IMMUTABLE = ConfigDict(frozen=True, extra="forbid")
 
 
-def _empty_state_tokens() -> dict[str, str]:
+def _empty_state_tokens() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
     return {}
 
 
