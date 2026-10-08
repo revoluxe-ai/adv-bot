@@ -22,11 +22,15 @@ from app.modules.attribution_facts.domain.models import (
     AttributionCommerceFact,
     AttributionFactKey,
     AttributionMetrics,
+    AttributionScope,
     CampaignDayTotals,
     DateWindow,
     DayReconciliationResult,
     NmDayContribution,
     ObservationProvenance,
+)
+from app.modules.attribution_facts.domain.window_reconciliation_coverage import (
+    assess_reconciliation_grid,
 )
 from app.modules.attribution_facts.domain.observation_identity import (
     semantic_observation_id,
@@ -141,7 +145,6 @@ async def build_ingest_batch_from_raw_items(
             )
         )
     reconciliations: list[DayReconciliationResult] = []
-    all_passed = True
     for day in day_rows:
         contributions = tuple(
             recon_by_key.get((day.physical_adv_id, day.event_date), ())
@@ -169,11 +172,18 @@ async def build_ingest_batch_from_raw_items(
         dates = sorted({row.event_date for row in nm_rows})
         today = datetime.now(tz=timezone.utc).date()
         window = DateWindow(dates[0], dates[-1]) if dates else DateWindow(today, today)
+        physical_ids = frozenset({row.physical_adv_id for row in nm_rows})
+        scope = AttributionScope(shop_id=shop_id, physical_adv_ids=physical_ids)
+        grid_pass, source_through = assess_reconciliation_grid(
+            tuple(reconciliations),
+            scope,
+            window,
+        )
         coverage = evaluate_window_coverage(
             has_any_facts=bool(facts),
-            all_days_reconciled=all_passed and bool(reconciliations),
+            all_days_reconciled=grid_pass,
             partial_membership_fallback=partial_fallback,
-            source_complete_through=window.end if all_passed else None,
+            source_complete_through=source_through,
             window=window,
         )
 

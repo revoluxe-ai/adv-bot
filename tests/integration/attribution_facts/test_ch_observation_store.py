@@ -112,10 +112,8 @@ async def test_migration_tables_and_latest_projection(clickhouse_client: object)
     result = await reader.query(scope, window)
     assert len(result.facts) >= 1
     assert all(f.key.physical_adv_id == 39900256 for f in result.facts)
-    assert result.coverage.status in (
-        AttributionCoverageStatus.COMPLETE,
-        AttributionCoverageStatus.PARTIAL,
-    )
+    assert result.coverage.status == AttributionCoverageStatus.COMPLETE
+    assert result.coverage.source_complete_through == _DAY
 
 
 @pytest.mark.asyncio
@@ -178,3 +176,83 @@ async def test_correction_updates_latest_not_sums(clickhouse_client: object) -> 
     match = next(f for f in result.facts if f.key == fact.key)
     assert match.metrics.attributed_orders == 99
     assert match.metrics.attributed_gmv_rub == Decimal("123.45")
+
+
+@pytest.mark.asyncio
+async def test_nullable_metrics_roundtrip(clickhouse_client: object) -> None:
+    """Missing orders/GMV persist as NULL and read back as None (not zero)."""
+    from app.modules.attribution_facts.domain.enums import SourceFamily
+    from app.modules.attribution_facts.domain.ingest_models import AttributionIngestBatch
+    from app.modules.attribution_facts.domain.models import (
+        AttributionCommerceFact,
+        AttributionCoverage,
+        AttributionFactKey,
+        AttributionMetrics,
+        ObservationProvenance,
+    )
+
+    await _prepare_tables(clickhouse_client)
+    ch = rewriting_clickhouse_client(clickhouse_client)
+    repo = ClickHouseAttributionObservationRepository(ch)
+    reader = ChAttributionFactsReader(ch)
+    key = AttributionFactKey(
+        shop_id="shop-ch",
+        physical_adv_id=39900256,
+        event_date=_DAY,
+        app_type=9,
+        ordered_nm_id=999001,
+        source_family=SourceFamily.WB_PROMOTION_FULLSTATS_NM_DAY,
+    )
+    draft = AttributionCommerceFact(
+        key=key,
+        metrics=AttributionMetrics(
+            attributed_orders=None,
+            attributed_gmv_rub=None,
+            attributed_atc=None,
+            attributed_units_shks=None,
+        ),
+        attribution_class=AttributionClass.LINKED,
+        provenance=ObservationProvenance(
+            observation_id="pending",
+            source_revision=1,
+            ingested_at=datetime(2026, 9, 8, 2, 0, tzinfo=UTC),
+            membership_snapshot_id="h-null",
+        ),
+    )
+    fact = AttributionCommerceFact(
+        key=draft.key,
+        metrics=draft.metrics,
+        attribution_class=draft.attribution_class,
+        provenance=ObservationProvenance(
+            observation_id=semantic_observation_id(draft),
+            source_revision=1,
+            ingested_at=draft.provenance.ingested_at,
+            membership_snapshot_id="h-null",
+        ),
+    )
+    from app.modules.attribution_facts.domain.models import DayReconciliationResult
+
+    recon = DayReconciliationResult(
+        physical_adv_id=39900256,
+        event_date=_DAY,
+        passed=True,
+        nm_orders_sum=0,
+        day_orders=0,
+        nm_gmv_sum=Decimal(0),
+        day_gmv_rub=Decimal(0),
+        unattributed_orders=0,
+    )
+    batch = AttributionIngestBatch(
+        shop_id="shop-ch",
+        facts=(fact,),
+        reconciliations=(recon,),
+        coverage=AttributionCoverage(status=AttributionCoverageStatus.PARTIAL),
+        used_raw_apps_nms=True,
+        partial_membership_fallback=False,
+    )
+    await repo.append_batch(batch)
+    scope = AttributionScope(shop_id="shop-ch", physical_adv_ids=frozenset({39900256}))
+    result = await reader.query(scope, DateWindow(_DAY, _DAY))
+    match = next(f for f in result.facts if f.key == key)
+    assert match.metrics.attributed_orders is None
+    assert match.metrics.attributed_gmv_rub is None

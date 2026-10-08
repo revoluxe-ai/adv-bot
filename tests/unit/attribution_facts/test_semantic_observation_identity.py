@@ -98,3 +98,9 @@ def test_atc_change_new_id() -> None:
 
 def test_units_shks_change_new_id() -> None:
     assert semantic_observation_id(_fact(units=1)) != semantic_observation_id(_fact(units=2))
+
+
+def test_missing_orders_vs_explicit_zero_differ() -> None:
+    assert semantic_observation_id(_fact(orders=None)) != semantic_observation_id(
+        _fact(orders=0)
+    )

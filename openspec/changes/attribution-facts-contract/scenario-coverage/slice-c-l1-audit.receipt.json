@@ -3,12 +3,12 @@
   "change_id": "attribution-facts-contract",
   "scope": "slice_c_l1_only",
   "producer": "slice-c-certification-repair",
-  "certified_head": "bec0ab9f7",
+  "certified_head": "f8d72697a",
   "destructive_ch": {
     "status": "PASS",
-    "executed_at_utc": "2026-10-08T11:20:00Z",
+    "executed_at_utc": "2026-10-08T11:25:00Z",
     "command": "ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE=1 ALLOW_DESTRUCTIVE_TEST_SUBPROCESS=1 poetry run pytest -m 'integration and destructive_local' tests/integration/attribution_facts/test_ch_observation_store.py -q",
-    "result": "2 passed"
+    "result": "3 passed"
   },
   "certification_guards": {
     "SPARSE_WINDOW_COMPLETE_GUARD": "PASS",
@@ -23,15 +23,15 @@
     },
     "S11": {
       "status": "PASS",
-      "evidence": "EXECUTED destructive_local: test_ch_observation_store.py::test_migration_tables_and_latest_projection"
+      "evidence": "EXECUTED destructive_local: test_migration_tables_and_latest_projection (COMPLETE + source_complete_through)"
     },
     "S12": {
       "status": "PASS",
-      "evidence": "EXECUTED destructive_local: test_ch_observation_store.py::test_correction_updates_latest_not_sums"
+      "evidence": "EXECUTED destructive_local: test_correction_updates_latest_not_sums"
     },
     "S13": {
       "status": "PASS",
-      "evidence": "ChAttributionFactsReader + test_window_reconciliation_grid.py + destructive_local reader query"
+      "evidence": "EXECUTED destructive_local reader query + test_window_reconciliation_grid.py"
     },
     "S14": {
       "status": "PASS",
