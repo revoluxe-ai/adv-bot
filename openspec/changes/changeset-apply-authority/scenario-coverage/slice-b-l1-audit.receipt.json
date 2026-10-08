@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "change_id": "changeset-apply-authority",
+  "scope": "slice_b_l1_only",
+  "producer": "slice-b-impl-verify",
+  "produced_at": "2026-10-08",
+  "head_note": "PG ledger persistence; full end-to-end apply scenarios deferred to Slice C",
+  "scenarios": {
+    "S03": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_idempotency_unique_key_and_conflict",
+      "note": "Durable idempotency row + conflict; replay without writer deferred to Slice C"
+    },
+    "S04": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_idempotency_unique_key_and_conflict"
+    },
+    "S17": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_evidence_insert_only_immutable"
+    },
+    "S23": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_insert_claim_and_invalidate",
+      "note": "Terminal INVALIDATED persistence; distinct apply gate needs Slice C service"
+    },
+    "S25": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_attempt_lifecycle_separate_from_evidence"
+    },
+    "S30": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_insert_claim_and_invalidate"
+    },
+    "S31": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_insert_claim_and_invalidate"
+    },
+    "S34": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_blocked_reconciliation_persists",
+      "note": "Durable BLOCKED_RECONCILIATION; retry rejection needs Slice C orchestration"
+    }
+  },
+  "deferred_scenarios": [
+    "S22",
+    "S24",
+    "S35",
+    "S01",
+    "S02",
+    "S05",
+    "S06",
+    "S07",
+    "S08",
+    "S09",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S15",
+    "S16",
+    "S18",
+    "S19",
+    "S26",
+    "S27",
+    "S28",
+    "S29",
+    "S32",
+    "S33"
+  ],
+  "pytest_command": "poetry run pytest -m 'integration and destructive_local' tests/integration/wb_sky_control_plane/apply/",
+  "full_change_cert_deferred": true
+}

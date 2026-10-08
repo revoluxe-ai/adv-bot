@@ -4,7 +4,7 @@ PLANNING_ONLY: false
 PLANNING_MERGED: true
 PLANNING_MERGE_PR: 459
 IMPLEMENTATION_GO: true
-SLICE_A_OWNER_MERGED: pending (#464)
+SLICE_A_OWNER_MERGED: true (#464 → 6b62da98d)
 SLICE_B_IMPLEMENTATION_GO: true (PG ledger only — this instruction)
 SLICE_C_PLUS_AUTHORIZED: false
 BASELINE_SHA: `origin/stage` at slice cut — refresh at verify
@@ -28,11 +28,11 @@ BASELINE_SHA: `origin/stage` at slice cut — refresh at verify
 - [x] 2.2 Pure functions: `pd1`, `cpd1`, idempotency decisions, receipt lifecycle, binding hints
 - [x] 2.3 Unit tests + `slice-a-l1-audit.receipt.json` (truthful partial/deferred labels)
 
-## 3. Slice B — PG ledger (**in progress**)
+## 3. Slice B — PG ledger (**completed pending Owner merge**)
 
-- [ ] 3.1 Forward-only Alembic for receipt / idempotency / attempt / evidence tables
-- [ ] 3.2 PG repositories + claim/concurrency semantics (no writer orchestration)
-- [ ] 3.3 Disposable-Postgres integration tests + `slice-b-l1-audit.receipt.json`
+- [x] 3.1 Forward-only Alembic `f9c0a1b2d3e4` for receipt / idempotency / attempt / evidence tables
+- [x] 3.2 PG repositories + claim/concurrency semantics (no writer orchestration)
+- [x] 3.3 Disposable-Postgres integration tests + `slice-b-l1-audit.receipt.json`
 
 ## 4. Slice C — PG policy apply path (**not authorized**)
 
