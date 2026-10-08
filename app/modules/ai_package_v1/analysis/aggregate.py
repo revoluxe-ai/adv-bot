@@ -26,7 +26,13 @@ from app.modules.ai_package_v1.analysis.coverage import (
     effective_range,
     resolve_coverage_status,
 )
+from app.modules.ai_package_v1.analysis.attribution_evidence import (
+    build_leg_attribution_outputs,
+    package_attribution_uncomputable,
+    spend_refs_for_leg_window,
+)
 from app.modules.ai_package_v1.analysis.models import CampaignDailyFact
+from app.modules.attribution_facts.domain.models import AttributionQueryResult
 from app.modules.ai_package_v1.keyword_performance.domain.cutoff import PackageCutoff
 from app.modules.ai_package_v1.keyword_performance.domain.enums import WindowSpendStatus
 from app.modules.ai_package_v1.keyword_performance.domain.models import KeywordWindowRowV1
@@ -63,6 +69,7 @@ def fold_campaign_windows(
     source_first: date | None,
     source_last: date | None,
     custom_forced_partial: bool,
+    attribution_by_leg_window: dict[tuple[str, int], AttributionQueryResult] | None = None,
 ) -> list[dict[str, object]]:
     """Одна строка на физическую ногу и окно."""
     by_leg: dict[int, list[CampaignDailyFact]] = defaultdict(list)
@@ -86,6 +93,9 @@ def fold_campaign_windows(
                     source_first=source_first,
                     source_last=source_last,
                     custom_forced_partial=custom_forced_partial,
+                    attribution_query=(
+                        (attribution_by_leg_window or {}).get((spec.window_id, adv_id))
+                    ),
                 )
             )
     return rows
@@ -169,6 +179,7 @@ def _campaign_row(
     source_first: date | None,
     source_last: date | None,
     custom_forced_partial: bool,
+    attribution_query: AttributionQueryResult | None = None,
 ) -> dict[str, object]:
     observed = {fact.stat_date for fact in facts}
     in_window = [fact for fact in facts if spec.start <= fact.stat_date <= spec.end]
@@ -187,7 +198,16 @@ def _campaign_row(
         source_complete_through=source_complete_through,
     )
     metrics, uncomputable = _campaign_metrics(in_window, status)
-    uncomputable.extend(_reserved_campaign_uncomputable())
+    uncomputable.extend(_reserved_shop_uncomputable())
+    if attribution_query is not None:
+        attr_metrics, attr_gaps = build_leg_attribution_outputs(
+            attribution_query,
+            spend_refs_for_leg_window(in_window),
+        )
+        metrics.update(attr_metrics)
+        uncomputable.extend(attr_gaps)
+    else:
+        uncomputable.extend(_attribution_blocked_uncomputable())
     return _base_row(
         shop_id=shop_id,
         cutoff=cutoff,
@@ -255,7 +275,8 @@ def _package_row(
         if isinstance(adv_raw, int) and not isinstance(adv_raw, bool):
             included.append(adv_raw)
     uncomputable = list(metric_gaps)
-    uncomputable.extend(_reserved_package_uncomputable())
+    uncomputable.extend(_reserved_shop_uncomputable())
+    uncomputable.extend(package_attribution_uncomputable(len(included)))
     return _base_row(
         shop_id=shop_id,
         cutoff=cutoff,
@@ -428,16 +449,32 @@ def _sum_member_metrics(
     return metrics, gaps
 
 
-def _reserved_campaign_uncomputable() -> list[dict[str, object]]:
-    blocked: list[dict[str, object]] = [
+def _attribution_blocked_uncomputable() -> list[dict[str, object]]:
+    from app.modules.ai_package_v1.analysis.attribution_evidence import (
+        ATTRIBUTION_DIRECT_GMV_RUB,
+        ATTRIBUTION_DIRECT_ORDERS,
+        ATTRIBUTION_LINKED_GMV_RUB,
+        ATTRIBUTION_LINKED_ORDERS,
+    )
+
+    metric_ids = (
+        ATTRIBUTION_DIRECT_ORDERS,
+        ATTRIBUTION_DIRECT_GMV_RUB,
+        ATTRIBUTION_LINKED_ORDERS,
+        ATTRIBUTION_LINKED_GMV_RUB,
+        "CPO_FACT_DIRECT",
+        "DRR_FACT_DIRECT",
+        "CPO_FACT_LINKED",
+        "DRR_FACT_LINKED",
+    )
+    return [
         {"metric_id": metric_id, "reason_codes": list(ATTRIBUTION_BLOCKERS)}
-        for metric_id in (
-            "CPO_FACT_DIRECT",
-            "DRR_FACT_DIRECT",
-            "CPO_FACT_LINKED",
-            "DRR_FACT_LINKED",
-        )
+        for metric_id in metric_ids
     ]
+
+
+def _reserved_shop_uncomputable() -> list[dict[str, object]]:
+    blocked: list[dict[str, object]] = []
     blocked.append({"metric_id": "SHOP_DRR", "reason_codes": list(SHOP_DRR_BLOCKERS)})
     blocked.append(
         {"metric_id": "ALL_SHOP_AD_SPEND", "reason_codes": list(SHOP_SPEND_BLOCKERS)}
@@ -446,16 +483,13 @@ def _reserved_campaign_uncomputable() -> list[dict[str, object]]:
     return blocked
 
 
-def _reserved_package_uncomputable() -> list[dict[str, object]]:
-    return _reserved_campaign_uncomputable()
-
-
 def _reserved_keyword_uncomputable() -> list[dict[str, object]]:
     blocked: list[dict[str, object]] = [
         {"metric_id": metric_id, "reason_codes": list(SKU_ECONOMICS_BLOCKERS)}
         for metric_id in ("SKU_GMV", "SKU_DRR", "SKU_ORDERS")
     ]
-    blocked.extend(_reserved_campaign_uncomputable())
+    blocked.extend(_reserved_shop_uncomputable())
+    blocked.extend(_attribution_blocked_uncomputable())
     return blocked
 
 

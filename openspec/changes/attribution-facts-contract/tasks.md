@@ -57,11 +57,11 @@ ChangeSet Apply; unrelated collectors; production deployment.
 
 ## Slice D — AI Package / analysis consumption
 
-- [ ] D.1 Wire `AnalysisAggregationService` to `AttributionFactsReader`
-- [ ] D.2 Emit `attributed_orders` / GMV direct+linked; CPO_FACT_* / DRR_FACT_* when COMPLETE
-- [ ] D.3 Retain `BLOCKED_BY_ATTRIBUTION_FACTS` when not COMPLETE
-- [ ] D.4 Contract tests under `tests/unit/ai_package_v1/` for analysis attribution fields
-- [ ] D.5 Update multi-window spec scenarios (consumer change coordination)
+- [x] D.1 Wire `AnalysisAggregationService` to `AttributionFactsReader`
+- [x] D.2 Emit `attributed_orders` / GMV direct+linked; CPO_FACT_* / DRR_FACT_* when COMPLETE
+- [x] D.3 Retain `BLOCKED_BY_ATTRIBUTION_FACTS` when not COMPLETE
+- [x] D.4 Contract tests under `tests/unit/ai_package_v1/` for analysis attribution fields
+- [x] D.5 Update multi-window spec scenarios (consumer change coordination)
 
 **Gate:** targeted ai_package_v1 unit tests; no MCP transport edits
 

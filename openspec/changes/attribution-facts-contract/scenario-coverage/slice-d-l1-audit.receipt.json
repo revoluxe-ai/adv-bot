@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "change_id": "attribution-facts-contract",
+  "scope": "slice_d_l1_only",
+  "producer": "slice-d-implementation",
+  "certified_head": "0d6fc9f0d",
+  "scenarios": {
+    "S15": {
+      "status": "PASS",
+      "evidence": "tests/unit/ai_package_v1/analysis/test_attribution_consumption.py"
+    },
+    "S16": {
+      "status": "PASS",
+      "evidence": "tests/unit/ai_package_v1/analysis/test_attribution_consumption.py::test_s16_package_scope_attribution_scope_mismatch"
+    }
+  }
+}

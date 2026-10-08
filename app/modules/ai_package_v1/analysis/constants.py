@@ -36,10 +36,8 @@ SKU_ECONOMICS_BLOCKERS: tuple[str, ...] = (
 
 FORBIDDEN_NUMERIC_METRICS: frozenset[str] = frozenset(
     {
-        "CPO_FACT_DIRECT",
-        "DRR_FACT_DIRECT",
-        "CPO_FACT_LINKED",
-        "DRR_FACT_LINKED",
+        # Campaign/keyword fold must not invent shop/SKU economics or attribution.
+        # Attribution CPO/DRR are emitted only via AttributionFactsReader path.
         "SHOP_DRR",
         "ALL_SHOP_AD_SPEND",
         "SHOP_AD_SPEND",
