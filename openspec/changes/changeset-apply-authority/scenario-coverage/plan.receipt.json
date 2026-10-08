@@ -4,7 +4,7 @@
   "CHANGE_ID": "changeset-apply-authority",
   "MODE": "plan",
   "PLAN_STATUS": "ready",
-  "PLAN_EVIDENCE_ID": "c4c3e0ffb1fa38b90405b298c53a286853cb217a3f40ab55c9ecb95820112841",
+  "PLAN_EVIDENCE_ID": "d4aa1ccfab2ddd98d69b00be109590660ccdca7e0e3f7337b206852619304016",
   "PLAN_CONTENT_HASH": "f68fe9158fafd28a4a0b9e9c90daada9e8b570c402ee79e148531b5909cf245a",
   "PLAN_PATH": "openspec/changes/changeset-apply-authority/scenario-coverage/plan.md",
   "RECEIPT_PATH": "openspec/changes/changeset-apply-authority/scenario-coverage/plan.receipt.json",
@@ -16,7 +16,7 @@
   "INPUTS": {
     "DESIGN_REVISION": {
       "path": "openspec/changes/changeset-apply-authority/design.md",
-      "content_hash": "d5ce5f63d5dc31e09cd1ff4ee2d75787edfd678f1ee451a4211f96f93d666317"
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
     },
     "SPEC_REVISION": [
       {
@@ -26,7 +26,7 @@
     ],
     "LIFECYCLE_REVISION": {
       "source": "openspec/changes/changeset-apply-authority/design.md",
-      "content_hash": "d5ce5f63d5dc31e09cd1ff4ee2d75787edfd678f1ee451a4211f96f93d666317"
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
     },
     "OWNER_CONTRACT_REVISION": {
       "path": "openspec/changes/changeset-apply-authority/owner-contract.md",
@@ -36,7 +36,7 @@
   "GENERATED_FROM": {
     "DESIGN_REVISION": {
       "path": "openspec/changes/changeset-apply-authority/design.md",
-      "content_hash": "d5ce5f63d5dc31e09cd1ff4ee2d75787edfd678f1ee451a4211f96f93d666317"
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
     },
     "SPEC_REVISION": [
       {
@@ -46,7 +46,7 @@
     ],
     "LIFECYCLE_REVISION": {
       "source": "openspec/changes/changeset-apply-authority/design.md",
-      "content_hash": "d5ce5f63d5dc31e09cd1ff4ee2d75787edfd678f1ee451a4211f96f93d666317"
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
     },
     "OWNER_CONTRACT_REVISION": {
       "path": "openspec/changes/changeset-apply-authority/owner-contract.md",

@@ -1,13 +1,15 @@
 # Planning review — changeset-apply-authority
 
 MODE: planning_review (bounded)
-BASELINE_STAGE: `fc24ac17f840641af978cc46e9f89095f61b0b50`
+BASELINE_STAGE: `2247c055e46fd7fd5107f86491f34836b1bc4918`
 PR: #459
 
 ## Result
 
-**PASS** — owner contract repairs complete; receipt lifecycle + ABA + ADR promotion;
-scenarios S01–S35; OpenSpec strict @1.6.0.
+**PASS** — receipt lifecycle + ABA + ADR promotion; scenarios S01–S35; idempotency
+fingerprint aligned (F1–F5 repairs); OpenSpec strict @1.6.0.
+
+Independent Composer 2.5 review: initial FAIL (F1–F5) → repaired in same PR.
 
 ## Stage delta (since `c956e1673`)
 
@@ -31,4 +33,4 @@ scenarios S01–S35; OpenSpec strict @1.6.0.
 
 ## Owner gate
 
-Ready for **planning merge GO** only — no implementation GO.
+Owner acceptance recorded — **planning merge GO**; Slice A implementation authorized post-merge.

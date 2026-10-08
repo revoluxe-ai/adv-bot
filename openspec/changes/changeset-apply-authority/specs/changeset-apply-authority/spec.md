@@ -11,7 +11,7 @@ mutation domain.
 
 - **GIVEN** an `ApplyInvocationContext` whose server-resolved principal lacks shop authorization
 - **WHEN** Apply Authority processes `apply(request, context)`
-- **THEN** execution status MUST be `REJECTED` with `UNAUTHORIZED`
+- **THEN** terminal status MUST be `REJECTED` with reason `UNAUTHORIZED`
 - **AND** no production writer adapter MUST be invoked
 
 #### Scenario: MCP cannot invoke writer directly (S16)
@@ -372,7 +372,7 @@ Authorization failure MUST NOT transition a valid receipt to `INVALIDATED` or `C
 #### Scenario: Unauthorized caller preserves receipt (S32)
 
 - **GIVEN** a valid `ISSUED` receipt and a mismatched unauthorized `ApplyInvocationContext`
-- **WHEN** Apply Authority rejects with `UNAUTHORIZED`
+- **WHEN** Apply Authority rejects with reason `UNAUTHORIZED`
 - **THEN** receipt state MUST remain `ISSUED`
 - **AND** no writer MUST be invoked
 

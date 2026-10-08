@@ -27,7 +27,7 @@ dry-run.
   (single transaction); **no WB HTTP writes** in V1.
 - Proposed ADR **`changeset-apply-authority-ownership`** (placement, forbidden
   bypass paths).
-- Scenario coverage plan **S01–S29** mapped to implementation slices (planning
+- Scenario coverage plan **S01–S35** mapped to implementation slices (planning
   evidence only).
 - Owner contract review repairs: `ApplyInvocationContext`, receipt ownership,
   atomic PG+evidence txn, attempt vs evidence split.
@@ -66,5 +66,5 @@ dry-run.
 | `preview_digest` (`pd1`) helper in repo | **Missing** — normative in this change only |
 | Apply / receipt persistence tables | **Missing** — by design until Slice B |
 | Promoted `campaign-settings-changeset-ownership` ADR in registry | **Addressed** in this PR |
-| Decision Experiment Memory product module | **Not found** in repo — boundary documented conceptually |
+| Decision Experiment Memory | **Separate authority** — Apply references evidence by id only; not co-located in this repo |
 | Canonical domain `PrincipalRef` type | **Missing** — reuse `LogicalScopeV1` + new `PrincipalRefV1` in apply contract |

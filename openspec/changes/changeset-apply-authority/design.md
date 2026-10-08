@@ -32,7 +32,7 @@ time; collector explicitly avoids settings writes (`runtime.py`).
 
 **Goals:** Define transport-independent Apply contract, binding, lifecycle,
 evidence, idempotency, transaction boundaries, verification, transport parity,
-scenario plan S01–S20.
+scenario plan S01–S35.
 
 **Non-Goals:** Implementation, migrations, REST/MCP, WB apply (Slice D), legacy
 removal, promoted ADR merge (proposed only).
@@ -347,6 +347,6 @@ No automatic WB retry on unknown external outcome.
 - Whether audit must be same-txn mandatory or compensating job acceptable.
 
 ```text
-DESIGN_STATUS: READY_FOR_OWNER_CONTRACT_REVIEW
-IMPLEMENTATION_READY: false
+DESIGN_STATUS: OWNER_ACCEPTED
+IMPLEMENTATION_READY: true (Slice A domain-only; PG/writers remain later slices)
 ```
