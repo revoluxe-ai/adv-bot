@@ -3,7 +3,7 @@
 Planning artifact. Implementation via `/opsx-apply` after Owner implementation GO.
 
 ```text
-TASKS_STATUS: SLICE_B_COMPLETE
+TASKS_STATUS: SLICE_C_COMPLETE
 PLANNING_READY: yes
 APPLY_READY: slice_a_applied
 OWNER_CONTRACT_STATUS: ACCEPTED (Owner GO Slice A)
@@ -44,12 +44,12 @@ ChangeSet Apply; unrelated collectors; production deployment.
 
 ## Slice C — CH store + backfill + reader
 
-- [ ] C.1 Propose CH DDL via clickhouse-migrations control plane (separate migration GO)
-- [ ] C.2 Observation repository append + latest projection queries
-- [ ] C.3 Backfill job design (bounded windows; read-only WB if needed — Owner GO for live)
-- [ ] C.4 `ChAttributionFactsReader` implements port
-- [ ] C.5 Reconciliation batch marks day PASS/FAIL in metadata
-- [ ] C.6 Integration tests destructive_local CH
+- [x] C.1 Propose CH DDL via clickhouse-migrations control plane (separate migration GO)
+- [x] C.2 Observation repository append + latest projection queries
+- [x] C.3 Backfill job design (bounded windows; read-only WB if needed — Owner GO for live)
+- [x] C.4 `ChAttributionFactsReader` implements port
+- [x] C.5 Reconciliation batch marks day PASS/FAIL in metadata
+- [x] C.6 Integration tests destructive_local CH
 
 **Gate:** reader returns facts + coverage for fixture shop/adv window
 

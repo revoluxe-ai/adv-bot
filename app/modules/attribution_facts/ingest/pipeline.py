@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections import defaultdict
 from collections.abc import Mapping
 from datetime import date, datetime, timezone
@@ -23,11 +22,18 @@ from app.modules.attribution_facts.domain.models import (
     AttributionCommerceFact,
     AttributionFactKey,
     AttributionMetrics,
+    AttributionScope,
     CampaignDayTotals,
     DateWindow,
     DayReconciliationResult,
     NmDayContribution,
     ObservationProvenance,
+)
+from app.modules.attribution_facts.domain.window_reconciliation_coverage import (
+    assess_reconciliation_grid,
+)
+from app.modules.attribution_facts.domain.observation_identity import (
+    semantic_observation_id,
 )
 from app.modules.attribution_facts.domain.reconciliation import reconcile_campaign_day
 from app.modules.attribution_facts.ingest.raw_fullstats import (
@@ -38,16 +44,6 @@ from app.modules.attribution_facts.membership.resolver import (
     MembershipResolveResult,
     MembershipSnapshotResolver,
 )
-
-
-def _observation_id(
-    shop_id: str,
-    key: AttributionFactKey,
-    orders: int,
-    gmv: Decimal,
-) -> str:
-    blob = f"{shop_id}|{key}|{orders}|{gmv}"
-    return hashlib.sha256(blob.encode()).hexdigest()[:32]
 
 
 async def build_ingest_batch_from_raw_items(
@@ -105,25 +101,34 @@ async def build_ingest_batch_from_raw_items(
             if resolved_day.snapshot is not None
             else "missing"
         )
-        prov = ObservationProvenance(
-            observation_id=_observation_id(
-                shop_id, key, row.orders, row.gmv_rub
+        draft = AttributionCommerceFact(
+            key=key,
+            metrics=AttributionMetrics(
+                attributed_orders=row.orders,
+                attributed_gmv_rub=row.gmv_rub,
+                attributed_atc=row.atc,
+                attributed_units_shks=row.units_shks,
             ),
-            source_revision=source_revision,
-            ingested_at=ingested_at,
-            membership_snapshot_id=snap_id,
+            attribution_class=attr_class,
+            provenance=ObservationProvenance(
+                observation_id="pending",
+                source_revision=source_revision,
+                ingested_at=ingested_at,
+                membership_snapshot_id=snap_id,
+            ),
         )
+        obs_id = semantic_observation_id(draft)
         facts.append(
             AttributionCommerceFact(
-                key=key,
-                metrics=AttributionMetrics(
-                    attributed_orders=row.orders,
-                    attributed_gmv_rub=row.gmv_rub,
-                    attributed_atc=row.atc,
-                    attributed_units_shks=row.units_shks,
+                key=draft.key,
+                metrics=draft.metrics,
+                attribution_class=draft.attribution_class,
+                provenance=ObservationProvenance(
+                    observation_id=obs_id,
+                    source_revision=source_revision,
+                    ingested_at=ingested_at,
+                    membership_snapshot_id=snap_id,
                 ),
-                attribution_class=attr_class,
-                provenance=prov,
             )
         )
 
@@ -140,7 +145,6 @@ async def build_ingest_batch_from_raw_items(
             )
         )
     reconciliations: list[DayReconciliationResult] = []
-    all_passed = True
     for day in day_rows:
         contributions = tuple(
             recon_by_key.get((day.physical_adv_id, day.event_date), ())
@@ -155,8 +159,6 @@ async def build_ingest_batch_from_raw_items(
             contributions,
         )
         reconciliations.append(result)
-        if not result.passed:
-            all_passed = False
 
     if not used_raw:
         coverage = coverage_for_ingest_source(
@@ -168,11 +170,18 @@ async def build_ingest_batch_from_raw_items(
         dates = sorted({row.event_date for row in nm_rows})
         today = datetime.now(tz=timezone.utc).date()
         window = DateWindow(dates[0], dates[-1]) if dates else DateWindow(today, today)
+        physical_ids = frozenset({row.physical_adv_id for row in nm_rows})
+        scope = AttributionScope(shop_id=shop_id, physical_adv_ids=physical_ids)
+        grid_pass, source_through = assess_reconciliation_grid(
+            tuple(reconciliations),
+            scope,
+            window,
+        )
         coverage = evaluate_window_coverage(
             has_any_facts=bool(facts),
-            all_days_reconciled=all_passed and bool(reconciliations),
+            all_days_reconciled=grid_pass,
             partial_membership_fallback=partial_fallback,
-            source_complete_through=window.end if all_passed else None,
+            source_complete_through=source_through,
             window=window,
         )
 

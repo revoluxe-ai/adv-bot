@@ -24,15 +24,32 @@ def _read_int(row: Mapping[str, Any], *names: str) -> int:
     return 0
 
 
-def _read_decimal(row: Mapping[str, Any], *names: str) -> Decimal:
+def _read_int_optional(row: Mapping[str, Any], *names: str) -> int | None:
     for name in names:
+        if name not in row:
+            continue
         value = row.get(name)
-        if value is not None:
-            try:
-                return Decimal(str(value))
-            except (TypeError, ValueError):
-                continue
-    return Decimal(0)
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _read_decimal_optional(row: Mapping[str, Any], *names: str) -> Decimal | None:
+    for name in names:
+        if name not in row:
+            continue
+        value = row.get(name)
+        if value is None:
+            return None
+        try:
+            return Decimal(str(value))
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def _parse_event_date(value: object) -> date | None:
@@ -99,10 +116,10 @@ def fullstats_item_to_raw_rows(
                         event_date=event_date,
                         app_type=app_type,
                         ordered_nm_id=ordered_nm_id,
-                        orders=_read_int(nm, "orders"),
-                        gmv_rub=_read_decimal(nm, "sum_price", "sumPrice"),
-                        atc=_read_int(nm, "atbs") or None,
-                        units_shks=_read_int(nm, "shks") or None,
+                        orders=_read_int_optional(nm, "orders"),
+                        gmv_rub=_read_decimal_optional(nm, "sum_price", "sumPrice"),
+                        atc=_read_int_optional(nm, "atbs"),
+                        units_shks=_read_int_optional(nm, "shks"),
                     )
                 )
     return tuple(rows)
@@ -129,8 +146,8 @@ def fullstats_items_to_campaign_day_rows(
                 RawCampaignDayRow(
                     physical_adv_id=physical_adv_id,
                     event_date=event_date,
-                    orders=_read_int(day, "orders"),
-                    gmv_rub=_read_decimal(day, "sum_price", "sumPrice"),
+                    orders=_read_int_optional(day, "orders"),
+                    gmv_rub=_read_decimal_optional(day, "sum_price", "sumPrice"),
                 )
             )
     return tuple(result)
