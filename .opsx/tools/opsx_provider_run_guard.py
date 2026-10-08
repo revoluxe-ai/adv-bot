@@ -24,13 +24,22 @@ from typing import Any, Literal
 EXIT_BLOCKED_FINGERPRINT = 3
 EXIT_PERMIT = 0
 EXIT_USAGE = 2
+EXIT_PROVIDER_FAILED = 5
+EXIT_PROVIDER_ERROR = 6
 
 GuardStatus = Literal[
     "PERMIT",
+    "PROVIDER_PASSED",
+    "PROVIDER_FAILED",
+    "PROVIDER_ERROR",
     "BLOCKED_FINGERPRINT_MISMATCH",
     "BLOCKED_AUTHORIZATION",
     "BLOCKED_PACKET_INVALID",
 ]
+
+GuardPermission = Literal["DENIED", "PERMITTED"]
+
+ProviderResult = Literal["NOT_RUN", "PASSED", "FAILED", "ERROR"]
 
 AuthorizationState = Literal[
     "NOT_AUTHORIZED",
@@ -40,6 +49,10 @@ AuthorizationState = Literal[
 ]
 
 EXIT_BLOCKED_AUTHORIZATION = 4
+
+
+class ProviderSubprocessError(RuntimeError):
+    """Subprocess runner returned an unusable result (fail-closed)."""
 
 
 @dataclass(frozen=True)
@@ -114,7 +127,7 @@ class ProviderRunPacket:
 
 @dataclass(frozen=True)
 class GuardVerdict:
-    """Результат проверки до spawn."""
+    """Результат проверки guard и (опционально) provider subprocess."""
 
     status: GuardStatus
     mismatch_field: str | None = None
@@ -122,6 +135,10 @@ class GuardVerdict:
     computed: str | None = None
     spawn_count: int = 0
     authorization_state: AuthorizationState | None = None
+    guard_permission: GuardPermission = "DENIED"
+    provider_spawned: bool = False
+    provider_return_code: int | None = None
+    provider_result: ProviderResult = "NOT_RUN"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -322,6 +339,7 @@ def _blocked(
         expected=expected,
         computed=computed,
         spawn_count=0,
+        guard_permission="DENIED",
     )
 
 
@@ -424,6 +442,7 @@ def _blocked_authorization(
         computed=state,
         spawn_count=0,
         authorization_state=state,
+        guard_permission="DENIED",
     )
 
 
@@ -597,7 +616,20 @@ def verify_provider_run_packet(
         status="PERMIT",
         spawn_count=0,
         authorization_state="AUTHORIZED_UNUSED",
+        guard_permission="PERMITTED",
+        provider_result="NOT_RUN",
     )
+
+
+def resolve_subprocess_returncode(result: Any) -> int:
+    """Extract return code from subprocess runner result; fail closed if unknown."""
+
+    if result is None:
+        raise ProviderSubprocessError("subprocess_runner_returned_none")
+    returncode = getattr(result, "returncode", None)
+    if returncode is None:
+        raise ProviderSubprocessError("subprocess_result_missing_returncode")
+    return int(returncode)
 
 
 def run_guarded_pytest(
@@ -632,6 +664,8 @@ def run_guarded_pytest(
             status="PERMIT",
             spawn_count=0,
             authorization_state="AUTHORIZED_UNUSED",
+            guard_permission="PERMITTED",
+            provider_result="NOT_RUN",
         )
 
     if not live_token:
@@ -647,16 +681,43 @@ def run_guarded_pytest(
 
     runner = subprocess_runner or subprocess.run
     env = build_provider_subprocess_env(packet, extra_env=extra_env)
-    _ = runner(
-        list(packet.pytest_argv),
-        cwd=repo_root,
-        env=env,
-        check=False,
-    )
+    try:
+        completed = runner(
+            list(packet.pytest_argv),
+            cwd=repo_root,
+            env=env,
+            check=False,
+        )
+        returncode = resolve_subprocess_returncode(completed)
+    except Exception:
+        return GuardVerdict(
+            status="PROVIDER_ERROR",
+            spawn_count=1,
+            authorization_state="AUTHORIZED_CONSUMED",
+            guard_permission="PERMITTED",
+            provider_spawned=True,
+            provider_return_code=None,
+            provider_result="ERROR",
+        )
+
+    if returncode == 0:
+        return GuardVerdict(
+            status="PROVIDER_PASSED",
+            spawn_count=1,
+            authorization_state="AUTHORIZED_CONSUMED",
+            guard_permission="PERMITTED",
+            provider_spawned=True,
+            provider_return_code=returncode,
+            provider_result="PASSED",
+        )
     return GuardVerdict(
-        status="PERMIT",
+        status="PROVIDER_FAILED",
         spawn_count=1,
         authorization_state="AUTHORIZED_CONSUMED",
+        guard_permission="PERMITTED",
+        provider_spawned=True,
+        provider_return_code=returncode,
+        provider_result="FAILED",
     )
 
 
@@ -666,6 +727,22 @@ def _load_packet_json(path: Path) -> ProviderRunPacket:
         return ProviderRunPacket.from_mapping(data)
     except (KeyError, TypeError, ValueError) as exc:
         raise SystemExit(f"BLOCKED_PACKET_INVALID:{exc}") from exc
+
+
+def cli_exit_code_for_verdict(verdict: GuardVerdict) -> int:
+    """Map guard verdict to process exit code (guard vs provider execution)."""
+
+    if verdict.status == "BLOCKED_FINGERPRINT_MISMATCH":
+        return EXIT_BLOCKED_FINGERPRINT
+    if verdict.status == "BLOCKED_AUTHORIZATION":
+        return EXIT_BLOCKED_AUTHORIZATION
+    if verdict.status in ("PERMIT", "PROVIDER_PASSED"):
+        return EXIT_PERMIT
+    if verdict.status == "PROVIDER_FAILED":
+        return EXIT_PROVIDER_FAILED
+    if verdict.status == "PROVIDER_ERROR":
+        return EXIT_PROVIDER_ERROR
+    return EXIT_USAGE
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -720,13 +797,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(json.dumps(verdict.to_dict(), indent=2, sort_keys=True))
     if verdict.status == "BLOCKED_FINGERPRINT_MISMATCH":
         print("BLOCKED_FINGERPRINT_MISMATCH", file=sys.stderr)
-        return EXIT_BLOCKED_FINGERPRINT
-    if verdict.status == "BLOCKED_AUTHORIZATION":
+    elif verdict.status == "BLOCKED_AUTHORIZATION":
         print("BLOCKED_AUTHORIZATION", file=sys.stderr)
-        return EXIT_BLOCKED_AUTHORIZATION
-    if verdict.status == "PERMIT":
-        return EXIT_PERMIT
-    return EXIT_USAGE
+    elif verdict.status == "PROVIDER_FAILED":
+        print("PROVIDER_FAILED", file=sys.stderr)
+    elif verdict.status == "PROVIDER_ERROR":
+        print("PROVIDER_ERROR", file=sys.stderr)
+    return cli_exit_code_for_verdict(verdict)
 
 
 if __name__ == "__main__":

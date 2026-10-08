@@ -82,6 +82,7 @@ def build_packet(
         "docker compose -f tests/docker-compose.test.yml down\n"
     )
     return {
+        "packet_evidence_id": "PROVIDER-PACKET-v3",
         "audited_head": head,
         "audited_status_sha256": status,
         "audited_tracked_diff_sha256": diff,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -106,6 +107,10 @@ def _packet(
 
 def _identity_compute(expected: str):
     return lambda _root: expected
+
+
+def _completed(returncode: int) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(args=["pytest"], returncode=returncode)
 
 
 @pytest.mark.unit
@@ -340,13 +345,15 @@ def test_one_shot_consumed_blocks_second_spawn(tmp_path: Path) -> None:
         "compute_manifest": _identity_compute(packet.audited_untracked_manifest_sha256),
         "live_token": _TEST_LIVE_TOKEN,
     }
-    mock_run = MagicMock()
+    mock_run = MagicMock(return_value=_completed(0))
     first = guard.run_guarded_pytest(
         repo,
         packet,
         subprocess_runner=mock_run,
         **base_kw,
     )
+    assert first.status == "PROVIDER_PASSED"
+    assert first.provider_result == "PASSED"
     assert first.spawn_count == 1
     assert mock_run.call_count == 1
     second = guard.run_guarded_pytest(
@@ -492,6 +499,7 @@ def test_run_guarded_pytest_passes_merged_env_to_subprocess(tmp_path: Path) -> N
     def _capture_run(argv, cwd, env, check):  # type: ignore[no-untyped-def]
         captured["argv"] = argv
         captured["env"] = env
+        return _completed(0)
 
     base_kw = {
         "compute_head": _identity_compute(packet.audited_head),
@@ -518,3 +526,91 @@ def test_allowed_run_block_sha256_trailing_newline_canonical() -> None:
     assert guard.allowed_run_block_sha256(text) == guard.allowed_run_block_sha256(
         "echo ok\n"
     )
+
+
+def _run_packet(tmp_path: Path):
+    block = _minimal_block()
+    packet = _packet(block)
+    base_kw = {
+        "compute_head": _identity_compute(packet.audited_head),
+        "compute_status": _identity_compute(packet.audited_status_sha256),
+        "compute_diff": _identity_compute(packet.audited_tracked_diff_sha256),
+        "compute_manifest": _identity_compute(packet.audited_untracked_manifest_sha256),
+        "live_token": _TEST_LIVE_TOKEN,
+    }
+    return block, packet, tmp_path, base_kw
+
+
+@pytest.mark.unit
+def test_provider_rc_zero_consumed_and_cli_success(tmp_path: Path) -> None:
+    _, packet, repo, base_kw = _run_packet(tmp_path)
+    mock_run = MagicMock(return_value=_completed(0))
+    verdict = guard.run_guarded_pytest(
+        repo, packet, subprocess_runner=mock_run, **base_kw
+    )
+    assert verdict.status == "PROVIDER_PASSED"
+    assert verdict.authorization_state == "AUTHORIZED_CONSUMED"
+    assert verdict.guard_permission == "PERMITTED"
+    assert guard.cli_exit_code_for_verdict(verdict) == guard.EXIT_PERMIT
+
+
+@pytest.mark.unit
+def test_provider_rc_nonzero_failed_and_cli_nonzero(tmp_path: Path) -> None:
+    _, packet, repo, base_kw = _run_packet(tmp_path)
+    mock_run = MagicMock(return_value=_completed(1))
+    verdict = guard.run_guarded_pytest(
+        repo, packet, subprocess_runner=mock_run, **base_kw
+    )
+    assert verdict.status == "PROVIDER_FAILED"
+    assert verdict.provider_return_code == 1
+    assert verdict.provider_result == "FAILED"
+    assert verdict.authorization_state == "AUTHORIZED_CONSUMED"
+    assert guard.cli_exit_code_for_verdict(verdict) == guard.EXIT_PROVIDER_FAILED
+
+
+@pytest.mark.unit
+def test_provider_runner_exception_error_and_consumed(tmp_path: Path) -> None:
+    _, packet, repo, base_kw = _run_packet(tmp_path)
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("spawn failed")
+
+    verdict = guard.run_guarded_pytest(
+        repo, packet, subprocess_runner=_boom, **base_kw
+    )
+    assert verdict.status == "PROVIDER_ERROR"
+    assert verdict.provider_result == "ERROR"
+    assert verdict.spawn_count == 1
+    assert verdict.authorization_state == "AUTHORIZED_CONSUMED"
+    assert guard.cli_exit_code_for_verdict(verdict) == guard.EXIT_PROVIDER_ERROR
+
+
+@pytest.mark.unit
+def test_provider_missing_returncode_is_error(tmp_path: Path) -> None:
+    _, packet, repo, base_kw = _run_packet(tmp_path)
+    verdict = guard.run_guarded_pytest(
+        repo,
+        packet,
+        subprocess_runner=lambda *_a, **_k: None,
+        **base_kw,
+    )
+    assert verdict.status == "PROVIDER_ERROR"
+
+
+@pytest.mark.unit
+def test_fingerprint_mismatch_does_not_consume(tmp_path: Path) -> None:
+    block = _minimal_block()
+    packet = _packet(block, head="wrong")
+    verdict = guard.verify_provider_run_packet(
+        tmp_path,
+        packet,
+        compute_head=_identity_compute("abc123"),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.status == "BLOCKED_FINGERPRINT_MISMATCH"
+    assert not guard.authorization_ledger_path(
+        tmp_path, packet.change_id
+    ).is_file()

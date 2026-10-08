@@ -55,4 +55,10 @@ export AUTHORIZE_ONE_LIVE_RUN='<owner-secret>'
 poetry run python .opsx/tools/opsx_seal_provider_packet.py --live-token "$AUTHORIZE_ONE_LIVE_RUN"
 ```
 
+`run` maps provider subprocess exit: `PROVIDER_PASSED` (0), `PROVIDER_FAILED` (5),
+`PROVIDER_ERROR` (6). Authorization stays `AUTHORIZED_CONSUMED` after spawn even
+on failure.
+
+Non-consuming preflight: `opsx_provider_preflight.py` (imports, docker, collect-only).
+
 Unit tests: `tests/unit/opsx/test_opsx_provider_run_guard.py`.
