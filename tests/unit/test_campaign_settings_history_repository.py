@@ -22,8 +22,16 @@ class FakeClient:
         self.rows: list[tuple[object, ...]] = []
 
     async def query(self, query: str, parameters=None):
-        self.query_calls.append((query, dict(parameters or {})))
-        return SimpleNamespace(result_rows=list(self.rows), column_names=())
+        params = dict(parameters or {})
+        self.query_calls.append((query, params))
+        rows = list(self.rows)
+        start_at = params.get("start_at")
+        end_at = params.get("end_at")
+        if start_at is not None and "observed_at >=" in query:
+            rows = [row for row in rows if row[0] >= start_at]
+        if end_at is not None and "observed_at <" in query:
+            rows = [row for row in rows if row[0] < end_at]
+        return SimpleNamespace(result_rows=rows, column_names=())
 
     async def insert(
         self,
@@ -143,3 +151,25 @@ async def test_timeline_is_read_only_and_deterministically_ordered_by_sql() -> N
     assert "ORDER BY observed_at, snapshot_id" in query
     assert params["adv_setting_id"] == 42
     assert client.insert_calls == []
+
+
+@pytest.mark.asyncio
+async def test_timeline_up_to_excludes_snapshots_at_or_after_end() -> None:
+    client = FakeClient()
+    first = datetime(2026, 10, 1, tzinfo=UTC)
+    second = datetime(2026, 10, 2, tzinfo=UTC)
+    third = datetime(2026, 10, 3, tzinfo=UTC)
+    client.rows = [
+        (first, "a", 1, "1" * 64, '{"x":1}'),
+        (second, "b", 1, "2" * 64, '{"x":2}'),
+        (third, "c", 1, "3" * 64, '{"x":3}'),
+    ]
+    repo = ClickHouseCampaignSettingsHistoryRepository(client)
+
+    items = await repo.timeline_up_to(42, end_at=third)
+
+    assert [item.snapshot_id for item in items] == ["a", "b"]
+    query, params = client.query_calls[0]
+    assert "observed_at < %(end_at)s" in query
+    assert "observed_at >=" not in query
+    assert params["end_at"] == third

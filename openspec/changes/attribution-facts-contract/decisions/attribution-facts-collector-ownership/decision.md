@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (Owner GO Slice B)
 
 ## Context
 
