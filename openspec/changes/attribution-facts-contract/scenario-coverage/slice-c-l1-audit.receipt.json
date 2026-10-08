@@ -3,7 +3,7 @@
   "change_id": "attribution-facts-contract",
   "scope": "slice_c_l1_only",
   "producer": "slice-c-certification-repair",
-  "certified_head": "f8d72697a",
+  "certified_head": "677a0606f",
   "destructive_ch": {
     "status": "PASS",
     "executed_at_utc": "2026-10-08T11:25:00Z",
@@ -38,6 +38,9 @@
       "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py"
     }
   },
-  "deferred_scenarios": ["S15", "S16"],
+  "deferred_scenarios": [
+    "S15",
+    "S16"
+  ],
   "full_change_cert_deferred": true
 }
