@@ -48,6 +48,9 @@ _RAW_SHA256_BY_FILENAME: dict[str, str] = {
     "007_create_shop_campaign_inventory_and_availability.sql": (
         "064772c5448a9824731cc8483a653e60b0c6a11f90937594b9ffd70a511479ab"
     ),
+    "008_create_attribution_facts.sql": (
+        "5e54946441b3a2f93db3cc51d532bbf61af9bb225aef72de52d996b9c56786fb"
+    ),
 }
 
 _004_FILENAME = "004_create_auto_shelf_bid_increment_tables.sql"
@@ -64,6 +67,7 @@ _CORPUS_REVISION_IDS: tuple[str, ...] = (
     "005",
     "006",
     "007",
+    "008",
 )
 _ALEMBIC_REVISION_LINE = re.compile(
     r"(?m)^(?:Revision ID:\s*|revision\s*(?::\s*str\s*)?=\s*)['\"]?"
@@ -155,7 +159,7 @@ def test_legacy_baseline_foreign_trees_stay_outside_corpus() -> None:
 
     Spec ``clickhouse-migration-lifecycle``, сценарии ``Alembic stays out of
     ClickHouse migrations`` и ``Test DDL is not canonical``. Корпус ``001``–``007``
-    лежит только в ``scripts/clickhouse_migrations``; чужие ``008``+ не
+    лежит только в ``scripts/clickhouse_migrations``; чужие ``009``+ не
     подмешиваются из соседних worktree.
     """
     corpus_resolved = _CORPUS_DIR.resolve()
@@ -170,12 +174,12 @@ def test_legacy_baseline_foreign_trees_stay_outside_corpus() -> None:
         assert "test_adv_bot_clickhouse" not in corpus_text
         assert "destructive_ch_reset" not in corpus_text
 
-    copied_008 = [
+    copied_009 = [
         path
         for path in _CORPUS_DIR.rglob("*")
-        if path.is_file() and path.name.startswith("008")
+        if path.is_file() and path.name.startswith("009")
     ]
-    assert copied_008 == []
+    assert copied_009 == []
     assert sorted(path.name for path in _CORPUS_DIR.iterdir() if path.is_file()) == (
         sorted(_RAW_SHA256_BY_FILENAME)
     )

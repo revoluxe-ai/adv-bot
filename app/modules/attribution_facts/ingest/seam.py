@@ -14,6 +14,9 @@ from app.modules.attribution_facts.membership.resolver import MembershipSnapshot
 from app.modules.attribution_facts.ports.campaign_settings_history import (
     CampaignSettingsHistoryAsOfPort,
 )
+from app.modules.attribution_facts.ports.observation_writer import (
+    AttributionObservationWriter,
+)
 from app.modules.attribution_facts.ports.shop_campaign_inventory import (
     ShopCampaignInventoryNmPort,
 )
@@ -30,6 +33,7 @@ class AttributionIngestActivation:
     physical_adv_id: int
     history_port: CampaignSettingsHistoryAsOfPort | None
     inventory_port: ShopCampaignInventoryNmPort | None
+    observation_writer: AttributionObservationWriter | None = None
 
 
 _active_ingest: ContextVar[AttributionIngestActivation | None] = ContextVar(
@@ -133,6 +137,15 @@ async def maybe_ingest_fullstats_chunk(items: list[object]) -> None:
         )
         return
     _ = _last_batch_store.set(batch)
+    if activation.observation_writer is not None:
+        try:
+            await activation.observation_writer.append_batch(batch)
+        except Exception:
+            logger.exception(
+                "attribution persistence failed shop_id=%s adv_id=%s",
+                activation.shop_id,
+                activation.physical_adv_id,
+            )
     logger.debug(
         "attribution ingest batch shop_id=%s adv_id=%s facts=%s coverage=%s",
         activation.shop_id,

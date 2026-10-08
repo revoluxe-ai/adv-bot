@@ -60,9 +60,21 @@ _RAW_SHA256_BY_FILENAME: dict[str, str] = {
     "007_create_shop_campaign_inventory_and_availability.sql": (
         "064772c5448a9824731cc8483a653e60b0c6a11f90937594b9ffd70a511479ab"
     ),
+    "008_create_attribution_facts.sql": (
+        "5e54946441b3a2f93db3cc51d532bbf61af9bb225aef72de52d996b9c56786fb"
+    ),
 }
 
-_IDS_IN_ORDER: tuple[str, ...] = ("001", "002", "003", "004", "005", "006", "007")
+_IDS_IN_ORDER: tuple[str, ...] = (
+    "001",
+    "002",
+    "003",
+    "004",
+    "005",
+    "006",
+    "007",
+    "008",
+)
 _FILENAMES_IN_ORDER: tuple[str, ...] = tuple(_RAW_SHA256_BY_FILENAME)
 _SCHEMA_PRIVILEGE = "schema_ddl"
 _GRANT_PRIVILEGE = "privileged_grant"
@@ -84,6 +96,10 @@ _DEFAULT_DB_OBJECTS: dict[str, tuple[str, ...]] = {
     "007": (
         "default_db.shop_campaign_inventory",
         "default_db.shop_campaign_collection_availability",
+    ),
+    "008": (
+        "default_db.attribution_fact_observations",
+        "default_db.attribution_day_reconciliation",
     ),
 }
 _SYSTEM_OBJECTS: tuple[str, ...] = (
@@ -227,19 +243,19 @@ def test_validate_keeps_default_db_and_system_qualification() -> None:
     assert "default_db." not in grant_text
 
 
-def test_validate_fingerprint_is_exactly_001_through_007(
+def test_validate_fingerprint_is_exactly_001_through_008(
     tmp_path: Path,
 ) -> None:
-    """Reviewed ``006``–``007`` входят в corpus, чужой successor не входит.
+    """Reviewed ``008`` входит в corpus, чужой successor не входит.
 
-    Spec ``clickhouse-migration-lifecycle``, сценарии ``Reviewed 006 is accepted``,
-    reviewed successor и ``Unreviewed successor blocks apply``. Хеш копии включает
-    комментарии, а соседний ``008`` не расширяет reviewed fingerprint.
+    Spec ``clickhouse-migration-lifecycle``, сценарии reviewed successor и
+    ``Unreviewed successor blocks apply``. Хеш копии включает комментарии,
+    а соседний ``009`` не расширяет reviewed fingerprint.
     """
     corpus_dir = canonical_corpus_dir()
     canonical = validate()
     assert tuple(version.id for version in canonical.versions) == _IDS_IN_ORDER
-    assert canonical.versions[-1].id == "007"
+    assert canonical.versions[-1].id == "008"
     assert canonical.versions[-1].privilege_class == _SCHEMA_PRIVILEGE
 
     for filename in _FILENAMES_IN_ORDER:
@@ -248,12 +264,12 @@ def test_validate_fingerprint_is_exactly_001_through_007(
     probed_path = tmp_path / probed_name
     probed_raw = probed_path.read_bytes() + b"\n-- probe-keeps-comments\n"
     probed_path.write_bytes(probed_raw)
-    foreign = tmp_path / "008_unreviewed.sql"
-    foreign.write_bytes(b"-- FOREIGN_008_MARKER\nSELECT 1;\n")
+    foreign = tmp_path / "009_unreviewed.sql"
+    foreign.write_bytes(b"-- FOREIGN_009_MARKER\nSELECT 1;\n")
     fingerprint = validate(corpus_dir=tmp_path)
 
     assert tuple(version.id for version in fingerprint.versions) == _IDS_IN_ORDER
-    assert all(not version.filename.startswith("008") for version in fingerprint.versions)
+    assert all(not version.filename.startswith("009") for version in fingerprint.versions)
     assert all(
         version.sha256 != _sha256_raw(foreign.read_bytes())
         for version in fingerprint.versions
@@ -263,7 +279,7 @@ def test_validate_fingerprint_is_exactly_001_through_007(
     assert probed.sha256 == _sha256_raw(probed_raw)
     assert probed.sha256 != _RAW_SHA256_BY_FILENAME[probed_name]
     assert probed.privilege_class == _SCHEMA_PRIVILEGE
-    assert foreign.read_bytes().startswith(b"-- FOREIGN_008_MARKER\n")
+    assert foreign.read_bytes().startswith(b"-- FOREIGN_009_MARKER\n")
 
 
 def test_validate_excludes_test_ddl_from_the_fingerprint(tmp_path: Path) -> None:
