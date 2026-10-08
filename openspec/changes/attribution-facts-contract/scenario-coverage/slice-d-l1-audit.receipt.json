@@ -3,7 +3,7 @@
   "change_id": "attribution-facts-contract",
   "scope": "slice_d_l1_only",
   "producer": "slice-d-implementation",
-  "certified_head": "0d6fc9f0d",
+  "certified_head": "39aaaff7c",
   "scenarios": {
     "S15": {
       "status": "PASS",

@@ -22,7 +22,6 @@ from app.modules.ai_package_v1.domain.funnel_orders_boundary import (
 from app.modules.ai_package_v1.analysis.attribution_reader import (
     AnalysisAttributionReaderProtocol,
     ChAnalysisAttributionReader,
-    EmptyAnalysisAttributionReader,
     collect_attribution_evidence,
 )
 from app.modules.ai_package_v1.analysis.aggregate import legs_from_scope

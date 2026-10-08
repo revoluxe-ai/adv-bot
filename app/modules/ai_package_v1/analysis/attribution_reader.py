@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Protocol
 
+from app.modules.ai_package_v1.keyword_performance.windows.engine import WindowSpec
+
 from app.modules.attribution_facts.domain.models import (
     AttributionCoverage,
     AttributionQueryResult,
@@ -81,15 +83,15 @@ async def collect_attribution_evidence(
     reader: AnalysisAttributionReaderProtocol,
     *,
     shop_id: str,
-    windows: list[object],
+    windows: list[WindowSpec],
     legs: list[tuple[int, str]],
 ) -> tuple[AnalysisAttributionLegEvidence, ...]:
     """Pre-fetch attribution для каждой physical leg × analysis window."""
     evidence: list[AnalysisAttributionLegEvidence] = []
     for spec in windows:
-        window_id = str(getattr(spec, "window_id"))
-        start = getattr(spec, "start")
-        end = getattr(spec, "end")
+        window_id = str(spec.window_id)
+        start = spec.start
+        end = spec.end
         for adv_id, _role in legs:
             query = await reader.query_leg_window(
                 shop_id=shop_id,
