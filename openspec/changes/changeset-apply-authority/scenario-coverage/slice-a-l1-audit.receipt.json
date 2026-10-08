@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "change_id": "changeset-apply-authority",
+  "scope": "slice_a_l1_only",
+  "producer": "slice-a-evidence-repair",
+  "produced_at": "2026-10-08",
+  "head_note": "Slice A pure semantics only; no durable PG/writer certification",
+  "scenarios": {
+    "S02": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_stale_state_invalidates_permanently_aba"
+    },
+    "S04": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_idempotency.py::test_idempotency_conflict"
+    },
+    "S07": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_slice_a_scenario_evidence.py::test_digest_hint_mismatch"
+    },
+    "S20": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_validation_and_trust_boundary.py::test_s20_unsupported_contract_version_fails_closed"
+    },
+    "S21": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_validation_and_trust_boundary.py::test_s21_apply_request_rejects_forged_auth_fields, test_s21_invocation_context_is_distinct_trusted_type"
+    },
+    "S22": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_idempotency.py::test_unauthorized_replay_hides_evidence"
+    },
+    "S30": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_stale_state_invalidates_permanently_aba"
+    },
+    "S31": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_stale_state_invalidates_permanently_aba"
+    },
+    "S32": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_unauthorized_preserves_issued"
+    },
+    "S33": {
+      "status": "PASS",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_changeset_mismatch_preserves_receipt"
+    },
+    "S34": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/unit/wb_sky_control_plane/apply/test_receipt_lifecycle.py::test_unknown_internal_commit_blocks_reconciliation",
+      "note": "Pure lifecycle transition only; durable retry rejection deferred to Slice B"
+    }
+  },
+  "deferred_scenarios": [
+    "S01",
+    "S03",
+    "S05",
+    "S06",
+    "S08",
+    "S09",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S15",
+    "S16",
+    "S17",
+    "S18",
+    "S19",
+    "S23",
+    "S24",
+    "S25",
+    "S26",
+    "S27",
+    "S28",
+    "S29",
+    "S35"
+  ],
+  "pytest_command": "poetry run pytest -m unit tests/unit/wb_sky_control_plane/apply/ tests/unit/wb_sky_control_plane/",
+  "full_change_cert_deferred": true
+}

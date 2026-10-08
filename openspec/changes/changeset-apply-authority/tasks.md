@@ -1,51 +1,56 @@
 ## Planning gate (this change)
 
-PLANNING_ONLY: true
-IMPLEMENTATION_GO: false
-BASELINE_SHA: record at verify — `origin/stage` at branch cut
+PLANNING_ONLY: false
+PLANNING_MERGED: true
+PLANNING_MERGE_PR: 459
+IMPLEMENTATION_GO: true
+SLICE_A_OWNER_MERGED: pending (#464)
+SLICE_B_IMPLEMENTATION_GO: true (PG ledger only — this instruction)
+SLICE_C_PLUS_AUTHORIZED: false
+BASELINE_SHA: `origin/stage` at slice cut — refresh at verify
 
 ## 0. Planning verification
 
-- [x] 0.1 `npx @fission-ai/openspec@latest validate changeset-apply-authority --type change --strict` (PASS 2026-10-07 cloud)
+- [x] 0.1 OpenSpec strict validate `changeset-apply-authority` (planning)
 - [x] 0.2 Materialize `scenario-coverage/plan.md` with S01–S35 rows
-- [x] 0.3 `git diff --check` clean on planning artifacts
-- [x] 0.4 `git merge-tree $(git merge-base HEAD origin/stage) HEAD origin/stage` → CLEAN
-- [x] 0.5 Owner contract review (`OWNER_CONTRACT_REVIEW_READY`) + planning merge repairs
+- [x] 0.3 Planning merged to `stage` (#459)
+- [x] 0.4 Owner contract review + receipt lifecycle repairs
 
 ## 1. Architecture (planning)
 
-- [x] 1.1 Inventory merged `wb_sky_control_plane` dry-run contract on `origin/stage`
+- [x] 1.1 Inventory merged `wb_sky_control_plane` dry-run contract
 - [x] 1.2 Proposed ADR `changeset-apply-authority-ownership`
-- [x] 1.3 Document evidence gaps (`preview_digest`, registry ADR promotion)
+- [x] 1.3 Promoted `campaign-settings-changeset-ownership` ADR on stage
 
-## 2. Slice A — domain vocabulary (implementation **not** authorized)
+## 2. Slice A — domain vocabulary (**completed**)
 
-- [ ] 2.1 Add `apply/models` types: `ApplyRequestV1`, `DryRunReceiptV1`, `ApplyEvidenceV1`, `ApplyPlanV1`
-- [ ] 2.2 Pure functions: `pd1` preview digest, idempotency key conflict rules, binding validation
-- [ ] 2.3 Unit tests for S02, S04, S07, S20 without PG/WB
+- [x] 2.1 `apply/models` types: `ApplyRequestV1`, `DryRunReceiptV1`, `ApplyEvidenceV1`, `ApplyPlanV1`
+- [x] 2.2 Pure functions: `pd1`, `cpd1`, idempotency decisions, receipt lifecycle, binding hints
+- [x] 2.3 Unit tests + `slice-a-l1-audit.receipt.json` (truthful partial/deferred labels)
 
-## 3. Slice B — PG ledger (implementation **not** authorized)
+## 3. Slice B — PG ledger (**in progress**)
 
-- [ ] 3.1 Forward-only Alembic for apply/idempotency/audit tables
-- [ ] 3.2 Receipt persistence API for dry-run (transport change, separate)
+- [ ] 3.1 Forward-only Alembic for receipt / idempotency / attempt / evidence tables
+- [ ] 3.2 PG repositories + claim/concurrency semantics (no writer orchestration)
+- [ ] 3.3 Disposable-Postgres integration tests + `slice-b-l1-audit.receipt.json`
 
-## 4. Slice C — PG policy apply path (implementation **not** authorized)
+## 4. Slice C — PG policy apply path (**not authorized**)
 
 - [ ] 4.1 `ApplyAuthorityService` orchestration
 - [ ] 4.2 `pg.campaign_settings_policy_v1` writer adapter
-- [ ] 4.3 Post-apply verification + S08, S09, S12–S14 integration tests
+- [ ] 4.3 Post-apply verification + integration tests
 
-## 5. Slice D — WB writer behind authority (implementation **not** authorized)
+## 5. Slice D — WB writer behind authority (**not authorized**)
 
-- [ ] 5.1 Single narrow WB mutation class with `UNKNOWN_EXTERNAL_STATE` (S10–S11)
+- [ ] 5.1 WB mutation class with `UNKNOWN_EXTERNAL_STATE`
 
-## 6. Slice E — REST/MCP (implementation **not** authorized)
+## 6. Slice E — REST/MCP (**not authorized**)
 
-- [ ] 6.1 Transport handlers call same service (S15–S16)
+- [ ] 6.1 Transport handlers call same service
 
-## 7. Slice F — cross-links (implementation **not** authorized)
+## 7. Slice F — cross-links (**not authorized**)
 
-- [ ] 7.1 Optional history / decision-memory references (S18–S19)
+- [ ] 7.1 Optional history / decision-memory references
 
 ## Scenario coverage
 
