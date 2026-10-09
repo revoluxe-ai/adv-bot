@@ -33,11 +33,11 @@ eligibility, diagnostics contract, reason codes, exhaustive unit tests.
 
 ## Slice B deliverables
 
-- PG tables `adcontrolshopfeaturerow` / `adcontrolcampaignfeaturerow` with identity
-  `(shop_id, feature_id, schema_version)` and `(shop_id, advert_id, feature_id, schema_version)`.
+- PG tables with logical identity shop `(shop_id, feature_id)` and campaign
+  `(shop_id, advert_id, feature_id)`; `schema_version` column on the authoritative row.
 - `payload_codec` + `AdControlSettingsRepository` (validate via `FEATURE_REGISTRY`).
-- `AdControlChangeSetV1` ops `shop.set_ad_control_feature` /
-  `campaign.set_ad_control_feature` + `validate_ad_control_changeset` (read-only).
+- `AdControlChangeSetV1` ops `shop.set_ad_control_feature`,
+  `campaign.set_ad_control_override` / `disable` / `clear` + dry-run validator (read-only).
 
 ## Non-merge
 

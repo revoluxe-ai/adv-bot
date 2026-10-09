@@ -12,7 +12,7 @@
 
 ## 3. Slice B — persistence + ChangeSet dry-run
 
-- [x] 3.1 Persistence `(scope, feature_id, schema_version)` — PG models, Alembic, repository, payload codec
+- [x] 3.1 Persistence logical slot identity — PG models, Alembic, repository, payload codec
 - [x] 3.2 AdControlChangeSetV1 + `validate_ad_control_changeset` (dry-run only; no Apply Authority wiring)
 
 ## 4. Future slices

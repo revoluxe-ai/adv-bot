@@ -22,7 +22,10 @@ from app.modules.ad_control_settings.domain.registry import (
     assert_scope_supported,
     get_feature_definition,
 )
-from app.modules.ad_control_settings.persistence.cas import AdControlMutationKind
+from app.modules.ad_control_settings.persistence.cas import (
+    AdControlMutationKind,
+    UnsupportedSchemaVersionError,
+)
 from app.modules.ad_control_settings.persistence.payload_codec import (
     PayloadCodecError,
     decode_payload_json,
@@ -30,7 +33,6 @@ from app.modules.ad_control_settings.persistence.payload_codec import (
 )
 from app.modules.ad_control_settings.persistence.repository import (
     AdControlPersistenceError,
-    CampaignDisableUpsert,
     CampaignOverrideUpsert,
     ShopFeatureUpsert,
     validate_campaign_override_upsert,
@@ -39,6 +41,9 @@ from app.modules.ad_control_settings.persistence.repository import (
 from app.modules.wb_sky_control_plane.models.ad_control_changeset import (
     AdControlChangeSetV1,
     AdControlOperationV1,
+    AdvertCampaignRefV1,
+    CampaignFeatureTargetV1,
+    CampaignOverridePayloadV1,
     ClearCampaignAdControlFeatureOperation,
     DisableCampaignAdControlFeatureOperation,
     SetCampaignAdControlOverrideOperation,
@@ -363,6 +368,15 @@ def _validate_shop_operation(
                 payload=decoded,
             )
         )
+    except UnsupportedSchemaVersionError as exc:
+        errors.append(
+            ControlPlaneError(
+                code="UNSUPPORTED_SCHEMA_VERSION",
+                message=str(exc),
+                operation_index=index,
+            )
+        )
+        return [], errors
     except AdControlPersistenceError as exc:
         errors.append(
             ControlPlaneError(
@@ -405,7 +419,11 @@ def _validate_shop_operation(
     current_activation = snapshot.activation.value
     desired_activation = body.activation.value
     current_json = snapshot.payload_json
-    if current_activation == desired_activation and current_json == desired_json:
+    if (
+        current_activation == desired_activation
+        and snapshot.schema_version == schema_version
+        and current_json == desired_json
+    ):
         return [
             AdControlSemanticDiffV1(
                 target_key=f"shop:{feature_id.value}",
@@ -440,6 +458,16 @@ def _validate_shop_operation(
                 desired=_json_preview(desired_json),
             )
         )
+    if snapshot.schema_version != schema_version:
+        diffs.append(
+            AdControlSemanticDiffV1(
+                target_key=f"shop:{feature_id.value}",
+                intent=intent,
+                field_path="schema_version",
+                current=str(snapshot.schema_version),
+                desired=str(schema_version),
+            )
+        )
     return diffs, errors
 
 
@@ -454,10 +482,11 @@ def _validate_campaign_override(
     ],
 ) -> tuple[list[AdControlSemanticDiffV1], list[ControlPlaneError]]:
     errors: list[ControlPlaneError] = []
-    ref, body, scope_err = _campaign_scope_check(changeset, operation, index)
+    ref, _, scope_err = _campaign_scope_check(changeset, operation, index)
     if scope_err is not None:
         return [], [scope_err]
 
+    body = operation.payload
     feature_id = body.feature_id
     schema_version = body.schema_version
     scope_reason = assert_scope_supported(feature_id, AdControlScope.CAMPAIGN)
@@ -478,6 +507,15 @@ def _validate_campaign_override(
             ControlPlaneError(
                 code="INVALID_PAYLOAD",
                 message=str(exc),
+                operation_index=index,
+            )
+        )
+        return [], errors
+    if decoded is None:
+        errors.append(
+            ControlPlaneError(
+                code="INVALID_PAYLOAD",
+                message="campaign override requires payload",
                 operation_index=index,
             )
         )
@@ -564,11 +602,49 @@ def _validate_campaign_disable(
         AdControlCampaignFeatureSnapshotV1,
     ],
 ) -> tuple[list[AdControlSemanticDiffV1], list[ControlPlaneError]]:
+    errors: list[ControlPlaneError] = []
     ref, body, scope_err = _campaign_scope_check(changeset, operation, index)
     if scope_err is not None:
         return [], [scope_err]
 
     feature_id = body.feature_id
+    schema_version = body.schema_version
+    scope_reason = assert_scope_supported(feature_id, AdControlScope.CAMPAIGN)
+    if scope_reason is not None:
+        errors.append(
+            ControlPlaneError(
+                code=scope_reason.value,
+                message="feature not supported at CAMPAIGN scope",
+                operation_index=index,
+            )
+        )
+        return [], errors
+
+    try:
+        definition = get_feature_definition(feature_id)
+        if schema_version != definition.schema_version:
+            raise UnsupportedSchemaVersionError(
+                f"unsupported schema_version {schema_version} for {feature_id}"
+            )
+    except UnsupportedSchemaVersionError as exc:
+        errors.append(
+            ControlPlaneError(
+                code="UNSUPPORTED_SCHEMA_VERSION",
+                message=str(exc),
+                operation_index=index,
+            )
+        )
+        return [], errors
+    except Exception:
+        errors.append(
+            ControlPlaneError(
+                code="UNKNOWN_FEATURE",
+                message="unknown feature_id",
+                operation_index=index,
+            )
+        )
+        return [], errors
+
     key = (ref.shop_id, ref.advert_id, feature_id)
     snapshot = campaign_snapshots.get(key)
     rev_err = _check_revision_precondition(
@@ -592,7 +668,10 @@ def _validate_campaign_disable(
             )
         ], []
 
-    if snapshot.mode == AdControlFeatureMode.DISABLED:
+    if (
+        snapshot.mode == AdControlFeatureMode.DISABLED
+        and snapshot.schema_version == schema_version
+    ):
         return [
             AdControlSemanticDiffV1(
                 target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
@@ -666,17 +745,24 @@ def _validate_campaign_clear(
     ], []
 
 
+_CampaignScopedOperation = (
+    SetCampaignAdControlOverrideOperation
+    | DisableCampaignAdControlFeatureOperation
+    | ClearCampaignAdControlFeatureOperation
+)
+
+
 def _campaign_scope_check(
     changeset: AdControlChangeSetV1,
-    operation: AdControlOperationV1,
+    operation: _CampaignScopedOperation,
     index: int,
 ) -> tuple[
-    object,
-    object,
+    AdvertCampaignRefV1,
+    CampaignOverridePayloadV1 | CampaignFeatureTargetV1,
     ControlPlaneError | None,
 ]:
-    ref = operation.resource  # type: ignore[attr-defined]
-    body = operation.payload  # type: ignore[attr-defined]
+    ref = operation.resource
+    body = operation.payload
     if ref.shop_id != changeset.scope.shop_id:
         return ref, body, ControlPlaneError(
             code="SCOPE_SHOP_MISMATCH",

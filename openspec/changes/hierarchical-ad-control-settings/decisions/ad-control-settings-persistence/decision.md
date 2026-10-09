@@ -7,8 +7,9 @@ Proposed (change `hierarchical-ad-control-settings`, Slice B)
 ## Context
 
 Slice A delivered pure domain resolver with configured payloads typed in Python.
-Owner contract requires separate persistence for configured policy vs derived state,
-identity `(scope, feature_id, schema_version)`, JSONB as representation only.
+Owner contract requires separate persistence for configured policy vs derived state;
+logical slot identity excludes `schema_version` (row attribute only); JSONB as
+representation only.
 
 ## Decision
 

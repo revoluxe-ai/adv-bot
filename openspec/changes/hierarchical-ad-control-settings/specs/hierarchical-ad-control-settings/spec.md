@@ -58,10 +58,9 @@ emit new control actions from hierarchical evidence.
 
 ### Requirement: Price semantics boundary (Slice A foundation)
 
-Slice A diagnostics remain fail-closed for **catalog-price** CPO actuation
-(`CATALOG_PRICE_SEMANTICS_ACCEPTED = NO`). V1 **order-value** semantics are
-accepted on stage via `drr-cpo-price-semantics`; runtime hierarchical CPO
-actuation is a future slice, not Slice B persistence.
+Slice A catalog-price CPO diagnostics MUST remain fail-closed while
+`CATALOG_PRICE_SEMANTICS_ACCEPTED = NO`. V1 order-value acceptance on stage MUST
+NOT imply catalog-price authority. Slice B MUST NOT perform runtime CPO actuation.
 
 #### Scenario: Catalog-price CPO actuation still blocked in foundation diagnostics
 
@@ -69,11 +68,15 @@ actuation is a future slice, not Slice B persistence.
 - **WHEN** proposed CPO is requested on catalog-price authority
 - **THEN** proposal MUST remain blocked with an explicit reason code
 
-### Requirement: Versioned persistence identity
+### Requirement: Configured persistence logical identity
 
-Configured shop and campaign policy MUST be stored with identity
-`(scope, feature_id, schema_version)`; JSONB MUST be decoded only through the
-domain registry validators.
+Configured shop and campaign policy MUST persist exactly one authoritative row per
+logical feature slot. Shop identity MUST be `(shop_id, feature_id)`. Campaign
+identity MUST be `(shop_id, advert_id, feature_id)`. `schema_version` MUST be stored
+on that row as an attribute only and MUST NOT be part of logical identity.
+Unsupported or newer `schema_version` values MUST fail closed. Multiple rows for one
+feature solely because schema versions differ MUST be forbidden. JSONB MUST be decoded
+only through domain registry validators.
 
 #### Scenario: Shop row round-trip
 
@@ -84,10 +87,24 @@ domain registry validators.
 ### Requirement: Ad control ChangeSet dry-run
 
 `AdControlChangeSetV1` mutations MUST be validated by
-`validate_ad_control_changeset` without PostgreSQL or WB writes.
+`validate_ad_control_changeset` without PostgreSQL or WB writes. Concurrency authority
+MUST be `expected_revision` only; `state_token` MUST remain a semantic fingerprint for
+snapshots and diagnostics and MUST NOT be a second CAS precondition.
 
-#### Scenario: Stale state_token rejected
+#### Scenario: Stale revision rejected
 
-- **GIVEN** an existing shop feature snapshot with `state_token` `acs_live`
-- **WHEN** a ChangeSet presents `acs_wrong` for the same feature
-- **THEN** dry-run MUST return `REJECTED` with `STATE_TOKEN_STALE`
+- **GIVEN** an existing shop feature snapshot at authoritative revision `N`
+- **WHEN** a ChangeSet presents `expected_revision` not equal to `N`
+- **THEN** dry-run MUST return `REJECTED` with `REVISION_CONFLICT`
+
+#### Scenario: Absent row with revision precondition
+
+- **GIVEN** no authoritative row for the feature slot
+- **WHEN** a ChangeSet presents `expected_revision` that is not null
+- **THEN** dry-run MUST return `REJECTED` with `REVISION_CONFLICT`
+
+#### Scenario: Existing row without create revision
+
+- **GIVEN** an authoritative row exists for the feature slot
+- **WHEN** a ChangeSet presents `expected_revision` null
+- **THEN** dry-run MUST return `REJECTED` with `REVISION_CONFLICT`

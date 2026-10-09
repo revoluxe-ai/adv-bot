@@ -594,6 +594,31 @@ def _campaign_disable_is_no_op(
     )
 
 
+def classify_shop_mutation_kind(
+    existing: AdControlShopFeatureRow,
+    upsert: ShopFeatureUpsert,
+) -> AdControlMutationKind:
+    """Public classifier shared by dry-run parity tests (matches repository CAS)."""
+    return _shop_mutation_kind(existing, upsert)
+
+
+def classify_campaign_override_is_no_op(
+    existing: AdControlCampaignFeatureRow,
+    upsert: CampaignOverrideUpsert,
+    payload_json: dict[str, object],
+) -> bool:
+    """Public classifier shared by dry-run parity tests (matches repository CAS)."""
+    return _campaign_override_is_no_op(existing, upsert, payload_json)
+
+
+def classify_campaign_disable_is_no_op(
+    existing: AdControlCampaignFeatureRow,
+    upsert: CampaignDisableUpsert,
+) -> bool:
+    """Public classifier shared by dry-run parity tests (matches repository CAS)."""
+    return _campaign_disable_is_no_op(existing, upsert)
+
+
 def _assert_schema_supported(
     feature_id: AdControlFeatureId,
     schema_version: int,
