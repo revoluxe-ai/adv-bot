@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import IntegrityError, PendingRollbackError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from app.modules.ad_control_settings.persistence.cas import UnsupportedSchemaVersionError
@@ -26,6 +27,7 @@ from app.modules.ad_control_settings.persistence.cas import (
     AdControlMutationKind,
     RevisionConflictError,
 )
+from app.modules.ad_control_settings.persistence.payload_codec import encode_payload_json
 from app.modules.ad_control_settings.persistence.repository import (
     AdControlPersistenceError,
     AdControlSettingsRepository,
@@ -415,3 +417,107 @@ async def test_migration_tables_exist(async_engine: AsyncEngine) -> None:
     assert "adcontrolshopfeaturerow" in tables
     assert "adcontrolcampaignfeaturerow" in tables
     assert "adcontrolslotmutationledger" in tables
+
+
+async def test_shop_enabled_payload_update(ad_control_session) -> None:
+    repo = AdControlSettingsRepository(ad_control_session)
+    shop_id = "int-shop-update"
+    base = ShopFeatureUpsert(
+        shop_id=shop_id,
+        feature_id=AdControlFeatureId.DRR_POLICY,
+        schema_version=1,
+        activation=ShopFeatureActivation.ENABLED,
+        payload=_drr(),
+    )
+    created = await repo.apply_shop_mutation(base, expected_revision=None)
+    assert created.kind == AdControlMutationKind.CREATE
+    alt_profile = DrrPolicyParamsV1(
+        profile=drr_profile_from_percent(Decimal("20"), Decimal("25")),
+    )
+    updated_upsert = ShopFeatureUpsert(
+        shop_id=shop_id,
+        feature_id=AdControlFeatureId.DRR_POLICY,
+        schema_version=1,
+        activation=ShopFeatureActivation.ENABLED,
+        payload=alt_profile,
+    )
+    updated = await repo.apply_shop_mutation(
+        updated_upsert, expected_revision=created.revision
+    )
+    assert updated.kind == AdControlMutationKind.UPDATE
+    assert updated.revision == created.revision + 1
+    row = await repo.get_shop_row(shop_id, AdControlFeatureId.DRR_POLICY)
+    assert row is not None
+    assert row.revision == updated.revision
+
+
+async def test_concurrent_create_does_not_leak_integrity_error(
+    async_engine: AsyncEngine,
+) -> None:
+    maker = async_sessionmaker(async_engine, expire_on_commit=False)
+
+    async def _create() -> None:
+        async with maker() as session:
+            repo = AdControlSettingsRepository(session)
+            await repo.apply_shop_mutation(
+                ShopFeatureUpsert(
+                    shop_id="int-shop-leak",
+                    feature_id=AdControlFeatureId.DRR_POLICY,
+                    schema_version=1,
+                    activation=ShopFeatureActivation.ENABLED,
+                    payload=_drr(),
+                ),
+                expected_revision=None,
+            )
+            await session.commit()
+
+    results = await asyncio.gather(_create(), _create(), return_exceptions=True)
+    errors = [r for r in results if isinstance(r, Exception)]
+    assert len(errors) == 1
+    assert isinstance(errors[0], RevisionConflictError)
+    assert not any(isinstance(r, IntegrityError) for r in errors)
+
+
+async def test_flush_conflict_requires_rollback_before_reuse(
+    ad_control_session,
+) -> None:
+    from datetime import UTC, datetime
+
+    from app.modules.ad_control_settings.persistence.models import (
+        AdControlShopFeatureRow,
+    )
+    from app.modules.ad_control_settings.persistence.repository import (
+        _flush_or_conflict,
+    )
+
+    repo = AdControlSettingsRepository(ad_control_session)
+    upsert = ShopFeatureUpsert(
+        shop_id="int-shop-rollback",
+        feature_id=AdControlFeatureId.DRR_POLICY,
+        schema_version=1,
+        activation=ShopFeatureActivation.ENABLED,
+        payload=_drr(),
+    )
+    created = await repo.apply_shop_mutation(upsert, expected_revision=None)
+    assert created.revision == 1
+    payload_json = encode_payload_json(upsert.feature_id, upsert.payload)
+    duplicate = AdControlShopFeatureRow(
+        shop_id=upsert.shop_id,
+        feature_id=upsert.feature_id.value,
+        schema_version=upsert.schema_version,
+        activation=upsert.activation.value,
+        payload_json=payload_json,
+        revision=99,
+        state_token="duplicate-token",
+        updated_at=datetime.now(tz=UTC),
+    )
+    ad_control_session.add(duplicate)
+    with pytest.raises(RevisionConflictError):
+        await _flush_or_conflict(ad_control_session, scope="shop duplicate")
+    with pytest.raises(PendingRollbackError):
+        await repo.get_shop_row(upsert.shop_id, upsert.feature_id)
+    await ad_control_session.rollback()
+    row = await repo.get_shop_row(upsert.shop_id, upsert.feature_id)
+    assert row is None
+    second = await repo.apply_shop_mutation(upsert, expected_revision=None)
+    assert second.kind == AdControlMutationKind.CREATE

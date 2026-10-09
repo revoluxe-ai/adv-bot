@@ -6,7 +6,10 @@ on:
       - "alembic_/**"
       - "alembic.ini"
       - "app/db/**"
+      - "app/modules/ad_control_settings/**"
       - "tests/migrations/**"
+      - "tests/ad_control_persistence_live/**"
+      - "tests/integration/ad_control_settings/**"
       - ".github/workflows/migration-gates.yml"
       - ".github/ci/migration-ephemeral.env"
       - "k8s/jobs/**"
@@ -169,6 +172,9 @@ jobs:
           PY
           MIGRATION_EPHEMERAL_PG_URL="postgresql://replay:replay@localhost:5432/replay_db" \
             poetry run pytest tests/migrations/test_ephemeral_expand_upgrade.py -q
+          AD_CONTROL_PERSISTENCE_PG_URL="postgresql://replay:replay@localhost:5432/replay_db" \
+            poetry run pytest tests/ad_control_persistence_live \
+              --confcutdir=tests/ad_control_persistence_live -q
           # Missing alembic_version ⇒ BASE (42P01 only)
           poetry run python - <<'PY'
           from sqlalchemy import create_engine, text
