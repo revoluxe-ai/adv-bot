@@ -32,7 +32,8 @@ Do not maintain a second path list inside command bodies.
 one-shot authorization before any provider pytest. Env
 `AUTHORIZE_ONE_LIVE_RUN` must match packet `one_shot_authorization_id`
 (SHA-256 of token). Only `AUTHORIZED_UNUSED` may spawn; consumption is
-written to `.opsx/runs/scenario-coverage/<change_id>/one_shot_authorization.json`
+claimed atomically via `O_CREAT|O_EXCL` under
+`.opsx/runs/scenario-coverage/<change_id>/authorizations/<one_shot_authorization_id>.json`
 at spawn boundary (not rolled back on pytest failure). Child pytest inherits
 the parent process environment (PATH, Poetry) and receives audited test DB /
 Redis coordinates from the packet (overriding conflicting parent values).
@@ -45,8 +46,8 @@ poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet packet.jso
 
 Packets include explicit `pytest_targets` (POSIX repo paths). Verification uses
 `PurePosixPath` so Windows cannot fail on backslash parents. Frozen run block
-must list targets and `guard verify` → `guard run` only (no direct
-`poetry run pytest` before guard).
+must list targets, `# CANONICAL_PYTEST_ARGV_SHA256`, and `guard verify` →
+`guard run` only (no executable pytest in the block; provider argv is packet-only).
 
 Seal untracked packet at current HEAD (after pull, before live run):
 

@@ -654,6 +654,27 @@ def test_canonical_pytest_argv_sha256_mismatch_rejects() -> None:
 
 
 @pytest.mark.unit
+def test_pytest_smuggled_on_guard_line_rejected() -> None:
+    block = _minimal_block()
+    lines = block.splitlines()
+    lines.insert(
+        -2,
+        "poetry run pytest tests/other/ -m x # opsx_provider_run_guard.py run",
+    )
+    bad_block = "\n".join(lines) + "\n"
+    packet = _packet(bad_block)
+    verdict = guard.verify_provider_run_packet(
+        Path("/tmp"),
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.mismatch_field == "unguarded_pytest_in_block"
+
+
 def test_python_m_pytest_in_block_rejected() -> None:
     block = _minimal_block()
     lines = block.splitlines()

@@ -256,8 +256,6 @@ def block_has_unguarded_pytest_invocation(block_text: str) -> bool:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        if "opsx_provider_run_guard.py" in stripped:
-            continue
         lowered = stripped.lower()
         if pytest_token.search(stripped):
             return True
@@ -429,7 +427,10 @@ def authorization_ledger_path(
 def _load_authorization_ledger(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
 
 
 def _authorization_ledger_payload(
@@ -465,6 +466,8 @@ def resolve_authorization_state(
         return "AUTHORIZED_UNUSED"
     ledger = _load_authorization_ledger(ledger_path)
     if ledger is None:
+        if ledger_path.is_file():
+            return "EXPIRED_OR_INVALID"
         return "AUTHORIZED_UNUSED"
     stored_id = str(ledger.get("one_shot_authorization_id", ""))
     stored_state = str(ledger.get("authorization_state", ""))
