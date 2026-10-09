@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "change_id": "changeset-apply-authority",
+  "scope": "slice_c_l1_service",
+  "producer": "slice-c-implementation",
+  "produced_at": "2026-10-09",
+  "head_note": "ApplyAuthorityService + pg.campaign_settings_policy_v1; disposable PG integration",
+  "scenarios": {
+    "S01": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s01_verified_mutates_adv_setting"
+    },
+    "S02": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s02_stale_state_zero_mutation"
+    },
+    "S03": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s03_replay_without_second_mutation"
+    },
+    "S05": {
+      "status": "PLANNED",
+      "note": "Capability drift invalidation — add dedicated PG test in follow-up repair if required"
+    },
+    "S06": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s06_unauthorized_zero_mutation"
+    },
+    "S08": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s08_two_operations_atomic"
+    },
+    "S09": {
+      "status": "PLANNED",
+      "note": "Validation failure zero writes — covered partially by S02; expand if Owner requires explicit case"
+    },
+    "S12": {
+      "status": "CONTRIBUTION",
+      "evidence": "ApplyAuthorityService post-write field compare on locked AdvSetting rows",
+      "note": "Happy-path verification in S01/S08; mismatch rollback test deferred"
+    },
+    "S13": {
+      "status": "PLANNED",
+      "note": "VERIFICATION_MISMATCH harness not yet isolated"
+    },
+    "S14": {
+      "status": "CONTRIBUTION",
+      "evidence": "post_state_tokens computed in ApplyAuthorityService success path",
+      "note": "Assert token delta in dedicated test deferred"
+    },
+    "S23": {
+      "status": "CONTRIBUTION",
+      "evidence": "Slice B test_consumed_receipt_claim_is_terminal + fresh apply RECEIPT_INVALID path in service",
+      "note": "Distinct-apply service rejection without dedicated S23 PG test"
+    },
+    "S24": {
+      "status": "CONTRIBUTION",
+      "evidence": "Slice B release_claim + service _rollback_rejected release_in_flight",
+      "note": "Orchestrated pre-write rollback PG test deferred"
+    },
+    "S26": {
+      "status": "CONTRIBUTION",
+      "evidence": "Single transaction evidence + AdvSetting mutation in S01",
+      "note": "Explicit atomicity failure injection deferred"
+    },
+    "S27": {
+      "status": "PLANNED",
+      "note": "UNKNOWN_INTERNAL_COMMIT harness not implemented"
+    },
+    "S28": {
+      "status": "CONTRIBUTION",
+      "evidence": "S06 UNAUTHORIZED vs capability drift separation in service reason mapping",
+      "note": "Dedicated CAPABILITY_DRIFT PG test deferred"
+    },
+    "S29": {
+      "status": "PASS",
+      "evidence": "design.md legacy bypass acknowledgement; no global write exclusivity claimed"
+    },
+    "S30": {
+      "status": "PASS",
+      "evidence": "Slice B invalidate sticky + service _abort_before_claim invalidate"
+    },
+    "S31": {
+      "status": "PASS",
+      "evidence": "Slice B ABA invalidate tests"
+    },
+    "S32": {
+      "status": "CONTRIBUTION",
+      "evidence": "S06 unauthorized does not mutate receipt lifecycle before claim",
+      "note": "Explicit receipt state assertion deferred"
+    },
+    "S33": {
+      "status": "CONTRIBUTION",
+      "evidence": "CHANGESET_DIGEST_MISMATCH preserves receipt (service early gate)",
+      "note": "Dedicated PG test deferred"
+    },
+    "S34": {
+      "status": "CONTRIBUTION",
+      "evidence": "Slice B blocked reconciliation + service REJECTED path",
+      "note": "Service retry rejection test deferred"
+    },
+    "S35": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s03_replay_without_second_mutation"
+    }
+  },
+  "deferred_scenarios": ["S07", "S10", "S11", "S15", "S16", "S18", "S19", "S20", "S21", "S22"]
+}
