@@ -466,3 +466,88 @@ def test_baseline_warn_allows_current_oversized_file_but_detects_growth(
 
     assert current.status == "WARN"
     assert grown.status == "FAIL"
+
+
+def _repo_guard_paths() -> tuple[object, Path, Path]:
+    """Возвращает guard module, repo root и production config path."""
+    mod = _load_guard_module()
+    repo_root = Path(__file__).resolve().parents[3]
+    config_path = repo_root / "tools" / "openspec" / "openspec_guard.yaml"
+    return mod, repo_root, config_path
+
+
+def test_opsx_verify_accepted_baseline_warn_strict_exit_zero() -> None:
+    """На accepted stage opsx_verify: WARN, --strict exit 0, growth budget 0."""
+    mod, repo_root, config_path = _repo_guard_paths()
+    config = mod.load_config(config_path)
+    scenario = config.scenarios["opsx_verify"]
+    assert scenario.baseline is not None
+    assert scenario.baseline.allowed_growth_chars == 0
+    assert scenario.baseline.status == "WARN"
+
+    result = mod.check_scenario(config, repo_root, "opsx_verify")
+    assert result.chars == scenario.baseline.baseline_chars
+    assert result.status == "WARN"
+
+    assert (
+        mod.run(
+            ["--scenario", "opsx_verify", "--strict"],
+            config_path=config_path,
+            repo_root=repo_root,
+        )
+        == 0
+    )
+
+
+def test_scenario_baseline_plus_one_char_fails_strict(tmp_path: Path) -> None:
+    """+1 char над scenario baseline => FAIL при --strict."""
+    mod = _load_guard_module()
+    config_data = _base_config()
+    config_data["scenario_defaults"] = {
+        "green_chars": 5,
+        "warn_chars": 20,
+        "fail_chars": 21,
+        "reserved_chars": {},
+    }
+    config_data["scenarios"] = {
+        "growth_probe": {
+            "baseline_chars": 8,
+            "allowed_growth_chars": 0,
+            "status": "WARN",
+            "includes": ["workflow/*.md"],
+        }
+    }
+    config_path = _write_config(tmp_path, config_data)
+    workflow_dir = tmp_path / "workflow"
+    workflow_dir.mkdir()
+    target = workflow_dir / "bundle.md"
+    target.write_text("12345678", encoding="utf-8")
+
+    assert (
+        mod.run(
+            ["--scenario", "growth_probe", "--strict"],
+            config_path=config_path,
+            repo_root=tmp_path,
+        )
+        == 0
+    )
+
+    target.write_text("123456789", encoding="utf-8")
+    assert (
+        mod.run(
+            ["--scenario", "growth_probe", "--strict"],
+            config_path=config_path,
+            repo_root=tmp_path,
+        )
+        == 1
+    )
+
+
+def test_opsx_propose_scenario_baseline_unchanged_by_opsx_verify_rebaseline() -> None:
+    """Соседний scenario baseline не меняется при opsx_verify rebaseline."""
+    mod, _, config_path = _repo_guard_paths()
+    config = mod.load_config(config_path)
+    propose = config.scenarios["opsx_propose"].baseline
+    assert propose is not None
+    assert propose.baseline_chars == 74485
+    assert propose.allowed_growth_chars == 0
