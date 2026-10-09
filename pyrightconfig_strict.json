@@ -151,6 +151,8 @@
     "tools/wb_api_master_map.py",
     "app/modules/campaign_settings_contract",
     "app/modules/campaign_settings_history",
+    "app/modules/decision_experiment_memory",
+    "tests/unit/decision_experiment_memory",
     "app/modules/wb_sky_control_plane",
     "tests/unit/wb_sky_control_plane",
     "scripts/clickhouse_migration_control_plane",
