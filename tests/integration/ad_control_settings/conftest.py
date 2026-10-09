@@ -1,4 +1,4 @@
-"""Integration fixtures for ad control persistence."""
+"""Integration fixtures for ad control persistence (migration-backed schema)."""
 
 from __future__ import annotations
 
@@ -6,12 +6,7 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.modules.ad_control_settings.persistence.models import (
-    AdControlCampaignFeatureRow,
-    AdControlShopFeatureRow,
-    AdControlSlotMutationLedger,
-)
-from app.utils.db.base import Base
+from app.db.migration_ephemeral_baseline import AD_CONTROL_TABLES
 
 pytestmark = [pytest.mark.integration, pytest.mark.destructive_local]
 
@@ -22,20 +17,26 @@ _TRUNCATE_SQL = (
 
 
 @pytest.fixture(autouse=True)
-async def _ensure_ad_control_tables(async_engine: AsyncEngine) -> None:
-    """Create ad control tables if missing (session schema may predate migration)."""
+async def _require_ad_control_tables(async_engine: AsyncEngine) -> None:
+    """Fail if session schema lacks migration-created ad-control tables."""
     async with async_engine.begin() as conn:
-        await conn.run_sync(
-            lambda sync_conn: Base.metadata.create_all(
-                sync_conn,
-                tables=[
-                    AdControlSlotMutationLedger.__table__,
-                    AdControlShopFeatureRow.__table__,
-                    AdControlCampaignFeatureRow.__table__,
-                ],
-                checkfirst=True,
+        for table in AD_CONTROL_TABLES:
+            exists = await conn.scalar(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = 'public' AND table_name = :name
+                    )
+                    """
+                ),
+                {"name": table},
             )
-        )
+            if not exists:
+                pytest.fail(
+                    f"missing {table}: run test DB bootstrap / Alembic head "
+                    "(do not rely on create_all in this package)"
+                )
         await conn.execute(text(_TRUNCATE_SQL))
     yield
 

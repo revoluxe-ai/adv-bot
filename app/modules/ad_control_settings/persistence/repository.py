@@ -5,6 +5,10 @@ Read/write configured ad control rows с доменной валидацией �
 ``expected_revision=int`` => row must exist with that revision (update / disable / clear).
 
 Row ``revision`` is allocated from ``AdControlSlotMutationLedger`` (survives CLEAR).
+
+Transaction boundary: ``RevisionConflictError`` from ``_flush_or_conflict`` may leave
+the SQLAlchemy session in a failed state; callers (future Apply Authority) MUST
+``rollback()`` before retrying another mutation in the same session.
 """
 
 from __future__ import annotations

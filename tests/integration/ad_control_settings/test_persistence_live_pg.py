@@ -10,6 +10,10 @@ from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 
 from app.modules.ad_control_settings.persistence.cas import UnsupportedSchemaVersionError
+from app.modules.ad_control_settings.persistence.revision_ledger import (
+    SlotMutationKey,
+    read_mutation_revision,
+)
 
 from app.modules.ad_control_settings.domain.campaign_ref import CampaignRef
 from app.modules.ad_control_settings.domain.configured import DrrPolicyParamsV1
@@ -383,6 +387,24 @@ async def test_unsupported_schema_fail_closed(ad_control_session) -> None:
             ),
             expected_revision=None,
         )
+
+
+async def test_no_op_does_not_consume_ledger_revision(ad_control_session) -> None:
+    repo = AdControlSettingsRepository(ad_control_session)
+    campaign = CampaignRef(shop_id="int-ledger-noop", advert_id=901)
+    disable = CampaignDisableUpsert(
+        campaign=campaign,
+        feature_id=AdControlFeatureId.DRR_POLICY,
+        schema_version=1,
+    )
+    first = await repo.apply_campaign_disable(disable, expected_revision=None)
+    key = SlotMutationKey.for_campaign(campaign, AdControlFeatureId.DRR_POLICY)
+    ledger_after_create = await read_mutation_revision(ad_control_session, key)
+    assert ledger_after_create == first.revision
+    second = await repo.apply_campaign_disable(disable, expected_revision=first.revision)
+    assert second.kind == AdControlMutationKind.NO_OP
+    ledger_after_noop = await read_mutation_revision(ad_control_session, key)
+    assert ledger_after_noop == ledger_after_create
 
 
 async def test_migration_tables_exist(async_engine: AsyncEngine) -> None:
