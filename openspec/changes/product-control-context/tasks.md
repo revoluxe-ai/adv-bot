@@ -15,10 +15,10 @@ Planning / domain apply only. No runtime until explicit slice GO.
 
 ## Slice B — Binding projector (read-only)
 
-- [ ] 2.1 Implement `CampaignProductBindingProjector` from `AdvSetting` + `ComplexAdv` shape.
-- [ ] 2.2 Map Auto and Search legs to separate bindings with provenance `PG_NMIDS`.
-- [ ] 2.3 Never assign PRIMARY from `main_nmid`; set UNKNOWN for multi-nmid complexes.
-- [ ] 2.4 Unit tests: Auto+Search, one product→many complexes, multi-nm ambiguous.
+- [x] 2.1 Implement `CampaignProductBindingProjector` from `AdvSetting` + `ComplexAdv` shape.
+- [x] 2.2 Map Auto and Search legs to separate bindings with provenance `PG_NMIDS`.
+- [x] 2.3 Never assign PRIMARY from `main_nmid`; set UNKNOWN for multi-nmid complexes.
+- [x] 2.4 Unit tests: Auto+Search, one product→many complexes, multi-nm ambiguous.
 
 ## Slice C — Persistence (no runtime adapter)
 
