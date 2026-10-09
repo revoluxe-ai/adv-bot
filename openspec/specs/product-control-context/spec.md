@@ -101,6 +101,24 @@ Missing, zero, or negative effective price MUST fail closed with
 - **WHEN** `ProductCpoResolver.resolve` runs
 - **THEN** outputs MUST be quantized to 0.01 RUB
 
+### Requirement: ProductCpoResolver scope boundary (price-based path)
+
+`ProductCpoResolver` is canonical for the **product price-based** CPO path
+(`ProductPricingReader` → effective unit price × `DrrProfile`).
+
+Implementations MUST NOT treat `ProductCpoResolver` as authority for **V1
+hierarchical campaign** `TARGET_CPO_RUB`. That semantics is defined only in
+`openspec/decisions/drr-cpo-price-semantics/decision.md` (DIRECT attributed order
+value × effective target DRR). This foundation spec does not add hierarchical
+runtime requirements.
+
+#### Scenario: Resolver not V1 campaign TARGET_CPO authority (S23)
+
+- **GIVEN** a V1 hierarchical campaign control consumer needs `TARGET_CPO_RUB`
+- **WHEN** sourcing economic target semantics
+- **THEN** consumer MUST use `drr-cpo-price-semantics` order-value rules
+- **AND** MUST NOT use `ProductCpoResolver` output as substitute authority
+
 ### Requirement: CampaignProductBinding projector
 
 `CampaignProductBindingProjector` SHALL emit distinct Auto and Search bindings with
