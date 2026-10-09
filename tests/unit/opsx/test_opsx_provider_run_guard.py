@@ -349,6 +349,75 @@ def test_auth_token_mismatch_blocks_spawn(tmp_path: Path) -> None:
 
 
 @pytest.mark.unit
+def test_docker_compose_test_volumes_resolve_under_tests_dir() -> None:
+    """Cert harness: bind mounts must be relative to tests/docker-compose.test.yml."""
+
+    compose = _REPO_ROOT / "tests" / "docker-compose.test.yml"
+    text = compose.read_text(encoding="utf-8")
+    assert ".\\tests\\" not in text
+    assert "tests/tests" not in text
+    assert "./postgres-init" in text
+    assert "./clickhouse-config" in text
+
+
+@pytest.mark.unit
+def test_consumed_ledger_without_run_result_is_evidence_conflict(
+    tmp_path: Path,
+) -> None:
+    block = _minimal_block()
+    packet = _packet(block)
+    repo = tmp_path
+    ledger = guard.authorization_ledger_path(
+        repo, packet.change_id, packet.one_shot_authorization_id
+    )
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(
+        guard._authorization_ledger_payload(
+            one_shot_authorization_id=packet.one_shot_authorization_id
+        ).decode("utf-8"),
+        encoding="utf-8",
+    )
+    verdict = guard.verify_provider_run_packet(
+        repo,
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.status == "CERTIFICATION_EVIDENCE_CONFLICT"
+    assert verdict.mismatch_field == "run_result_receipt_missing"
+
+
+@pytest.mark.unit
+def test_run_guarded_pytest_writes_durable_run_result_receipt(
+    tmp_path: Path,
+) -> None:
+    _, packet, repo, base_kw = _run_packet(tmp_path)
+    mock_run = MagicMock(return_value=_completed(0))
+    guard.run_guarded_pytest(
+        repo,
+        packet,
+        subprocess_runner=mock_run,
+        packet_evidence_id="PROVIDER-PACKET-unit",
+        **base_kw,
+    )
+    receipt_path = guard.authorization_run_result_path(
+        repo, packet.change_id, packet.one_shot_authorization_id
+    )
+    assert receipt_path.is_file()
+    receipt = guard.load_provider_run_result(repo, packet)
+    assert receipt is not None
+    assert receipt["packet_evidence_id"] == "PROVIDER-PACKET-unit"
+    assert receipt["provider_spawned"] is True
+    assert receipt["spawn_count"] == 1
+    assert receipt["provider_return_code"] == 0
+    assert receipt["provider_result"] == "PASSED"
+    assert receipt["guard_status"] == "PROVIDER_PASSED"
+
+
+@pytest.mark.unit
 def test_one_shot_consumed_blocks_second_spawn(tmp_path: Path) -> None:
     block = _minimal_block()
     packet = _packet(block)

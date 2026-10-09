@@ -34,7 +34,11 @@ one-shot authorization before any provider pytest. Env
 (SHA-256 of token). Only `AUTHORIZED_UNUSED` may spawn; consumption is
 claimed atomically via `O_CREAT|O_EXCL` under
 `.opsx/runs/scenario-coverage/<change_id>/authorizations/<one_shot_authorization_id>.json`
-at spawn boundary (not rolled back on pytest failure). Child pytest inherits
+at spawn boundary (not rolled back on pytest failure). After spawn, an immutable
+`<one_shot_authorization_id>.run_result.json` receipt records terminal guard
+status, `provider_spawned`, `spawn_count`, `provider_return_code`, and
+`provider_result` (no secrets). A consumption ledger without a matching receipt
+yields `CERTIFICATION_EVIDENCE_CONFLICT` on verify (fail closed). Child pytest inherits
 the parent process environment (PATH, Poetry) and receives audited test DB /
 Redis coordinates from the packet (overriding conflicting parent values).
 

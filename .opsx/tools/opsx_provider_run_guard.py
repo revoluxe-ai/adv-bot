@@ -36,6 +36,7 @@ GuardStatus = Literal[
     "BLOCKED_FINGERPRINT_MISMATCH",
     "BLOCKED_AUTHORIZATION",
     "BLOCKED_PACKET_INVALID",
+    "CERTIFICATION_EVIDENCE_CONFLICT",
 ]
 
 GuardPermission = Literal["DENIED", "PERMITTED"]
@@ -424,6 +425,125 @@ def authorization_ledger_path(
     )
 
 
+def authorization_run_result_path(
+    repo_root: Path,
+    change_id: str,
+    one_shot_authorization_id: str,
+) -> Path:
+    """Durable terminal provider outcome (no secrets); pairs with consumption ledger."""
+
+    return (
+        repo_root
+        / ".opsx"
+        / "runs"
+        / "scenario-coverage"
+        / change_id
+        / "authorizations"
+        / f"{one_shot_authorization_id}.run_result.json"
+    )
+
+
+def persist_provider_run_result(
+    repo_root: Path,
+    packet: ProviderRunPacket,
+    verdict: GuardVerdict,
+    *,
+    packet_evidence_id: str | None = None,
+) -> None:
+    """Write immutable run-result receipt after one-shot claim (best-effort, O_EXCL)."""
+
+    path = authorization_run_result_path(
+        repo_root,
+        packet.change_id,
+        packet.one_shot_authorization_id,
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file():
+        return
+    payload = {
+        "packet_evidence_id": packet_evidence_id,
+        "audited_head": packet.audited_head,
+        "one_shot_authorization_id": packet.one_shot_authorization_id,
+        "change_id": packet.change_id,
+        "guard_status": verdict.status,
+        "guard_permission": verdict.guard_permission,
+        "provider_spawned": verdict.provider_spawned,
+        "spawn_count": verdict.spawn_count,
+        "provider_return_code": verdict.provider_return_code,
+        "provider_result": verdict.provider_result,
+        "authorization_state": verdict.authorization_state,
+    }
+    body = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    try:
+        fd = os.open(str(path), flags)
+        try:
+            _ = os.write(fd, body)
+        finally:
+            os.close(fd)
+    except FileExistsError:
+        return
+
+
+def load_provider_run_result(
+    repo_root: Path,
+    packet: ProviderRunPacket,
+) -> dict[str, Any] | None:
+    """Read durable run-result receipt if present."""
+
+    path = authorization_run_result_path(
+        repo_root,
+        packet.change_id,
+        packet.one_shot_authorization_id,
+    )
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def check_certification_evidence_consistency(
+    repo_root: Path,
+    packet: ProviderRunPacket,
+) -> GuardVerdict | None:
+    """Fail closed when consumed ledger lacks a matching durable run-result receipt."""
+
+    ledger_path = authorization_ledger_path(
+        repo_root,
+        packet.change_id,
+        packet.one_shot_authorization_id,
+    )
+    if not ledger_path.is_file():
+        return None
+    result = load_provider_run_result(repo_root, packet)
+    if result is None:
+        return GuardVerdict(
+            status="CERTIFICATION_EVIDENCE_CONFLICT",
+            mismatch_field="run_result_receipt_missing",
+            expected="durable_run_result",
+            computed="ledger_consumed_without_receipt",
+            spawn_count=0,
+            authorization_state="AUTHORIZED_CONSUMED",
+            guard_permission="DENIED",
+            provider_result="NOT_RUN",
+        )
+    stored_auth = str(result.get("one_shot_authorization_id", ""))
+    if stored_auth != packet.one_shot_authorization_id:
+        return GuardVerdict(
+            status="CERTIFICATION_EVIDENCE_CONFLICT",
+            mismatch_field="run_result_auth_mismatch",
+            expected=packet.one_shot_authorization_id,
+            computed=stored_auth,
+            spawn_count=0,
+            authorization_state="AUTHORIZED_CONSUMED",
+            guard_permission="DENIED",
+            provider_result="NOT_RUN",
+        )
+    return None
+
+
 def _load_authorization_ledger(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
@@ -728,6 +848,10 @@ def verify_provider_run_packet(
         if not provider_test_id_within_targets(node_id, packet.pytest_targets):
             return _blocked("provider_test_ids", node_id, "not_covered_by_targets")
 
+    evidence_block = check_certification_evidence_consistency(repo_root, packet)
+    if evidence_block is not None:
+        return evidence_block
+
     auth_block = _check_authorization(repo_root, packet, live_token=live_token)
     if auth_block is not None:
         return auth_block
@@ -764,8 +888,19 @@ def run_guarded_pytest(
     compute_diff: Callable[[Path], str] | None = None,
     compute_manifest: Callable[[Path], str] | None = None,
     live_token: str | None = None,
+    packet_evidence_id: str | None = None,
 ) -> GuardVerdict:
     """Проверить packet; при PERMIT — один subprocess (или dry_run)."""
+
+    def _finalize(verdict: GuardVerdict) -> GuardVerdict:
+        if verdict.authorization_state == "AUTHORIZED_CONSUMED":
+            persist_provider_run_result(
+                repo_root,
+                packet,
+                verdict,
+                packet_evidence_id=packet_evidence_id,
+            )
+        return verdict
 
     verdict = verify_provider_run_packet(
         repo_root,
@@ -822,34 +957,40 @@ def run_guarded_pytest(
         )
         returncode = resolve_subprocess_returncode(completed)
     except Exception:
-        return GuardVerdict(
-            status="PROVIDER_ERROR",
-            spawn_count=1,
-            authorization_state="AUTHORIZED_CONSUMED",
-            guard_permission="PERMITTED",
-            provider_spawned=True,
-            provider_return_code=None,
-            provider_result="ERROR",
+        return _finalize(
+            GuardVerdict(
+                status="PROVIDER_ERROR",
+                spawn_count=1,
+                authorization_state="AUTHORIZED_CONSUMED",
+                guard_permission="PERMITTED",
+                provider_spawned=True,
+                provider_return_code=None,
+                provider_result="ERROR",
+            )
         )
 
     if returncode == 0:
-        return GuardVerdict(
-            status="PROVIDER_PASSED",
+        return _finalize(
+            GuardVerdict(
+                status="PROVIDER_PASSED",
+                spawn_count=1,
+                authorization_state="AUTHORIZED_CONSUMED",
+                guard_permission="PERMITTED",
+                provider_spawned=True,
+                provider_return_code=returncode,
+                provider_result="PASSED",
+            )
+        )
+    return _finalize(
+        GuardVerdict(
+            status="PROVIDER_FAILED",
             spawn_count=1,
             authorization_state="AUTHORIZED_CONSUMED",
             guard_permission="PERMITTED",
             provider_spawned=True,
             provider_return_code=returncode,
-            provider_result="PASSED",
+            provider_result="FAILED",
         )
-    return GuardVerdict(
-        status="PROVIDER_FAILED",
-        spawn_count=1,
-        authorization_state="AUTHORIZED_CONSUMED",
-        guard_permission="PERMITTED",
-        provider_spawned=True,
-        provider_return_code=returncode,
-        provider_result="FAILED",
     )
 
 
@@ -868,6 +1009,8 @@ def cli_exit_code_for_verdict(verdict: GuardVerdict) -> int:
         return EXIT_BLOCKED_FINGERPRINT
     if verdict.status == "BLOCKED_AUTHORIZATION":
         return EXIT_BLOCKED_AUTHORIZATION
+    if verdict.status == "CERTIFICATION_EVIDENCE_CONFLICT":
+        return EXIT_BLOCKED_FINGERPRINT
     if verdict.status in ("PERMIT", "PROVIDER_PASSED"):
         return EXIT_PERMIT
     if verdict.status == "PROVIDER_FAILED":
@@ -907,8 +1050,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(list(argv) if argv is not None else None)
 
-    packet = _load_packet_json(args.packet)
+    packet_path = args.packet.resolve()
+    packet = _load_packet_json(packet_path)
     repo_root = args.repo.resolve()
+    packet_meta = json.loads(packet_path.read_text(encoding="utf-8"))
+    packet_evidence_id_raw = packet_meta.get("packet_evidence_id")
+    packet_evidence_id = (
+        str(packet_evidence_id_raw) if packet_evidence_id_raw is not None else None
+    )
 
     live_token = os.environ.get("AUTHORIZE_ONE_LIVE_RUN")
 
@@ -924,6 +1073,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             packet,
             dry_run=args.dry_run,
             live_token=live_token,
+            packet_evidence_id=packet_evidence_id,
         )
 
     print(json.dumps(verdict.to_dict(), indent=2, sort_keys=True))
@@ -935,6 +1085,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("PROVIDER_FAILED", file=sys.stderr)
     elif verdict.status == "PROVIDER_ERROR":
         print("PROVIDER_ERROR", file=sys.stderr)
+    elif verdict.status == "CERTIFICATION_EVIDENCE_CONFLICT":
+        print("CERTIFICATION_EVIDENCE_CONFLICT", file=sys.stderr)
     return cli_exit_code_for_verdict(verdict)
 
 

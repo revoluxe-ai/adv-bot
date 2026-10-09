@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_password
     volumes:
-      - .\tests\postgres-init:/docker-entrypoint-initdb.d # добавляем init-скрипты для pg_hba.conf
+      - ./postgres-init:/docker-entrypoint-initdb.d
     ports:
       - "5433:5432" # Используем другой порт, чтобы избежать конфликтов с основной БД
     healthcheck:
@@ -38,7 +38,7 @@ services:
     # volumes:
     #   - ./ch_data_test:/var/lib/clickhouse
     volumes:
-      - .\tests\clickhouse-config:/etc/clickhouse-server/users.d/
+      - ./clickhouse-config:/etc/clickhouse-server/users.d/
 
 
   # test_redis: host :6379 for /opsx-test-env v0.1 probe + env.sample REDIS_PORT
