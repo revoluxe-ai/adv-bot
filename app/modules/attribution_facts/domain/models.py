@@ -82,8 +82,8 @@ class CampaignDayTotals:
 
     physical_adv_id: int
     event_date: date
-    orders: int
-    gmv_rub: Decimal
+    orders: int | None
+    gmv_rub: Decimal | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,8 +92,8 @@ class NmDayContribution:
 
     app_type: int
     ordered_nm_id: int
-    orders: int
-    gmv_rub: Decimal
+    orders: int | None
+    gmv_rub: Decimal | None
 
 
 @dataclass(frozen=True, slots=True)

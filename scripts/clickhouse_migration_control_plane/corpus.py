@@ -32,6 +32,7 @@ _CANONICAL_FILES: tuple[tuple[str, str], ...] = (
         "007",
         "007_create_shop_campaign_inventory_and_availability.sql",
     ),
+    ("008", "008_create_attribution_facts.sql"),
 )
 
 # SHA-256 сырых байтов канонических файлов, включая комментарии и переводы
@@ -78,6 +79,12 @@ _IMMUTABLE_IDENTITY: tuple[tuple[str, str, str, str], ...] = (
         "007_create_shop_campaign_inventory_and_availability.sql",
         _SCHEMA_DDL,
         "064772c5448a9824731cc8483a653e60b0c6a11f90937594b9ffd70a511479ab",
+    ),
+    (
+        "008",
+        "008_create_attribution_facts.sql",
+        _SCHEMA_DDL,
+        "6b0edcb3a7a23a15b8d9b273552c476ca5d79052f6a4d47f2b8728fdb4ce0356",
     ),
 )
 

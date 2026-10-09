@@ -43,7 +43,7 @@ from tests.unit.clickhouse_migration_contract_fixture import (
 
 pytestmark = pytest.mark.unit
 
-_VERSION_IDS = ("001", "002", "003", "004", "005", "006", "007")
+_VERSION_IDS = ("001", "002", "003", "004", "005", "006", "007", "008")
 _INSPECT_READS = ("system.tables", "system.columns", "SHOW CREATE")
 
 

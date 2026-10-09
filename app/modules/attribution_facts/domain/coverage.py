@@ -87,6 +87,15 @@ def evaluate_window_coverage(
             effective_covered_range_end=window.end,
             package_cutoff_date=package_cutoff_date,
         )
+    if partial_membership_fallback:
+        return AttributionCoverage(
+            status=AttributionCoverageStatus.PARTIAL,
+            reason_codes=tuple(reason_codes),
+            source_complete_through=source_complete_through,
+            effective_covered_range_start=window.start,
+            effective_covered_range_end=window.end,
+            package_cutoff_date=package_cutoff_date,
+        )
     return AttributionCoverage(
         status=AttributionCoverageStatus.COMPLETE,
         reason_codes=tuple(reason_codes),

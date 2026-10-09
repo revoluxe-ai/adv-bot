@@ -57,6 +57,7 @@ _FILENAMES: tuple[str, ...] = (
     "005_grant_system_log_truncate_to_adv_bot_user.sql",
     "006_create_campaign_settings_history.sql",
     "007_create_shop_campaign_inventory_and_availability.sql",
+    "008_create_attribution_facts.sql",
 )
 _VERSION_003 = "003_add_buyouts_sum_rub_to_wb_common_stat.sql"
 _VERSION_001 = "001_create_incremental_tables.sql"
@@ -287,18 +288,18 @@ def test_semicolon_inside_string_fails_validate_before_apply(
     assert _snapshot(canonical) == canonical_before
 
 
-def test_unreviewed_008_blocks_apply(tmp_path: Path) -> None:
+def test_unreviewed_009_blocks_apply(tmp_path: Path) -> None:
     """Непроверенный successor в каталоге чтения блокирует apply.
 
     Spec ``clickhouse-migration-lifecycle``, сценарий ``Unreviewed numeric
-    prefix blocks apply``. Отпечаток ``001``–``007`` не включает ``008``.
+    prefix blocks apply``. Отпечаток ``001``–``008`` не включает ``009``.
     Команда не принимает его молча и не исполняет.
     PROVES: PA_SIDE_EFFECT_PROOF.
     """
     canonical = canonical_corpus_dir()
     canonical_before = _snapshot(canonical)
     corpus_dir = _copy_corpus(tmp_path)
-    foreign_name = "008_unreviewed.sql"
+    foreign_name = "009_unreviewed.sql"
     foreign_sql = (
         b"CREATE TABLE default_db.should_not_run (id UInt8) ENGINE = Memory;\n"
     )
@@ -317,6 +318,7 @@ def test_unreviewed_008_blocks_apply(tmp_path: Path) -> None:
         "005",
         "006",
         "007",
+        "008",
     )
     assert all(version.filename != foreign_name for version in accepted.versions)
     for result, port, coordinator in outcomes:
