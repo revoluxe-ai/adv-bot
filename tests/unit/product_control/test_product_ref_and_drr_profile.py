@@ -6,10 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.modules.product_control.domain.drr_profile import (
-    drr_profile_from_percent,
-    validate_drr_profile,
-)
+from app.modules.product_control.domain.drr_profile import drr_profile_from_percent
 from app.modules.product_control.domain.invariants_drr import DrrProfileInvariantError
 from app.modules.product_control.domain.models import DrrProfile, ProductRef
 
