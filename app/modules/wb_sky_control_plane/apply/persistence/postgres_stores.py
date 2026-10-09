@@ -118,6 +118,18 @@ class PostgresDryRunReceiptStore:
         await self._session.flush()
         return ReceiptClaimResult.CLAIMED
 
+    async def release_claim(self, receipt_id: str) -> DryRunReceiptV1 | None:
+        """CLAIMED → ISSUED when apply rolls back before commit (S24 foundation)."""
+        row = await self._load_row(receipt_id)
+        if row is None:
+            return None
+        current = DryRunReceiptLifecycleState(row.lifecycle_state)
+        if current != DryRunReceiptLifecycleState.CLAIMED:
+            return receipt_row_to_domain(row)
+        row.lifecycle_state = DryRunReceiptLifecycleState.ISSUED.value
+        await self._session.flush()
+        return receipt_row_to_domain(row)
+
     async def transition_lifecycle(
         self,
         receipt_id: str,
@@ -228,19 +240,24 @@ class PostgresIdempotencyStore:
         key: IdempotencyKey,
         *,
         evidence_id: str,
+        attempt_id: str,
     ) -> None:
         row = await self._get_row_for_update(key)
         if row is None:
             raise LookupError("idempotency row missing on finalize")
+        if row.attempt_id is not None and row.attempt_id != attempt_id:
+            raise PermissionError("idempotency slot owned by another attempt")
         row.in_flight = False
         row.terminal_status = ApplyTerminalStatus.VERIFIED.value
         row.evidence_id = evidence_id
         await self._session.flush()
 
-    async def release_in_flight(self, key: IdempotencyKey) -> None:
+    async def release_in_flight(self, key: IdempotencyKey, *, attempt_id: str) -> None:
         row = await self._get_row_for_update(key)
         if row is None:
             return
+        if row.attempt_id is not None and row.attempt_id != attempt_id:
+            raise PermissionError("idempotency slot owned by another attempt")
         row.in_flight = False
         await self._session.flush()
 
