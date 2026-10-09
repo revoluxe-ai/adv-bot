@@ -94,6 +94,12 @@ architecture decisions belong here.
   - Scope: `ChangeSetV1`, dry-run validation, `sd1`/`st1`, and `wb_sky_control_plane`
     ownership; no production writes from dry-run; registry reuse only from
     `campaign_settings_contract`.
+- [changeset-apply-authority-ownership](changeset-apply-authority-ownership/decision.md)
+  - Status: Accepted
+  - Scope: WB Sky Apply Authority for in-scope `ChangeSetV1` PG policy apply;
+    `wb_sky_control_plane/apply/` orchestration and evidence ledger; V1 PG-only
+    bounded policy mutations; external WB and REST/MCP transports are separate
+    future changes; legacy bypass acknowledged until migration.
 - [shop-runner-shop-wide-collection](shop-runner-shop-wide-collection/decision.md)
   - Status: Accepted
   - Scope: shop-wide campaign ad data collection executor is shop-runner only;
@@ -121,6 +127,18 @@ architecture decisions belong here.
   - Scope: semantic ownership of decision/experiment memory (plans, lifecycle,
     validity, factual results, interpretation linkage); refs-only for settings,
     Apply, metrics, attribution; not production write authority.
+- [product-control-aggregate-ownership](product-control-aggregate-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `(shop_id, nmid)` control anchor; WBCard catalog-only; future
+    `ShopControlSettings` / `ProductControlSettings` (persistence in separate change).
+- [campaign-product-binding-ownership](campaign-product-binding-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `CampaignProductBinding` projector semantics; Auto/Search legs;
+    no `main_nmid` PRIMARY; multi-nm fail-closed.
+- [product-pricing-and-cpo-ownership](product-pricing-and-cpo-ownership/decision.md)
+  - Status: Accepted (EVIDENCE_GAP: runtime price SoT)
+  - Scope: pricing vs sales-economics ports; `ProductCpoResolver` pure math;
+    `PRICE_SEMANTICS_ACCEPTED = NO` until future runtime change.
 
 ## Change Requirements
 

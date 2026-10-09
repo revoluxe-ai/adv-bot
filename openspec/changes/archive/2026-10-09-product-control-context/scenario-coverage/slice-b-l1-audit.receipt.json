@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "change_id": "product-control-context",
+  "scope": "slice_b_l1_only",
+  "producer": "slice-b-apply-verify",
+  "produced_at": "2026-10-09",
+  "head_note": "Read-only binding projector; no persistence or price runtime",
+  "scenarios": {
+    "S01": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s01_auto_and_search_separate_bindings"
+    },
+    "S02": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s02_same_nmid_two_complexes"
+    },
+    "S05": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s05_main_nmid_ignored_not_primary_evidence"
+    },
+    "S17": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s17_search_physical_id_not_linkage_id"
+    }
+  },
+  "deferred_scenarios": [
+    "S03",
+    "S04",
+    "S06",
+    "S08",
+    "S09",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S15",
+    "S16",
+    "S18",
+    "S19",
+    "S20",
+    "S21",
+    "S22"
+  ],
+  "pytest_command": "pytest -m unit tests/unit/product_control/",
+  "full_change_cert_deferred": true
+}
