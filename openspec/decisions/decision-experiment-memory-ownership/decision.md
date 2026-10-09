@@ -52,9 +52,9 @@ No authoritative payload duplication in memory SoT.
    - execution: `ApplyEvidenceRef` (`apply_evidence_id` + optional digest; no receipt body);
    - attribution: `attribution_fact_set_ref` when `attribution-facts-contract`
      is deployed (optional; validity degrades if missing).
-4. **PostgreSQL** is the planned authoritative store for events and projections
-   (implementation Slice B); ClickHouse MAY receive derived analytics later but MUST
-   NOT be SoT for memory.
+4. **PostgreSQL** persistence for events and projections is a **separate future
+   change** (`decision-memory-persistence`); foundation on `stage` is domain-only.
+   ClickHouse MAY receive derived analytics later but MUST NOT be SoT for memory.
 5. AI Package export (`ai_package_v1`) MAY consume `DecisionMemoryReader` in a
    separate change; exporter MUST stay `READ_ONLY_NO_MUTATION`.
 6. Card A/B Hold durable state remains owned by A/B Hold decisions; memory MAY
@@ -110,7 +110,8 @@ Bad:
 
 ## Related changes
 
-- `openspec/changes/decision-experiment-memory/`
+- Archived: `openspec/changes/archive/*/decision-experiment-memory/` (foundation Slice A)
+- Future: `openspec/evolution/decision-experiment-memory-future-boundaries.md`
 
 ## References
 
