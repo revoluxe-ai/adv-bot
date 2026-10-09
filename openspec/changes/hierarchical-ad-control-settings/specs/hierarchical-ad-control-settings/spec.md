@@ -56,17 +56,18 @@ emit new control actions from hierarchical evidence.
 - **WHEN** `control_action_allowed` runs
 - **THEN** result MUST be disallowed with `ACTUAL_DRR_STALE`
 
-### Requirement: Price semantics boundary
+### Requirement: Price semantics boundary (Slice A foundation)
 
-Foundation MUST NOT perform authoritative price-dependent CPO production actuation
-while `PRICE_SEMANTICS_ACCEPTED = NO`.
+Slice A diagnostics remain fail-closed for **catalog-price** CPO actuation
+(`CATALOG_PRICE_SEMANTICS_ACCEPTED = NO`). V1 **order-value** semantics are
+accepted on stage via `drr-cpo-price-semantics`; runtime hierarchical CPO
+actuation is a future slice, not Slice B persistence.
 
-#### Scenario: Diagnostics proposal blocked
+#### Scenario: Catalog-price CPO actuation still blocked in foundation diagnostics
 
-- **GIVEN** diagnostic build with valid configured DRR
-- **WHEN** proposed CPO is requested semantically
-- **THEN** `proposed_max_cpo_rub` MUST be withheld with
-  `PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED`
+- **GIVEN** diagnostic build without accepted catalog-price semantics
+- **WHEN** proposed CPO is requested on catalog-price authority
+- **THEN** proposal MUST remain blocked with an explicit reason code
 
 ### Requirement: Versioned persistence identity
 

@@ -7,8 +7,9 @@ from decimal import Decimal
 
 import pytest
 from sqlalchemy import inspect, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+
+from app.modules.ad_control_settings.persistence.cas import UnsupportedSchemaVersionError
 
 from app.modules.ad_control_settings.domain.campaign_ref import CampaignRef
 from app.modules.ad_control_settings.domain.configured import DrrPolicyParamsV1
@@ -231,7 +232,8 @@ async def test_concurrent_create_one_wins(async_engine: AsyncEngine) -> None:
     results = await asyncio.gather(_create(), _create(), return_exceptions=True)
     errors = [r for r in results if isinstance(r, Exception)]
     assert len(errors) >= 1
-    assert any(isinstance(e, IntegrityError) or isinstance(e, RevisionConflictError) for e in errors)
+    assert len(errors) == 1
+    assert isinstance(errors[0], RevisionConflictError)
 
 
 async def test_table_unique_constraints(async_engine: AsyncEngine) -> None:
@@ -261,6 +263,128 @@ async def test_campaign_disabled_round_trip(ad_control_session) -> None:
     assert slots[AdControlFeatureId.DRR_POLICY].mode == AdControlFeatureMode.DISABLED
 
 
+async def test_campaign_disable_no_op_preserves_revision(ad_control_session) -> None:
+    repo = AdControlSettingsRepository(ad_control_session)
+    campaign = CampaignRef(shop_id="int-shop-dis-noop", advert_id=88)
+    disable = CampaignDisableUpsert(
+        campaign=campaign,
+        feature_id=AdControlFeatureId.DRR_POLICY,
+        schema_version=1,
+    )
+    first = await repo.apply_campaign_disable(disable, expected_revision=None)
+    row = await repo.get_campaign_row(campaign, AdControlFeatureId.DRR_POLICY)
+    assert row is not None
+    token_before = row.state_token
+    updated_before = row.updated_at
+    second = await repo.apply_campaign_disable(disable, expected_revision=first.revision)
+    assert second.kind == AdControlMutationKind.NO_OP
+    row_after = await repo.get_campaign_row(campaign, AdControlFeatureId.DRR_POLICY)
+    assert row_after is not None
+    assert row_after.revision == first.revision
+    assert row_after.state_token == token_before
+    assert row_after.updated_at == updated_before
+
+
+async def test_campaign_override_no_op_preserves_revision(ad_control_session) -> None:
+    repo = AdControlSettingsRepository(ad_control_session)
+    campaign = CampaignRef(shop_id="int-shop-ov-noop", advert_id=89)
+    override = CampaignOverrideUpsert(
+        campaign=campaign,
+        feature_id=AdControlFeatureId.DRR_POLICY,
+        schema_version=1,
+        payload=_drr(),
+    )
+    first = await repo.apply_campaign_override(override, expected_revision=None)
+    row = await repo.get_campaign_row(campaign, AdControlFeatureId.DRR_POLICY)
+    assert row is not None
+    token_before = row.state_token
+    second = await repo.apply_campaign_override(override, expected_revision=first.revision)
+    assert second.kind == AdControlMutationKind.NO_OP
+    row_after = await repo.get_campaign_row(campaign, AdControlFeatureId.DRR_POLICY)
+    assert row_after is not None
+    assert row_after.revision == first.revision
+    assert row_after.state_token == token_before
+
+
+async def test_clear_recreate_aba_new_revision_and_token(ad_control_session) -> None:
+    repo = AdControlSettingsRepository(ad_control_session)
+    campaign = CampaignRef(shop_id="int-shop-aba-camp", advert_id=900)
+    override = CampaignOverrideUpsert(
+        campaign=campaign,
+        feature_id=AdControlFeatureId.DRR_POLICY,
+        schema_version=1,
+        payload=_drr(),
+    )
+    first = await repo.apply_campaign_override(override, expected_revision=None)
+    first_token = first.state_token
+    await repo.clear_campaign_feature(
+        CampaignClearUpsert(campaign=campaign, feature_id=AdControlFeatureId.DRR_POLICY),
+        expected_revision=first.revision,
+    )
+    with pytest.raises(RevisionConflictError):
+        await repo.apply_campaign_override(override, expected_revision=first.revision)
+    second = await repo.apply_campaign_override(override, expected_revision=None)
+    assert second.revision != first.revision
+    assert second.state_token != first_token
+
+
+async def test_concurrent_campaign_create_one_wins(async_engine: AsyncEngine) -> None:
+    maker = async_sessionmaker(async_engine, expire_on_commit=False)
+    campaign = CampaignRef(shop_id="int-camp-race", advert_id=5010)
+
+    async def _create() -> None:
+        async with maker() as session:
+            repo = AdControlSettingsRepository(session)
+            await repo.apply_campaign_override(
+                CampaignOverrideUpsert(
+                    campaign=campaign,
+                    feature_id=AdControlFeatureId.DRR_POLICY,
+                    schema_version=1,
+                    payload=_drr(),
+                ),
+                expected_revision=None,
+            )
+            await session.commit()
+
+    results = await asyncio.gather(_create(), _create(), return_exceptions=True)
+    errors = [r for r in results if isinstance(r, Exception)]
+    assert len(errors) == 1
+    assert isinstance(errors[0], RevisionConflictError)
+
+
+async def test_stale_clear_revision(ad_control_session) -> None:
+    repo = AdControlSettingsRepository(ad_control_session)
+    campaign = CampaignRef(shop_id="int-stale-clear", advert_id=77)
+    created = await repo.apply_campaign_disable(
+        CampaignDisableUpsert(
+            campaign=campaign,
+            feature_id=AdControlFeatureId.DRR_POLICY,
+            schema_version=1,
+        ),
+        expected_revision=None,
+    )
+    with pytest.raises(RevisionConflictError):
+        await repo.clear_campaign_feature(
+            CampaignClearUpsert(campaign=campaign, feature_id=AdControlFeatureId.DRR_POLICY),
+            expected_revision=created.revision + 99,
+        )
+
+
+async def test_unsupported_schema_fail_closed(ad_control_session) -> None:
+    repo = AdControlSettingsRepository(ad_control_session)
+    with pytest.raises(UnsupportedSchemaVersionError):
+        await repo.apply_shop_mutation(
+            ShopFeatureUpsert(
+                shop_id="int-bad-schema",
+                feature_id=AdControlFeatureId.DRR_POLICY,
+                schema_version=99,
+                activation=ShopFeatureActivation.DISABLED,
+                payload=None,
+            ),
+            expected_revision=None,
+        )
+
+
 async def test_migration_tables_exist(async_engine: AsyncEngine) -> None:
     async with async_engine.connect() as conn:
         tables = await conn.run_sync(
@@ -268,3 +392,4 @@ async def test_migration_tables_exist(async_engine: AsyncEngine) -> None:
         )
     assert "adcontrolshopfeaturerow" in tables
     assert "adcontrolcampaignfeaturerow" in tables
+    assert "adcontrolslotmutationledger" in tables

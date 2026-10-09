@@ -9,13 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from app.modules.ad_control_settings.persistence.models import (
     AdControlCampaignFeatureRow,
     AdControlShopFeatureRow,
+    AdControlSlotMutationLedger,
 )
 from app.utils.db.base import Base
 
 pytestmark = [pytest.mark.integration, pytest.mark.destructive_local]
 
 _TRUNCATE_SQL = (
-    "TRUNCATE adcontrolcampaignfeaturerow, adcontrolshopfeaturerow RESTART IDENTITY CASCADE"
+    "TRUNCATE adcontrolcampaignfeaturerow, adcontrolshopfeaturerow, "
+    "adcontrolslotmutationledger RESTART IDENTITY CASCADE"
 )
 
 
@@ -27,6 +29,7 @@ async def _ensure_ad_control_tables(async_engine: AsyncEngine) -> None:
             lambda sync_conn: Base.metadata.create_all(
                 sync_conn,
                 tables=[
+                    AdControlSlotMutationLedger.__table__,
                     AdControlShopFeatureRow.__table__,
                     AdControlCampaignFeatureRow.__table__,
                 ],

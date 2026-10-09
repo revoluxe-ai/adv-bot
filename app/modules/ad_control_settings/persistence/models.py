@@ -11,6 +11,38 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.utils.db.base import BaseTable
 
 
+class AdControlSlotMutationLedger(BaseTable):
+    """
+    Monotonic mutation revision per logical slot (survives row delete/recreate).
+
+    Logical shop slot: ``(shop_id, feature_id, advert_id=0)``.
+    Logical campaign slot: ``(shop_id, advert_id, feature_id)``.
+    """
+
+    shop_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    scope: Mapped[str] = mapped_column(String(16), nullable=False)
+    advert_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    feature_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    last_mutation_revision: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "shop_id",
+            "scope",
+            "advert_id",
+            "feature_id",
+            name="uq_ad_control_slot_mutation_ledger",
+        ),
+        Index(
+            "ix_ad_control_slot_mutation_lookup",
+            "shop_id",
+            "scope",
+            "advert_id",
+            "feature_id",
+        ),
+    )
+
+
 class AdControlShopFeatureRow(BaseTable):
     """
     Shop-level feature slot: activation + optional typed payload.

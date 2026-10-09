@@ -3,6 +3,8 @@ Read/write configured ad control rows с доменной валидацией �
 
 ``expected_revision=None`` => authoritative row must be absent (create / idempotent clear).
 ``expected_revision=int`` => row must exist with that revision (update / disable / clear).
+
+Row ``revision`` is allocated from ``AdControlSlotMutationLedger`` (survives CLEAR).
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.ad_control_settings.domain.campaign_ref import CampaignRef
@@ -43,6 +46,10 @@ from app.modules.ad_control_settings.persistence.payload_codec import (
     PayloadCodecError,
     encode_payload_json,
     payload_json_from_untyped,
+)
+from app.modules.ad_control_settings.persistence.revision_ledger import (
+    SlotMutationKey,
+    allocate_mutation_revision,
 )
 from app.modules.ad_control_settings.persistence.state_token import (
     compute_ad_control_state_token,
@@ -125,11 +132,7 @@ class AdControlSettingsRepository:
         self,
         campaign: CampaignRef,
     ) -> dict[AdControlFeatureId, CampaignFeatureSlot]:
-        """
-        Загрузить campaign authority rows.
-
-        Missing feature => resolver treats as INHERIT (not loaded here).
-        """
+        """Load campaign authority rows; missing => INHERIT at resolver."""
         stmt = select(AdControlCampaignFeatureRow).where(
             AdControlCampaignFeatureRow.shop_id == campaign.shop_id,
             AdControlCampaignFeatureRow.advert_id == campaign.advert_id,
@@ -183,7 +186,7 @@ class AdControlSettingsRepository:
         *,
         expected_revision: int | None,
     ) -> AdControlMutationResult:
-        """CAS shop mutation; increments revision on success."""
+        """CAS shop mutation; ledger-backed revision on real mutations only."""
         validate_shop_upsert(upsert)
         existing = await self.get_shop_row(upsert.shop_id, upsert.feature_id)
         if existing is None:
@@ -205,7 +208,8 @@ class AdControlSettingsRepository:
             )
 
         payload_json = _shop_payload_json(upsert)
-        new_revision = existing.revision + 1
+        slot_key = SlotMutationKey.for_shop(upsert.shop_id, upsert.feature_id)
+        new_revision = await allocate_mutation_revision(self._session, slot_key)
         token = _shop_token(upsert, payload_json, new_revision)
         now = datetime.now(tz=UTC)
         stmt = (
@@ -240,19 +244,27 @@ class AdControlSettingsRepository:
         expected_revision: int | None,
     ) -> AdControlMutationResult:
         validate_campaign_override_upsert(upsert)
+        payload_json = encode_payload_json(upsert.feature_id, upsert.payload)
         existing = await self.get_campaign_row(upsert.campaign, upsert.feature_id)
         if existing is None:
             if expected_revision is not None:
                 raise RevisionConflictError("campaign row absent but revision expected")
-            return await self._insert_campaign_override(upsert)
+            return await self._insert_campaign_override(upsert, payload_json)
 
         if expected_revision is None:
             raise RevisionConflictError("campaign row exists but create revision expected")
         if existing.revision != expected_revision:
             raise RevisionConflictError("stale campaign revision")
 
-        payload_json = encode_payload_json(upsert.feature_id, upsert.payload)
-        new_revision = existing.revision + 1
+        if _campaign_override_is_no_op(existing, upsert, payload_json):
+            return AdControlMutationResult(
+                kind=AdControlMutationKind.NO_OP,
+                revision=existing.revision,
+                state_token=existing.state_token,
+            )
+
+        slot_key = SlotMutationKey.for_campaign(upsert.campaign, upsert.feature_id)
+        new_revision = await allocate_mutation_revision(self._session, slot_key)
         token = _campaign_token(
             upsert.campaign,
             upsert.feature_id,
@@ -305,7 +317,15 @@ class AdControlSettingsRepository:
         if existing.revision != expected_revision:
             raise RevisionConflictError("stale campaign revision")
 
-        new_revision = existing.revision + 1
+        if _campaign_disable_is_no_op(existing, upsert):
+            return AdControlMutationResult(
+                kind=AdControlMutationKind.NO_OP,
+                revision=existing.revision,
+                state_token=existing.state_token,
+            )
+
+        slot_key = SlotMutationKey.for_campaign(upsert.campaign, upsert.feature_id)
+        new_revision = await allocate_mutation_revision(self._session, slot_key)
         token = _campaign_token(
             upsert.campaign,
             upsert.feature_id,
@@ -334,15 +354,6 @@ class AdControlSettingsRepository:
         if result.rowcount != 1:
             raise RevisionConflictError("concurrent campaign disable lost CAS race")
 
-        if (
-            existing.mode == AdControlFeatureMode.DISABLED.value
-            and existing.schema_version == upsert.schema_version
-        ):
-            return AdControlMutationResult(
-                kind=AdControlMutationKind.NO_OP,
-                revision=existing.revision,
-                state_token=existing.state_token,
-            )
         return AdControlMutationResult(
             kind=AdControlMutationKind.DISABLE,
             revision=new_revision,
@@ -355,7 +366,7 @@ class AdControlSettingsRepository:
         *,
         expected_revision: int | None,
     ) -> AdControlMutationResult:
-        """Delete campaign authority; idempotent when already absent."""
+        """Delete campaign authority; bumps ledger revision (ABA-safe recreate)."""
         existing = await self.get_campaign_row(upsert.campaign, upsert.feature_id)
         if existing is None:
             if expected_revision is not None:
@@ -370,6 +381,9 @@ class AdControlSettingsRepository:
             raise RevisionConflictError("campaign row exists but absent revision expected")
         if existing.revision != expected_revision:
             raise RevisionConflictError("stale campaign revision for clear")
+
+        slot_key = SlotMutationKey.for_campaign(upsert.campaign, upsert.feature_id)
+        _ = await allocate_mutation_revision(self._session, slot_key)
 
         stmt = (
             delete(AdControlCampaignFeatureRow)
@@ -390,7 +404,8 @@ class AdControlSettingsRepository:
 
     async def _insert_shop_row(self, upsert: ShopFeatureUpsert) -> AdControlMutationResult:
         payload_json = _shop_payload_json(upsert)
-        revision = 1
+        slot_key = SlotMutationKey.for_shop(upsert.shop_id, upsert.feature_id)
+        revision = await allocate_mutation_revision(self._session, slot_key)
         token = _shop_token(upsert, payload_json, revision)
         now = datetime.now(tz=UTC)
         row = AdControlShopFeatureRow(
@@ -404,6 +419,7 @@ class AdControlSettingsRepository:
             updated_at=now,
         )
         self._session.add(row)
+        await _flush_or_conflict(self._session, scope="shop create")
         kind = (
             AdControlMutationKind.DISABLE
             if upsert.activation == ShopFeatureActivation.DISABLED
@@ -414,9 +430,10 @@ class AdControlSettingsRepository:
     async def _insert_campaign_override(
         self,
         upsert: CampaignOverrideUpsert,
+        payload_json: dict[str, object],
     ) -> AdControlMutationResult:
-        payload_json = encode_payload_json(upsert.feature_id, upsert.payload)
-        revision = 1
+        slot_key = SlotMutationKey.for_campaign(upsert.campaign, upsert.feature_id)
+        revision = await allocate_mutation_revision(self._session, slot_key)
         token = _campaign_token(
             upsert.campaign,
             upsert.feature_id,
@@ -439,6 +456,7 @@ class AdControlSettingsRepository:
                 updated_at=now,
             )
         )
+        await _flush_or_conflict(self._session, scope="campaign override create")
         return AdControlMutationResult(
             kind=AdControlMutationKind.CREATE,
             revision=revision,
@@ -449,7 +467,8 @@ class AdControlSettingsRepository:
         self,
         upsert: CampaignDisableUpsert,
     ) -> AdControlMutationResult:
-        revision = 1
+        slot_key = SlotMutationKey.for_campaign(upsert.campaign, upsert.feature_id)
+        revision = await allocate_mutation_revision(self._session, slot_key)
         token = _campaign_token(
             upsert.campaign,
             upsert.feature_id,
@@ -472,11 +491,19 @@ class AdControlSettingsRepository:
                 updated_at=now,
             )
         )
+        await _flush_or_conflict(self._session, scope="campaign disable create")
         return AdControlMutationResult(
             kind=AdControlMutationKind.DISABLE,
             revision=revision,
             state_token=token,
         )
+
+
+async def _flush_or_conflict(session: AsyncSession, *, scope: str) -> None:
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        raise RevisionConflictError(f"concurrent {scope} conflict") from exc
 
 
 def _shop_payload_json(upsert: ShopFeatureUpsert) -> dict[str, object] | None:
@@ -541,6 +568,28 @@ def _shop_mutation_kind(
     return AdControlMutationKind.UPDATE
 
 
+def _campaign_override_is_no_op(
+    existing: AdControlCampaignFeatureRow,
+    upsert: CampaignOverrideUpsert,
+    payload_json: dict[str, object],
+) -> bool:
+    return (
+        existing.mode == AdControlFeatureMode.OVERRIDE.value
+        and existing.schema_version == upsert.schema_version
+        and existing.payload_json == payload_json
+    )
+
+
+def _campaign_disable_is_no_op(
+    existing: AdControlCampaignFeatureRow,
+    upsert: CampaignDisableUpsert,
+) -> bool:
+    return (
+        existing.mode == AdControlFeatureMode.DISABLED.value
+        and existing.schema_version == upsert.schema_version
+    )
+
+
 def _assert_schema_supported(
     feature_id: AdControlFeatureId,
     schema_version: int,
@@ -550,8 +599,6 @@ def _assert_schema_supported(
         raise UnsupportedSchemaVersionError(
             f"unsupported schema_version {schema_version} for {feature_id}"
         )
-    if schema_version > definition.schema_version:
-        raise UnsupportedSchemaVersionError("newer unsupported schema")
 
 
 def validate_shop_upsert(upsert: ShopFeatureUpsert) -> None:

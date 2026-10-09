@@ -22,6 +22,36 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     op.create_table(
+        "adcontrolslotmutationledger",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("shop_id", sa.String(length=128), nullable=False),
+        sa.Column("scope", sa.String(length=16), nullable=False),
+        sa.Column("advert_id", sa.Integer(), nullable=False),
+        sa.Column("feature_id", sa.String(length=64), nullable=False),
+        sa.Column("last_mutation_revision", sa.BigInteger(), nullable=False),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "shop_id",
+            "scope",
+            "advert_id",
+            "feature_id",
+            name="uq_ad_control_slot_mutation_ledger",
+        ),
+    )
+    op.create_index(
+        "ix_ad_control_slot_mutation_lookup",
+        "adcontrolslotmutationledger",
+        ["shop_id", "scope", "advert_id", "feature_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_adcontrolslotmutationledger_shop_id"),
+        "adcontrolslotmutationledger",
+        ["shop_id"],
+        unique=False,
+    )
+
+    op.create_table(
         "adcontrolshopfeaturerow",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("shop_id", sa.String(length=128), nullable=False),
@@ -87,6 +117,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_index(
+        op.f("ix_adcontrolslotmutationledger_shop_id"),
+        table_name="adcontrolslotmutationledger",
+    )
+    op.drop_index(
+        "ix_ad_control_slot_mutation_lookup",
+        table_name="adcontrolslotmutationledger",
+    )
+    op.drop_table("adcontrolslotmutationledger")
     op.drop_index(
         op.f("ix_adcontrolcampaignfeaturerow_shop_id"),
         table_name="adcontrolcampaignfeaturerow",

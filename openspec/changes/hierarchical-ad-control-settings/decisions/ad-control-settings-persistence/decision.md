@@ -17,8 +17,9 @@ identity `(scope, feature_id, schema_version)`, JSONB as representation only.
 2. **Logical identity**: shop `(shop_id, feature_id)`; campaign
    `(shop_id, advert_id, feature_id)`. ``schema_version`` is a row attribute only.
 3. **INHERIT** at campaign scope = **row absent**; use `campaign.clear_ad_control_feature`.
-4. **Monotonic `revision`** (BIGINT) is CAS write authority; `state_token` is content
-   fingerprint only (includes revision for audit).
+4. **Monotonic `revision`** (BIGINT) on authoritative rows, allocated from
+   `AdControlSlotMutationLedger` (survives CLEAR/recreate); `state_token` is content
+   fingerprint only.
 5. **Precondition**: `expected_revision=None` => absent slot; `int` => must match row.
 6. **ChangeSet** ops: `shop.set_ad_control_feature`, `campaign.set_ad_control_override`,
    `campaign.disable_ad_control_feature`, `campaign.clear_ad_control_feature`.
@@ -29,7 +30,7 @@ identity `(scope, feature_id, schema_version)`, JSONB as representation only.
 ## Forbidden
 
 - Storing shop target DRR on campaign rows for INHERIT authority.
-- CPO production actuation paths while `PRICE_SEMANTICS_ACCEPTED = NO`.
+- Runtime CPO actuation in Slice B (persistence only; see `drr-cpo-price-semantics` for V1 order-value acceptance on stage).
 - Second parallel ChangeSet owner outside `wb_sky_control_plane`.
 
 ## Related

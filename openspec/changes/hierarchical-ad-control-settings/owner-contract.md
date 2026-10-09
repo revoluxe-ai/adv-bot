@@ -29,9 +29,12 @@ Campaign INHERIT reads current shop policy without persisting shop values on cam
 `DRR_POLICY`, `DYNAMIC_DRR_CONTROL`, `CPO_INCREASE_ON_HEADROOM`,
 `CPO_DECREASE_ON_OVERSPEND`, `CPO_SAFETY_BOUNDS` — independent modes and parameters.
 
-## Price semantics
+## Price semantics (Slice B boundary)
 
-`PRICE_SEMANTICS_ACCEPTED = NO`. Foundation allowed; CPO production actuation blocked.
+Accepted ADR `drr-cpo-price-semantics` on stage: V1 order-value path
+`PRICE_SEMANTICS_ACCEPTED = YES` (`PRICE_SEMANTICS_QUALIFIER = V1_ORDER_VALUE_BASIS`).
+Catalog-price path remains `CATALOG_PRICE_SEMANTICS_ACCEPTED = NO`.
+Slice B is persistence/settings only — no runtime DRR/CPO actuation here.
 
 ## Stale / insufficient data
 
