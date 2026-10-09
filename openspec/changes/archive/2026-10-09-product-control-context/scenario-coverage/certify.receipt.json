@@ -1,0 +1,41 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "product-control-context",
+  "MODE": "certify",
+  "FOUNDATION_SCOPE": "SLICES_A_B_ONLY",
+  "OWNER_SCOPE_DECISION": "OPTION_A_FOUNDATION_ONLY",
+  "VERDICT": "PASS",
+  "PASS_SCOPE": "FOUNDATION_A_B",
+  "PRODUCT_ACCEPTANCE_STATUS": "PASS",
+  "PRODUCER": "archive-close-certify",
+  "produced_at": "2026-10-09",
+  "slice_receipts": [
+    "scenario-coverage/slice-a-l1-audit.receipt.json",
+    "scenario-coverage/slice-b-l1-audit.receipt.json"
+  ],
+  "scenarios": {
+    "S01": {"status": "PASS", "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s01_auto_and_search_separate_bindings"},
+    "S02": {"status": "PASS", "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s02_same_nmid_two_complexes"},
+    "S03": {"status": "PASS", "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s03_single_nm_safe_resolve"},
+    "S04": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-shop-drr-runtime"},
+    "S05": {"status": "PASS", "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s05_main_nmid_ignored_not_primary_evidence"},
+    "S06": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-shop-drr-runtime"},
+    "S07": {"status": "PASS", "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s07_inherit_shop_uses_shop_drr"},
+    "S08": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-sku-override-runtime"},
+    "S09": {"status": "PASS", "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s09_enrolled_no_profiles_legacy_tier"},
+    "S10": {"status": "PASS", "evidence": "tests/unit/product_control/test_product_ref_and_drr_profile.py::test_drr_profile_requires_max_gte_target_on_construction"},
+    "S11": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-shop-drr-runtime", "note": "runtime pricing adapter/freshness"},
+    "S12": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-shop-drr-runtime"},
+    "S13": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-shop-drr-runtime", "note": "deployment zero-change requires runtime path"},
+    "S14": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-shop-drr-runtime"},
+    "S15": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-shop-drr-runtime"},
+    "S16": {"status": "PASS", "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s16_pricing_port_types_separate_from_sales_economics"},
+    "S17": {"status": "PASS", "evidence": "tests/unit/product_control/test_campaign_binding_projector.py::test_s17_search_physical_id_not_linkage_id"},
+    "S18": {"status": "MOVED_TO_FUTURE_CHANGE", "future_change": "product-control-settings-persistence"},
+    "S19": {"status": "PASS", "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s19_product_override_cannot_bypass_not_enrolled"},
+    "S20": {"status": "PASS", "evidence": "tests/unit/product_control/test_effective_control_resolver.py::test_shop_blocked_master_gate"},
+    "S21": {"status": "PASS", "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s21_override_without_profile_invalid"},
+    "S22": {"status": "PASS", "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s22_domain_max_cpo_001_rub"}
+  }
+}

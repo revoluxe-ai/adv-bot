@@ -127,6 +127,18 @@ architecture decisions belong here.
   - Scope: semantic ownership of decision/experiment memory (plans, lifecycle,
     validity, factual results, interpretation linkage); refs-only for settings,
     Apply, metrics, attribution; not production write authority.
+- [product-control-aggregate-ownership](product-control-aggregate-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `(shop_id, nmid)` control anchor; WBCard catalog-only; future
+    `ShopControlSettings` / `ProductControlSettings` (persistence in separate change).
+- [campaign-product-binding-ownership](campaign-product-binding-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `CampaignProductBinding` projector semantics; Auto/Search legs;
+    no `main_nmid` PRIMARY; multi-nm fail-closed.
+- [product-pricing-and-cpo-ownership](product-pricing-and-cpo-ownership/decision.md)
+  - Status: Accepted (EVIDENCE_GAP: runtime price SoT)
+  - Scope: pricing vs sales-economics ports; `ProductCpoResolver` pure math;
+    `PRICE_SEMANTICS_ACCEPTED = NO` until future runtime change.
 
 ## Change Requirements
 
