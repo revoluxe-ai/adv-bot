@@ -29,6 +29,9 @@ from app.modules.ai_package_v1.domain.enums import (
     ReasonCode,
 )
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
+from app.modules.ai_package_v1.analysis.attribution_reader import (
+    EmptyAnalysisAttributionReader,
+)
 from app.modules.ai_package_v1.analysis.campaign_reader import (
     EmptyAnalysisCampaignReader,
 )
@@ -275,6 +278,7 @@ class _World:
             settings_assembler=_Settings(),  # type: ignore[arg-type]
             keyword_assembler=_Keywords(huge),
             analysis_campaign_reader=EmptyAnalysisCampaignReader(),
+            analysis_attribution_reader=EmptyAnalysisAttributionReader(),
         )
         redis = cast(AsyncKv, self.redis)
         store = OAuthRedisStore(
