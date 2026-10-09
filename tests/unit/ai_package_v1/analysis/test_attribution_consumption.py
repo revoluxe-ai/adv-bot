@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import cast
 
 import pytest
 
@@ -32,6 +33,7 @@ from app.modules.ai_package_v1.analysis.models import (
     CampaignDailyFact,
 )
 from app.modules.ai_package_v1.analysis.catalog import build_analysis_windows
+from app.modules.ai_package_v1.keyword_performance.windows.engine import WindowSpec
 from app.modules.ai_package_v1.analysis.service import AnalysisAggregationService
 from app.modules.ai_package_v1.keyword_performance.domain.cutoff import PackageCutoff
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
@@ -123,7 +125,7 @@ def _partial_query() -> AttributionQueryResult:
     )
 
 
-def _analysis_windows() -> list[object]:
+def _analysis_windows() -> list[WindowSpec]:
     period = ExportPeriod(start=_DAY, end=_DAY)
     cutoff = PackageCutoff.from_generated_at(_GENERATED)
     return build_analysis_windows(
@@ -140,8 +142,11 @@ def _evidence_for_legs(
 ) -> tuple[AnalysisAttributionLegEvidence, ...]:
     windows = _analysis_windows()
     covering = next(
-        (spec for spec in windows if spec.start <= _DAY <= spec.end),
-        windows[0],
+        (spec for spec in windows if spec.window_id == "requested_custom"),
+        next(
+            (spec for spec in windows if spec.start <= _DAY <= spec.end),
+            windows[0],
+        ),
     )
     return (
         AnalysisAttributionLegEvidence(
@@ -164,6 +169,7 @@ def _build(
             period=period,
             scope=_scope(),
             campaign_facts=campaign_facts,
+            campaign_source_complete_through=_DAY,
             attribution_by_leg_window=evidence,
         )
     )
@@ -189,34 +195,40 @@ def _leg_row(
         uncomputable = row.get("uncomputable")
         if isinstance(uncomputable, list) and any(
             isinstance(item, dict)
-            and item.get("metric_id") in {CPO_FACT_DIRECT, ATTRIBUTION_DIRECT_ORDERS}
-            for item in uncomputable
+            and cast(dict[str, object], item).get("metric_id")
+            in {CPO_FACT_DIRECT, ATTRIBUTION_DIRECT_ORDERS}
+            for item in cast(list[object], uncomputable)
         ):
             return row
     return candidates[0]
 
 
-def _metric(row: dict[str, object], metric_id: str) -> object | None:
+def _metrics_of(row: dict[str, object]) -> dict[str, object]:
     metrics = row.get("metrics")
-    if not isinstance(metrics, dict):
+    assert isinstance(metrics, dict)
+    return cast(dict[str, object], metrics)
+
+
+def _metric(row: dict[str, object], metric_id: str) -> object | None:
+    cell = _metrics_of(row).get(metric_id)
+    if not isinstance(cell, dict):
         return None
-    cell = metrics.get(metric_id)
-    if isinstance(cell, dict):
-        return cell.get("value")
-    return None
+    cell_dict = cast(dict[str, object], cell)
+    return cell_dict.get("value")
 
 
 def _has_uncomputable(row: dict[str, object], metric_id: str, reason: str) -> bool:
     uncomputable = row.get("uncomputable")
     if not isinstance(uncomputable, list):
         return False
-    for item in uncomputable:
+    for item in cast(list[object], uncomputable):
         if not isinstance(item, dict):
             continue
-        if item.get("metric_id") != metric_id:
+        entry = cast(dict[str, object], item)
+        if entry.get("metric_id") != metric_id:
             continue
-        codes = item.get("reason_codes")
-        if isinstance(codes, list) and reason in codes:
+        codes = entry.get("reason_codes")
+        if isinstance(codes, list) and reason in cast(list[object], codes):
             return True
     return False
 
@@ -241,10 +253,13 @@ def test_partial_blocks_numeric_cpo() -> None:
     rows = _build(evidence, (_campaign_day(111),))
     row = _leg_row(rows, 111, window_id=evidence[0].window_id)
     assert _metric(row, CPO_FACT_DIRECT) is None
-    blocked = [
-        item
-        for item in row.get("uncomputable", [])
-        if isinstance(item, dict) and item.get("metric_id") == CPO_FACT_DIRECT
+    raw_uncomputable = row.get("uncomputable", [])
+    assert isinstance(raw_uncomputable, list)
+    blocked: list[dict[str, object]] = [
+        cast(dict[str, object], item)
+        for item in cast(list[object], raw_uncomputable)
+        if isinstance(item, dict)
+        and cast(dict[str, object], item).get("metric_id") == CPO_FACT_DIRECT
     ]
     assert blocked
 

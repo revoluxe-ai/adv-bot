@@ -29,7 +29,6 @@ from app.modules.ai_package_v1.analysis.coverage import (
 from app.modules.ai_package_v1.analysis.attribution_evidence import (
     build_leg_attribution_outputs,
     package_attribution_uncomputable,
-    spend_refs_for_leg_window,
 )
 from app.modules.ai_package_v1.analysis.models import CampaignDailyFact
 from app.modules.attribution_facts.domain.models import AttributionQueryResult
@@ -202,7 +201,11 @@ def _campaign_row(
     if attribution_query is not None:
         attr_metrics, attr_gaps = build_leg_attribution_outputs(
             attribution_query,
-            spend_refs_for_leg_window(in_window),
+            physical_adv_id=adv_id,
+            window_start=spec.start,
+            window_end=spec.end,
+            campaign_facts_in_window=in_window,
+            campaign_coverage_status=status,
         )
         metrics.update(attr_metrics)
         uncomputable.extend(attr_gaps)
