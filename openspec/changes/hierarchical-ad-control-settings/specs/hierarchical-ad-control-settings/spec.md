@@ -2,9 +2,10 @@
 
 ## Purpose
 
-Normative **foundation** semantics for hierarchical advertising automation settings:
+Normative semantics for hierarchical advertising automation settings:
 per-function modes at SHOP and CAMPAIGN, live inheritance, DRR triple separation,
-headroom eligibility, diagnostics contract. Persistence and runtime are out of scope.
+headroom eligibility, diagnostics contract. Slice B adds configured persistence and
+ChangeSet dry-run; runtime shop-runner and UI remain out of scope.
 
 ## ADDED Requirements
 
@@ -66,3 +67,26 @@ while `PRICE_SEMANTICS_ACCEPTED = NO`.
 - **WHEN** proposed CPO is requested semantically
 - **THEN** `proposed_max_cpo_rub` MUST be withheld with
   `PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED`
+
+### Requirement: Versioned persistence identity
+
+Configured shop and campaign policy MUST be stored with identity
+`(scope, feature_id, schema_version)`; JSONB MUST be decoded only through the
+domain registry validators.
+
+#### Scenario: Shop row round-trip
+
+- **GIVEN** ENABLED `DRR_POLICY` payload at shop scope
+- **WHEN** payload is encoded to JSONB and decoded
+- **THEN** typed payload MUST match registry validation for schema_version 1
+
+### Requirement: Ad control ChangeSet dry-run
+
+`AdControlChangeSetV1` mutations MUST be validated by
+`validate_ad_control_changeset` without PostgreSQL or WB writes.
+
+#### Scenario: Stale state_token rejected
+
+- **GIVEN** an existing shop feature snapshot with `state_token` `acs_live`
+- **WHEN** a ChangeSet presents `acs_wrong` for the same feature
+- **THEN** dry-run MUST return `REJECTED` with `STATE_TOKEN_STALE`

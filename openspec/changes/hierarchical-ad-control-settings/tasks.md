@@ -10,10 +10,13 @@
 - [x] 2.3 DRR triple + headroom eligibility + diagnostics contract
 - [x] 2.4 Unit tests
 
-## 3. Future slices (not this change)
+## 3. Slice B — persistence + ChangeSet dry-run
 
-- [ ] 3.1 Persistence `(scope, feature_id, schema_version)`
-- [ ] 3.2 ChangeSet / Apply operations
-- [ ] 3.3 Runtime shop-runner integration
-- [ ] 3.4 UI Advertising Control + Diagnostics
-- [ ] 3.5 Headroom production allocator (Owner algorithm GO)
+- [x] 3.1 Persistence `(scope, feature_id, schema_version)` — PG models, Alembic, repository, payload codec
+- [x] 3.2 AdControlChangeSetV1 + `validate_ad_control_changeset` (dry-run only; no Apply Authority wiring)
+
+## 4. Future slices
+
+- [ ] 4.1 Runtime shop-runner integration
+- [ ] 4.2 UI Advertising Control + Diagnostics
+- [ ] 4.3 Headroom production allocator (Owner algorithm GO)
