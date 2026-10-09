@@ -4,14 +4,14 @@ Planning / domain apply only. No runtime until explicit slice GO.
 
 ## Slice A — Domain vocabulary + ports (no PG, no runtime)
 
-- [ ] 1.1 Create `app/modules/product_control/domain/` package with module docstrings.
-- [ ] 1.2 Add `ProductRef(shop_id, nmid)`, `DrrProfile`, `ShopControlEnrollment`, `ProductControlMode`.
-- [ ] 1.3 Add ports: `ProductPricingReader`, `ProductSalesEconomicsReader`,
-      `EffectiveControlResolver`, `ProductCpoResolver` (protocols).
-- [ ] 1.4 Add `CampaignProductBinding`, `MembershipRole`, `LegRole`, blocker reason codes.
-- [ ] 1.5 Implement pure `ProductCpoResolver` math + `EffectiveControlResolver` LEGACY/SKU/SHOP tiers (no I/O).
-- [ ] 1.6 Unit tests: profile inheritance, NULL inherit, invariants, CPO rounding, blockers.
-- [ ] 1.7 Unit tests: multi-nm ambiguity policy (pure policy helpers).
+- [x] 1.1 Create `app/modules/product_control/domain/` package with module docstrings.
+- [x] 1.2 Add `ProductRef(shop_id, nmid)`, `DrrProfile`, `ShopControlEnrollment`, `ProductControlMode`.
+- [x] 1.3 Add ports: `ProductPricingReader`, `ProductSalesEconomicsReader`;
+      pure `EffectiveControlResolver`, `ProductCpoResolver` (no production adapters).
+- [x] 1.4 Add `CampaignProductBinding`, `MembershipRole`, `LegRole`, blocker reason codes.
+- [x] 1.5 Implement pure `ProductCpoResolver` math + `EffectiveControlResolver` LEGACY/SKU/SHOP tiers (no I/O).
+- [x] 1.6 Unit tests: profile inheritance, NULL inherit, invariants, CPO rounding, blockers.
+- [x] 1.7 Unit tests: multi-nm ambiguity policy (pure policy helpers).
 
 ## Slice B — Binding projector (read-only)
 
