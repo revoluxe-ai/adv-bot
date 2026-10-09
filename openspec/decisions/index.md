@@ -136,9 +136,15 @@ architecture decisions belong here.
   - Scope: `CampaignProductBinding` projector semantics; Auto/Search legs;
     no `main_nmid` PRIMARY; multi-nm fail-closed.
 - [product-pricing-and-cpo-ownership](product-pricing-and-cpo-ownership/decision.md)
-  - Status: Accepted (EVIDENCE_GAP: runtime price SoT)
-  - Scope: pricing vs sales-economics ports; `ProductCpoResolver` pure math;
-    `PRICE_SEMANTICS_ACCEPTED = NO` until future runtime change.
+  - Status: Accepted (`CATALOG_PRICE_SEMANTICS_ACCEPTED = NO` on price-based path)
+  - Scope: Path A — `ProductPricingReader` + `ProductCpoResolver` (catalog/unit
+    price × DRR); Path B — see `drr-cpo-price-semantics` (order-value campaign
+    `TARGET_CPO_RUB`; not `ProductCpoResolver`).
+- [drr-cpo-price-semantics](drr-cpo-price-semantics/decision.md)
+  - Status: Accepted (`PRICE_SEMANTICS_QUALIFIER = V1_ORDER_VALUE_BASIS`)
+  - Scope: V1 shop/campaign DRR denominators, order-value `TARGET_CPO_RUB`,
+    shop headroom rub, fail-closed blockers; catalog price not required for V1
+    campaign control; `ProductCpoResolver` path unchanged.
 
 ## Change Requirements
 
