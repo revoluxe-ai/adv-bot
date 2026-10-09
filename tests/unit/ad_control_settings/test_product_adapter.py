@@ -16,7 +16,6 @@ from app.modules.product_control.domain.effective_control_resolver import (
     EffectiveControlResolver,
 )
 from app.modules.product_control.domain.enums import (
-    DrrResolutionTier,
     ProductControlMode,
     ShopControlEnrollment,
 )

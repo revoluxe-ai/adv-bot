@@ -121,13 +121,15 @@ class AdControlDiagnosticsBuilder:
                 reason_codes.append(
                     AdControlReasonCode.NO_CONTROL_ACTION_STALE_OR_UNKNOWN,
                 )
-            hierarchical_active = (
-                AdControlSettingsResolver.assert_hierarchical_path(context) is None
+            hierarchical_blocked = AdControlSettingsResolver.assert_hierarchical_path(
+                context,
             )
             eligibility = campaign_headroom_eligibility(
                 context.campaign,
                 actual_drr,
-                hierarchical_active,
+                enrollment=context.enrollment,
+                control_path=context.control_path,
+                hierarchical_resolver_available=hierarchical_blocked is None,
             )
             reason_codes.extend(eligibility.reason_codes)
             blockers.extend(eligibility.blockers)

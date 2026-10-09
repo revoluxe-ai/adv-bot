@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from decimal import Decimal
 
 import pytest
@@ -33,8 +34,8 @@ def _shop_drr(target: str, max_drr: str) -> DrrPolicyParamsV1:
 
 
 def _ctx(
-    shop_features: dict,
-    campaign_features: dict,
+    shop_features: Mapping[AdControlFeatureId, ShopFeatureSlot],
+    campaign_features: Mapping[AdControlFeatureId, CampaignFeatureSlot],
     *,
     shop_id: str = "shop-1",
     advert_id: int = 1001,

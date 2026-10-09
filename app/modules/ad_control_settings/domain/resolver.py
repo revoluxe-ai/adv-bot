@@ -175,18 +175,9 @@ class AdControlSettingsResolver:
         if context.product_drr is None:
             return None
         if isinstance(context.product_drr, ProductDrrPolicyAdapterBlocked):
-            return ResolvedFeaturePolicy(
-                feature_id=feature_id,
-                active=False,
-                payload=None,
-                provenance=ProvenanceEntry(
-                    feature_id=feature_id,
-                    source_kind=EffectiveSourceKind.PRODUCT_DISABLED,
-                    source_scope=AdControlScope.PRODUCT,
-                    schema_version=1,
-                ),
-                reason_codes=(context.product_drr.reason,),
-            )
+            # Fall through to SHOP tier (CAMPAIGN > PRODUCT > SHOP); adapter block
+            # is not the same as product feature DISABLED.
+            return None
         assert isinstance(context.product_drr, ProductDrrPolicyAdapterSuccess)
         validate_feature_payload(feature_id, context.product_drr.params)
         return ResolvedFeaturePolicy(

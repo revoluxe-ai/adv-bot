@@ -11,7 +11,11 @@ from app.modules.ad_control_settings.domain.drr_state import (
     ActualDrrObservation,
     ShopEffectiveControlDrr,
 )
-from app.modules.ad_control_settings.domain.enums import DataSufficiency
+from app.modules.ad_control_settings.domain.enums import (
+    ControlPathKind,
+    DataSufficiency,
+    HierarchicalEnrollment,
+)
 from app.modules.ad_control_settings.domain.headroom import (
     CampaignHeadroomEligibility,
     ShopHeadroomState,
@@ -92,14 +96,35 @@ def control_action_allowed(actual: ActualDrrObservation) -> tuple[bool, AdContro
 def campaign_headroom_eligibility(
     campaign: CampaignRef,
     actual: ActualDrrObservation,
-    hierarchical_active: bool,
+    *,
+    enrollment: HierarchicalEnrollment,
+    control_path: ControlPathKind,
+    hierarchical_resolver_available: bool,
 ) -> CampaignHeadroomEligibility:
     """Eligibility contract без production ranking."""
     reasons: list[AdControlReasonCode] = []
     blockers: list[str] = []
-    if not hierarchical_active:
-        blockers.append("hierarchical_inactive")
+    if control_path == ControlPathKind.LEGACY_PASSTHROUGH:
+        blockers.append("legacy_passthrough")
+        reasons.append(AdControlReasonCode.LEGACY_PASSTHROUGH_ACTIVE)
+        return CampaignHeadroomEligibility(
+            campaign=campaign,
+            eligible=False,
+            reason_codes=tuple(reasons),
+            blockers=tuple(blockers),
+        )
+    if enrollment == HierarchicalEnrollment.NOT_ENROLLED:
+        blockers.append("not_enrolled")
         reasons.append(AdControlReasonCode.NOT_ENROLLED_FAIL_CLOSED)
+        return CampaignHeadroomEligibility(
+            campaign=campaign,
+            eligible=False,
+            reason_codes=tuple(reasons),
+            blockers=tuple(blockers),
+        )
+    if not hierarchical_resolver_available:
+        blockers.append("hierarchical_resolver_blocked")
+        reasons.append(AdControlReasonCode.INVALID_CONFIGURATION)
         return CampaignHeadroomEligibility(
             campaign=campaign,
             eligible=False,
