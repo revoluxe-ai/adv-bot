@@ -10,4 +10,4 @@ def test_exactly_one_alembic_head() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
     heads = script.get_heads()
     assert len(heads) == 1, heads
-    assert heads[0] == "a9c0e7b41d22"
+    assert heads[0] == "010e7ee6eac0"
