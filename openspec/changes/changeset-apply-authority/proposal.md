@@ -8,36 +8,33 @@ production-write authority. Transports (Telegram, future REST/MCP) and AI
 clients may propose `ChangeSetV1` but must not call WB or PostgreSQL settings
 writers directly.
 
-Today, campaign settings mutations still flow through legacy paths
+Campaign settings mutations still flow through legacy paths
 (`apply_adv_excel_rows`, Telegram handlers, shop-runner WB adapters) without a
 unified Apply contract, durable execution evidence, or transport-independent
-idempotency. This change defines **Apply Authority** as a separate feature from
+idempotency. This change delivers **Apply Authority** as a separate feature from
 dry-run.
 
-## What Changes
+## What Changes (implemented V1 — Slices A–C)
 
 - Transport-independent **`ApplyRequestV1`**, **`DryRunReceiptV1`**, **`ApplyEvidenceV1`**
   (immutable receipt), and internal **`ApplyPlanV1`** / writer orchestration contract.
-- **WB Sky Apply Authority** service boundary: re-validate, bind to dry-run,
-  authorize actor, enforce idempotency and `st1` concurrency, execute only via
-  registered writer adapters, post-apply verification, append-only audit.
-- **V1 scope:** one shop; bounded policy operations already in `ChangeSetV1`
+- **WB Sky Apply Authority** (`ApplyAuthorityService`): re-validate, bind to dry-run,
+  authorize actor, enforce idempotency and `st1` concurrency, execute via
+  **`pg.campaign_settings_policy_v1`**, post-apply PG reread verification, durable ledger.
+- **V1 scope (delivered):** one shop; three bounded policy operations
   (`campaign.set_budget_policy`, `campaign.set_sales_policy`,
   `campaign.set_bid_control_policy`); **PostgreSQL settings authority only**
-  (single transaction); **no WB HTTP writes** in V1.
-- Proposed ADR **`changeset-apply-authority-ownership`** (placement, forbidden
-  bypass paths).
-- Scenario coverage plan **S01–S35** mapped to implementation slices (planning
-  evidence only).
-- Owner contract review repairs: `ApplyInvocationContext`, receipt ownership,
-  atomic PG+evidence txn, attempt vs evidence split.
+  (single transaction); **no WB HTTP writes**.
+- Accepted ADR **`changeset-apply-authority-ownership`** (promoted on archive).
+- Scenario certification **S01–S35** with D/E/F scenarios moved to future changes
+  (see `FUTURE_BOUNDARIES.md`).
 
 ## Capabilities
 
 ### New Capabilities
 
-- `changeset-apply-authority`: sole production apply gate for in-scope ChangeSet
-  mutations; execution evidence; idempotency; verification.
+- `changeset-apply-authority`: production apply gate for in-scope PG policy
+  `ChangeSetV1` mutations; execution evidence; idempotency; verification.
 
 ### Modified Capabilities
 
@@ -46,25 +43,29 @@ dry-run.
 
 ## Impact
 
-- Future modules under `app/modules/wb_sky_control_plane/apply/` (implementation
-  slices — **not authorized in this planning change**).
-- Future PG ledger tables (design only; **no migrations** in planning).
-- **Out of scope:** REST/MCP handlers, WB writer adapters (Slice D), legacy path
-  removal, Excel/Telegram rewiring.
+- `app/modules/wb_sky_control_plane/apply/` (models, persistence, service, PG writer).
+- Alembic `f9c0a1b2d3e4` apply ledger tables.
+
+## Out of scope (separate future OpenSpec changes)
+
+- External WB writer adapters (`external-wb-apply-authority` concept).
+- REST/MCP/Telegram Apply transport (`apply-transport-adapters` concept).
+- Optional history / decision-memory cross-links.
+- Legacy path removal, Excel/Telegram rewiring, production deploy.
+
+See `FUTURE_BOUNDARIES.md`.
 
 ## Dependencies
 
 - Merged foundation: `openspec/specs/campaign-settings-changeset-contract/spec.md`
-- `openspec/decisions/campaign-settings-contract-ownership/decision.md` (PG current
-  settings authority)
-- `openspec/decisions/campaign-settings-changeset-ownership/decision.md` (promoted in this PR)
+- `openspec/decisions/campaign-settings-contract-ownership/decision.md`
+- `openspec/decisions/campaign-settings-changeset-ownership/decision.md`
 
-## Evidence Gaps (planning)
+## Evidence (close)
 
-| Gap | Status |
+| Item | Status |
 |-----|--------|
-| `preview_digest` (`pd1`) helper in repo | **Missing** — normative in this change only |
-| Apply / receipt persistence tables | **Missing** — by design until Slice B |
-| Promoted `campaign-settings-changeset-ownership` ADR in registry | **Addressed** in this PR |
-| Decision Experiment Memory | **Separate authority** — Apply references evidence by id only; not co-located in this repo |
-| Canonical domain `PrincipalRef` type | **Missing** — reuse `LogicalScopeV1` + new `PrincipalRefV1` in apply contract |
+| `preview_digest` (`pd1`) | **Implemented** (Slice A) |
+| Apply persistence tables | **Implemented** (Slice B migration) |
+| `changeset-apply-authority-ownership` ADR | **Promoted** on archive |
+| Production migration / transport | **Not in this change** |

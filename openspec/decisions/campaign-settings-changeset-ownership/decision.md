@@ -80,7 +80,7 @@ writers не вызываются.
 ## Related changes
 
 - `openspec/changes/archive/2026-10-07-campaign-settings-changeset-contract`
-- `openspec/changes/changeset-apply-authority` (apply only; does not alter dry-run semantics)
+- Archived: `openspec/changes/archive/*-changeset-apply-authority` (apply only; does not alter dry-run semantics)
 
 ## Review checklist
 

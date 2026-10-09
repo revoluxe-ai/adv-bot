@@ -683,6 +683,46 @@ async def test_s34_blocked_reconciliation(async_engine: AsyncEngine) -> None:
 
 
 @pytest.mark.destructive_local
+@pytest.mark.destructive_local
+async def test_s22_unauthorized_replay_hides_evidence(async_engine: AsyncEngine) -> None:
+    reader = FakeWbReader()
+    shop_id, resource_id, _adv_id = await seed_campaign_committed(async_engine)
+    changeset = ChangeSetV1(
+        changeset_id=f"cs_{uuid.uuid4().hex[:8]}",
+        scope=LogicalScopeV1(shop_id=shop_id),
+        operations=[
+            SetBudgetPolicyOperation(
+                operation_id="op1",
+                resource=CampaignResourceRef(resource_id=resource_id),
+                payload=BudgetPolicyPayload(auto_budget_daily_limit=88),
+            )
+        ],
+    )
+    bound = await prepare_bound_changeset(async_engine, reader, changeset)
+    rid = f"rcpt_{uuid.uuid4().hex}"
+    await issue_receipt_committed(
+        async_engine, changeset=bound, reader=reader, receipt_id=rid
+    )
+    idem = f"idem_{uuid.uuid4().hex[:8]}"
+    request = ApplyRequestV1(
+        contract_version=APPLY_CONTRACT_VERSION,
+        idempotency_key=idem,
+        changeset=bound,
+        dry_run_receipt_id=rid,
+    )
+    service = make_service(async_engine, reader)
+    first = await service.apply(request, auth_context(shop_id))
+    assert first.status == ApplyTerminalStatus.VERIFIED
+    assert first.evidence is not None
+    replay = await service.apply(
+        request, auth_context(shop_id, authorized=False)
+    )
+    assert replay.status == ApplyTerminalStatus.REJECTED
+    assert replay.reason_code == ApplyReasonCode.UNAUTHORIZED
+    assert replay.evidence is None
+
+
+@pytest.mark.destructive_local
 async def test_s35_replay_no_second_writer(async_engine: AsyncEngine) -> None:
     reader = FakeWbReader()
     shop_id, resource_id, adv_id = await seed_campaign_committed(async_engine)

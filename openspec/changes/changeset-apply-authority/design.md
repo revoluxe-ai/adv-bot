@@ -34,8 +34,9 @@ time; collector explicitly avoids settings writes (`runtime.py`).
 evidence, idempotency, transaction boundaries, verification, transport parity,
 scenario plan S01–S35.
 
-**Non-Goals:** Implementation, migrations, REST/MCP, WB apply (Slice D), legacy
-removal, promoted ADR merge (proposed only).
+**Non-Goals (V1 delivered):** WB HTTP apply, REST/MCP/Telegram Apply transports,
+legacy removal, production deploy. **Implemented:** PG ledger migration, Apply
+service, PG policy writer (Slices A–C). Future slices D/E/F → `FUTURE_BOUNDARIES.md`.
 
 ## Architecture Decision References
 
@@ -329,16 +330,18 @@ Fail closed codes include: `STALE_STATE`, `CAPABILITY_DRIFT`, `IDEMPOTENCY_CONFL
 
 No automatic WB retry on unknown external outcome.
 
-## Implementation slices (not authorized here)
+## Implementation slices
 
-| Slice | Boundary |
-|-------|----------|
-| A | `ApplyRequestV1`, `ApplyInvocationContext`, ports, `pd1`/`cpd1` pure functions, idempotency decision logic, lifecycle enums, receipt lifecycle rules, unit tests — **no PG, no writers, no receipt PG** |
-| B | PG: `ApplyAttemptRecord`, idempotency, `ApplyEvidenceV1`, **`DryRunReceiptStore`** |
-| C | PG policy writer + **single-txn** apply + in-txn verification + atomic evidence |
-| D | External WB writer + `UNKNOWN_EXTERNAL_STATE` |
-| E | REST/MCP adapters → `apply(request, context)` |
-| F | History / decision-memory reference links |
+| Slice | Status |
+|-------|--------|
+| A | **Delivered** — domain types, `pd1`/`cpd1`, pure idempotency/receipt rules, unit tests |
+| B | **Delivered** — PG ledger + `DryRunReceiptStore` |
+| C | **Delivered** — `ApplyAuthorityService`, PG policy writer, single-txn verification |
+| D | **Future change** — external WB writer + `UNKNOWN_EXTERNAL_STATE` |
+| E | **Future change** — REST/MCP transport adapters |
+| F | **Future change** — optional history / decision-memory cross-links |
+
+See `FUTURE_BOUNDARIES.md`.
 
 ## Open Questions
 
@@ -348,5 +351,5 @@ No automatic WB retry on unknown external outcome.
 
 ```text
 DESIGN_STATUS: OWNER_ACCEPTED
-IMPLEMENTATION_READY: true (Slice A domain-only; PG/writers remain later slices)
+V1_IMPLEMENTATION: COMPLETE (Slices A–C, PG-only)
 ```
