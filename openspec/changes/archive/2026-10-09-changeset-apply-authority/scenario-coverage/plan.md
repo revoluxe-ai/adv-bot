@@ -6,7 +6,8 @@ PLAN_STATUS: ready
 LIFECYCLE_STATUS: DERIVED
 PRODUCT_ACCEPTANCE_REQUIRED: true
 
-Planning evidence only. Does not assert tests exist or PASS.
+V1 certification (Slices A–C): see `certify.receipt.json`. Scenarios S10/S11,
+S15/S16 moved to future changes; S18/S19 not applicable to V1 implementation.
 
 ## GENERATED_FROM
 

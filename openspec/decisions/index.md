@@ -94,6 +94,12 @@ architecture decisions belong here.
   - Scope: `ChangeSetV1`, dry-run validation, `sd1`/`st1`, and `wb_sky_control_plane`
     ownership; no production writes from dry-run; registry reuse only from
     `campaign_settings_contract`.
+- [changeset-apply-authority-ownership](changeset-apply-authority-ownership/decision.md)
+  - Status: Accepted
+  - Scope: WB Sky Apply Authority for in-scope `ChangeSetV1` PG policy apply;
+    `wb_sky_control_plane/apply/` orchestration and evidence ledger; V1 PG-only
+    bounded policy mutations; external WB and REST/MCP transports are separate
+    future changes; legacy bypass acknowledged until migration.
 - [shop-runner-shop-wide-collection](shop-runner-shop-wide-collection/decision.md)
   - Status: Accepted
   - Scope: shop-wide campaign ad data collection executor is shop-runner only;

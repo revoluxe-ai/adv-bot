@@ -1,11 +1,27 @@
-## ADDED Requirements
+# changeset-apply-authority Specification
 
-### Requirement: Apply Authority is sole production write gate
+## Purpose
+
+WB Sky **Apply Authority** for bounded `ChangeSetV1` **PG policy** mutations:
+transport-independent apply contract, dry-run receipt binding, idempotency,
+durable evidence, and single-transaction PG writes via
+`pg.campaign_settings_policy_v1`. External WB mutation and REST/MCP Apply
+transports are **not** part of this spec's delivered V1 surface (see evolution
+doc below).
+
+Implemented V1 (Slices A–C): three `campaign.set_*_policy` operations, one
+PostgreSQL transaction per apply. Future WB/transport/cross-link work is
+documented in
+`openspec/evolution/changeset-apply-authority-future-boundaries.md` only.
+
+## Requirements
+
+### Requirement: Apply Authority is sole production write gate (V1 PG path)
 
 Only WB Sky Apply Authority MAY authorize production writes for in-scope
-`ChangeSetV1` apply operations. AI, MCP, REST, Telegram, and dry-run MUST NOT
-invoke production settings writers or WB mutation adapters directly for the same
-mutation domain.
+`ChangeSetV1` apply operations in V1. Dry-run MUST NOT invoke production
+settings writers. The V1 registered writer adapter is
+`pg.campaign_settings_policy_v1` only.
 
 #### Scenario: Unauthorized actor does not invoke writer (S06)
 
@@ -13,14 +29,6 @@ mutation domain.
 - **WHEN** Apply Authority processes `apply(request, context)`
 - **THEN** terminal status MUST be `REJECTED` with reason `UNAUTHORIZED`
 - **AND** no production writer adapter MUST be invoked
-
-#### Scenario: MCP cannot invoke writer directly (S16)
-
-- **GIVEN** an MCP tool attempt to call a production WB or PG settings writer
-  without going through Apply Authority
-- **WHEN** the call is evaluated against architecture policy
-- **THEN** the path MUST be forbidden
-- **AND** Apply Authority MUST remain the only allowed write gate
 
 ### Requirement: Dry-run success is not apply permission
 
@@ -119,26 +127,6 @@ in a single PostgreSQL transaction or roll back entirely.
 - **THEN** no `AdvSetting` policy fields MUST change
 - **AND** status MUST be `REJECTED` or `FAILED` before writer acceptance
 
-### Requirement: External writer failure taxonomy
-
-When external WB writers are introduced (out of V1 scope), rejection and unknown
-outcomes MUST be recorded distinctly.
-
-#### Scenario: External writer rejection recorded as failure (S10)
-
-- **GIVEN** an apply plan step that calls an external WB writer (future slice)
-- **AND** the writer returns a definitive rejection before acceptance
-- **WHEN** Apply Authority records the outcome
-- **THEN** execution status MUST be `FAILED` with `WRITER_REJECTED`
-- **AND** MUST NOT be reported as `VERIFIED`
-
-#### Scenario: Unknown WB result is UNKNOWN_EXTERNAL_STATE (S11)
-
-- **GIVEN** a writer call that may have reached WB but returned timeout/ambiguous error
-- **WHEN** Apply Authority cannot prove whether the mutation was accepted
-- **THEN** status MUST be `UNKNOWN_EXTERNAL_STATE`
-- **AND** Apply Authority MUST NOT automatically retry the external write
-
 ### Requirement: Post-apply verification
 
 After write, Apply Authority MUST reread canonical authoritative settings state
@@ -166,18 +154,6 @@ and MUST distinguish write acceptance from verified desired state.
 - **THEN** `ApplyEvidenceV1` MUST include `post_state_tokens` computed via `st1`
 - **AND** `post_state_tokens` MUST differ from `pre_state_tokens` when mutations occurred
 
-### Requirement: Transport parity
-
-REST and MCP Apply entrypoints MUST call the same Apply Authority application
-service with identical semantics.
-
-#### Scenario: REST and MCP use same Apply service (S15)
-
-- **GIVEN** equivalent `ApplyRequestV1` payloads from REST and MCP transports
-- **WHEN** each invokes Apply Authority
-- **THEN** validation, idempotency, and outcomes MUST be identical
-- **AND** transport channel MUST affect audit metadata only
-
 ### Requirement: Immutable apply evidence
 
 `ApplyEvidenceV1` MUST be append-only authoritative execution evidence owned by
@@ -185,10 +161,10 @@ Apply Authority, not by decision experiment memory.
 
 #### Scenario: Apply receipt is immutable evidence (S17)
 
-- **GIVEN** a finalized `ApplyEvidenceV1`
-- **WHEN** any consumer attempts to mutate stored evidence
-- **THEN** the store MUST forbid updates that change execution facts
-- **AND** only append-only audit linkage MAY be added in separate tables if needed
+- **GIVEN** a finalized `ApplyEvidenceV1` persisted through Apply Authority repositories
+- **WHEN** Apply Authority persistence APIs are used after terminal insert
+- **THEN** execution facts on the evidence row MUST NOT be updated in place
+- **AND** privileged raw SQL `UPDATE`/`DELETE` outside repository APIs is not claimed as DB-enforced immutability in V1
 
 ### Requirement: Campaign settings history boundary
 
@@ -411,3 +387,4 @@ Idempotent replay MUST return existing evidence without writer execution or rece
 - **WHEN** apply is invoked again with the same fingerprint F
 - **THEN** existing `ApplyEvidenceV1` MUST be returned
 - **AND** PG policy writers MUST NOT be invoked again
+

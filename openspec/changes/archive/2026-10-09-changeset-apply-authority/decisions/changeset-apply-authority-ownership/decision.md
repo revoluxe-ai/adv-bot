@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (canonical copy: `openspec/decisions/changeset-apply-authority-ownership/decision.md`)
 
 ## Context
 
