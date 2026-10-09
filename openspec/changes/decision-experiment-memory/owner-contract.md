@@ -17,14 +17,16 @@
 ## Что должно остаться неизменным
 
 - `campaign-settings-history` остаётся authority «какие настройки были / менялись».
-- Apply Authority (будущий) остаётся единственным authority production mutation.
+- Apply Authority (PG-only V1 на `stage`) остаётся единственным authority production mutation;
+  память хранит только `ApplyEvidenceRef` / `DryRunReceiptRef`, без копирования receipt body.
 - A/B Hold lifecycle и write-path — отдельный продуктовый контур; эта память только
   ссылается на него, не подменяет.
 - AI Package export остаётся read-only; новые поля — только после отдельного slice.
 
-## Чего сейчас не делаем
+## Чего сейчас не делаем (post–Slice A merge scope)
 
-- Реализацию, миграции, production writes.
+- PostgreSQL persistence, миграции, production memory writes (Slice B+).
+- Apply/exposure **ingest** runtime (Slice C) — ссылки только в домене.
 - MCP transport и расширение ZIP AI Package (slice F).
 - Слияние с campaign-settings-history, attribution-facts, shop-wide collection.
 - LLM как единственный судья успеха эксперимента.
@@ -34,7 +36,7 @@
 - Принят spec + design + proposed architecture decision с явными границами ownership.
 - Описаны lifecycle, append-only corrections, idempotency и reader port.
 - Implementation slices A–F согласованы с фактическим состоянием репозитория
-  (dry-run есть, Apply evidence — gap; AI Package — slice F).
+  (Apply Authority V1 на stage; memory Slice A — domain+ports+test fake; AI Package — slice F).
 
 ## Решения Owner
 

@@ -1,7 +1,7 @@
 ## Context
 
-WB Sky separates **settings facts**, **ChangeSet dry-run**, and (planned) **Apply
-Authority**. Decision-experiment memory is the **AI-readable semantic layer**:
+WB Sky separates **settings facts**, **ChangeSet dry-run**, and **Apply Authority**
+(PG-only V1 on `stage`). Decision-experiment memory is the **AI-readable semantic layer**:
 WHY / EXPECT / OUTCOME / validity / causal design — never production write authority.
 
 **Methodology addendum (planning repair):** experiments require a frozen
@@ -14,19 +14,18 @@ results, and structured retrieval (`experiment_memory_index`).
 | Authority | Role |
 |-----------|------|
 | `campaign-settings-history` | WHAT settings existed / changed (`state_token`, snapshots) |
-| Apply Authority (future) | WHAT was validated / applied / rejected |
+| Apply Authority (`changeset-apply-authority`, archived) | Execution truth (`ApplyEvidenceV1`); memory holds `ApplyEvidenceRef` only |
+| Dry-run receipt store (Apply Authority) | Validation truth (`DryRunReceiptV1`); memory holds `DryRunReceiptRef` only |
 | `attribution-facts-contract` (in flight) | Authoritative attribution fact refs (see dependency section) |
 | A/B Hold ADLs | Product hold experiment execution; memory may reference only |
 
 ### Repository evidence (updated)
 
 - `ChangeSetMetadataV1`: optional `decision_id` / `experiment_id` (non-semantic).
-- Dry-run: `DryRunResultV1`; durable receipt store — **gap**.
-- Apply receipt product type — **gap** on current `stage` baseline.
-- **`attribution-facts-contract`**: project change exists; Slice A implemented on
-  branch `cursor/attribution-facts-contract-slice-a`; **PR #456** may not be merged
-  into current `stage`. Treat as **known future evidence dependency**, not a
-  hard runtime prerequisite for decision-memory Slice A vocabulary.
+- Dry-run: `DryRunResultV1` (control plane) + durable `DryRunReceiptV1` (Apply Authority PG).
+- Apply execution: `ApplyEvidenceV1` / `ApplyEvidenceRef` in memory (no payload copy).
+- **`attribution-facts-contract`**: separate module on `stage`; optional
+  `AttributionFactSetRef` for later evaluator slices — not required for Slice A vocabulary.
 
 ## Goals / Non-Goals
 
@@ -135,7 +134,7 @@ when ingested later.
 
 **`SLICE_A_BLOCKED_BY_APPLY = NO`**
 
-Slice A uses `ApplyEvidenceRef` types and invariants only. Concrete Apply receipt
+Slice A uses `ApplyEvidenceRef` / `DryRunReceiptRef` types and invariants only. Concrete Apply
 integration is Slice C+; vocabulary and unit tests do not require Apply Authority.
 
 ### SLICE_A_BOUNDARY

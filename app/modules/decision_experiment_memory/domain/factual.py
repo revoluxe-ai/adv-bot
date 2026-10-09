@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from app.modules.decision_experiment_memory.domain.enums import PostHocAnalysisKind
 from app.modules.decision_experiment_memory.domain.refs import (
     ApplyEvidenceRef,
+    DryRunReceiptRef,
     MetricSpecRef,
     SettingsStateRef,
 )
@@ -62,7 +64,7 @@ class EvaluationProvenance:
     evaluation_run_digest: str
     ai_package_id: str | None = None
     ai_package_digest: str | None = None
-    dry_run_evidence_ref: ApplyEvidenceRef | None = None
+    dry_run_receipt_ref: DryRunReceiptRef | None = None
     extra_refs: dict[str, Any] | None = None
 
 
@@ -74,3 +76,5 @@ class PostHocAnalysisRecord:
     experiment_id: str
     interpretation_id: str
     recorded_at: datetime
+    analysis_kind: PostHocAnalysisKind
+    exploratory_metrics: tuple[MetricSpecRef, ...] = ()

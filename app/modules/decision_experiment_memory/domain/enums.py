@@ -49,6 +49,13 @@ class RegistrationKind(StrEnum):
     POST_HOC_EXPLORATORY = "POST_HOC_EXPLORATORY"
 
 
+class PostHocAnalysisKind(StrEnum):
+    """Post-hoc analysis classification (cannot rewrite preregistered plan)."""
+
+    EXPLORATORY = "EXPLORATORY"
+    POST_HOC = "POST_HOC"
+
+
 class ExecutionState(StrEnum):
     """Experiment execution machine (orthogonal to outcome)."""
 

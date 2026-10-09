@@ -16,6 +16,19 @@ class ApplyEvidenceRef:
 
 
 @dataclass(frozen=True, slots=True)
+class DryRunReceiptRef:
+    """Dry-run validation receipt reference (opaque id; no receipt body).
+
+    Aligns with ``DryRunReceiptV1.binding.receipt_id`` and optional binding
+    digests from Apply Authority — never interchangeable with ``ApplyEvidenceRef``.
+    """
+
+    dry_run_receipt_id: str
+    preview_digest: str | None = None
+    semantic_digest: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ChangeSetRef:
     """ChangeSet linkage reference."""
 

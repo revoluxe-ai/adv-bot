@@ -6,9 +6,10 @@
 - [x] 1.3 Owner contract review — architecture accepted.
 - [x] 1.4 Scenario coverage plan + receipt (`scenario-coverage/`).
 - [x] 1.5 Spec repair: INVALID/INCONCLUSIVE mapping, `experiment_design`, abort projection.
-- [ ] 1.6 `/opsx-planning-review change=decision-experiment-memory` PASS.
+- [ ] 1.6 `/opsx-planning-review change=decision-experiment-memory` — not recorded PASS
+      in change artifacts (Owner accepted planning via PR #457 merge; formal command
+      receipt still open if required pre-archive).
 - [x] 1.7 ADL promoted to `openspec/decisions/decision-experiment-memory-ownership/`.
-- [ ] 1.4 ADL promotion deferred until Owner accepts planning + post-review.
 
 ## 2. Slice A — domain vocabulary only (no PG, no Apply runtime)
 

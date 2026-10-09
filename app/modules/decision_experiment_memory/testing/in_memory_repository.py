@@ -1,4 +1,9 @@
-"""In-memory decision memory store for unit tests only (Slice A fake)."""
+"""TEST-ONLY in-memory fake for unit tests (Slice A).
+
+Not a production store, runtime singleton, or process-local memory tier.
+Production persistence is Slice B+ (PostgreSQL); this module MUST NOT be used
+outside ``tests/`` and decision-memory unit test harnesses.
+"""
 
 from __future__ import annotations
 
