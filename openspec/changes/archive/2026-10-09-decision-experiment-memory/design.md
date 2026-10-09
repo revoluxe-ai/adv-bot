@@ -1,3 +1,9 @@
+## Foundation archive scope
+
+**DELIVERED:** Slice A domain module + tests only (`app/modules/decision_experiment_memory/`).
+**NOT DELIVERED:** slices B–F (see `openspec/evolution/decision-experiment-memory-future-boundaries.md`).
+**OWNER_SCOPE:** Option A foundation-only; this change archives after merge.
+
 ## Context
 
 WB Sky separates **settings facts**, **ChangeSet dry-run**, and **Apply Authority**
