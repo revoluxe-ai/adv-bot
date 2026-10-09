@@ -13,7 +13,9 @@ from app.modules.decision_experiment_memory.domain.plan_serialization import (
     plan_body_digest,
 )
 from app.modules.decision_experiment_memory.domain.refs import MetricSpecRef
-from tests.unit.decision_experiment_memory.test_plan_body_digest import _base_body
+from tests.unit.decision_experiment_memory.test_plan_body_digest import (
+    sample_experiment_plan_body,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -40,7 +42,7 @@ def test_post_hoc_record_carries_kind_and_exploratory_metrics() -> None:
 
 
 def test_post_hoc_metrics_do_not_mutate_frozen_plan_digest() -> None:
-    body: ExperimentPlanBody = _base_body()
+    body: ExperimentPlanBody = sample_experiment_plan_body()
     digest_before = plan_body_digest(body)
     _ = PostHocAnalysisRecord(
         post_hoc_id="ph-2",

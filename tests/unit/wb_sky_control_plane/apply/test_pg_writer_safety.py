@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
+
+from app.modules.common_slaves.wildberries.models.models import AdvSetting
 
 from app.modules.wb_sky_control_plane.apply.writer.pg_campaign_settings_policy_v1 import (
     apply_plan_to_adv_settings,
@@ -36,7 +39,10 @@ def test_writer_rejects_wrong_bucket_in_field_path() -> None:
         ]
     )
     with pytest.raises(ValueError, match="bucket"):
-        apply_plan_to_adv_settings(plan, adv_by_resource={"cmp_x": row})
+        apply_plan_to_adv_settings(
+            plan,
+            adv_by_resource=cast(dict[str, AdvSetting], {"cmp_x": row}),
+        )
 
 
 def test_writer_rejects_no_op_effect() -> None:
@@ -52,4 +58,9 @@ def test_writer_rejects_no_op_effect() -> None:
         ]
     )
     with pytest.raises(ValueError, match="NO_OP"):
-        apply_plan_to_adv_settings(plan, adv_by_resource={"cmp_x": SimpleNamespace()})
+        apply_plan_to_adv_settings(
+            plan,
+            adv_by_resource=cast(
+                dict[str, AdvSetting], {"cmp_x": SimpleNamespace()}
+            ),
+        )

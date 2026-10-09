@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.modules.wb_sky_control_plane.apply.enums import (
     ApplyAttemptLifecycleState,
