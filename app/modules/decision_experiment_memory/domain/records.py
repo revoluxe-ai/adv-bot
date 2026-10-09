@@ -16,6 +16,7 @@ from app.modules.decision_experiment_memory.domain.enums import (
 from app.modules.decision_experiment_memory.domain.refs import (
     ApplyEvidenceRef,
     ChangeSetRef,
+    DryRunReceiptRef,
 )
 from app.modules.decision_experiment_memory.domain.validity import ValiditySnapshot
 from app.modules.decision_experiment_memory.errors import IdentityInvariantError
@@ -35,7 +36,7 @@ class DecisionMemoryRecord:
     decision_fingerprint: str | None = None
     changeset_ref: ChangeSetRef | None = None
     apply_evidence_ref: ApplyEvidenceRef | None = None
-    dry_run_receipt_id: str | None = None
+    dry_run_receipt_ref: DryRunReceiptRef | None = None
 
 
 @dataclass(frozen=True, slots=True)

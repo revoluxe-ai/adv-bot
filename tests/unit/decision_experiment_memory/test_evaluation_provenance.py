@@ -10,6 +10,8 @@ from app.modules.decision_experiment_memory.domain.factual import (
     EvaluationProvenance,
     Interpretation,
 )
+from app.modules.decision_experiment_memory.domain.records import DecisionMemoryRecord
+from app.modules.decision_experiment_memory.domain.enums import DecisionStatus
 from app.modules.decision_experiment_memory.domain.refs import (
     ApplyEvidenceRef,
     DryRunReceiptRef,
@@ -58,6 +60,21 @@ def test_evaluation_provenance_optional_ai_package_refs() -> None:
         ai_package_digest="pkg-dig",
     )
     assert provenance.ai_package_id == "pkg-1"
+
+
+def test_decision_record_uses_dry_run_receipt_ref_type() -> None:
+    dry = DryRunReceiptRef(dry_run_receipt_id="receipt-2")
+    record = DecisionMemoryRecord(
+        decision_id="d-1",
+        shop_id="shop-1",
+        status=DecisionStatus.VALIDATED,
+        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        observation="o",
+        rationale="r",
+        intended_action="a",
+        dry_run_receipt_ref=dry,
+    )
+    assert record.dry_run_receipt_ref is dry
 
 
 def test_interpretation_post_hoc_flag_defaults_false() -> None:

@@ -379,7 +379,7 @@ class InMemoryDecisionMemoryRepository(DecisionMemoryRepository):
             decision_fingerprint=record.decision_fingerprint,
             changeset_ref=record.changeset_ref,
             apply_evidence_ref=record.apply_evidence_ref,
-            dry_run_receipt_id=record.dry_run_receipt_id,
+            dry_run_receipt_ref=record.dry_run_receipt_ref,
         )
         self.save_decision(updated)
         return updated
