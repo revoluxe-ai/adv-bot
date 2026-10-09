@@ -13,6 +13,9 @@ from typing import TYPE_CHECKING
 from app.modules.product_control.domain.enums import LegRole
 
 if TYPE_CHECKING:
+    from app.modules.product_control.application.projection.campaign_binding_projector import (
+        BindingProjectionResult,
+    )
     from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv.complex_adv import (
         ComplexAdv,
     )
@@ -42,7 +45,7 @@ def _shop_id_from_complex(complex_adv: ComplexAdv) -> str | None:
     explicit = complex_adv.shop_id
     if explicit:
         return explicit
-    cabinet = getattr(complex_adv._adv_setting, "wb_cabinet", None)
+    cabinet = getattr(complex_adv.adv_setting, "wb_cabinet", None)
     if cabinet is not None:
         sid = getattr(cabinet, "shop_id", None)
         if sid:
@@ -58,10 +61,10 @@ def _nmids_tuple(raw: list[int] | None) -> tuple[int, ...]:
 
 def complex_adv_to_projection_source(complex_adv: ComplexAdv) -> ComplexAdvProjectionSource:
     """Собрать projection source из runtime ComplexAdv (read-only)."""
-    auto_setting = complex_adv._adv_setting
+    auto_setting = complex_adv.adv_setting
     auto_leg = AdvLegProjectionSource(
-        adv_setting_id=int(auto_setting.id),
-        physical_adv_id=int(auto_setting.adv_id) if auto_setting.adv_id else None,
+        adv_setting_id=complex_adv.original_adv_setting_id,
+        physical_adv_id=complex_adv.auto_adv_id,
         leg_role=LegRole.AUTO,
         nmids=_nmids_tuple(list(auto_setting.nmids or [])),
     )
@@ -85,7 +88,7 @@ def complex_adv_to_projection_source(complex_adv: ComplexAdv) -> ComplexAdvProje
     )
 
 
-def project_complex_adv(complex_adv: ComplexAdv):
+def project_complex_adv(complex_adv: ComplexAdv) -> BindingProjectionResult:
     """Удобная обёртка: ComplexAdv → результат проектора."""
     from app.modules.product_control.application.projection.campaign_binding_projector import (
         CampaignProductBindingProjector,
