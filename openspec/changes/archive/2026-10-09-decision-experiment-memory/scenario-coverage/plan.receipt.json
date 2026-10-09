@@ -6,8 +6,8 @@
   "PLAN_STATUS": "ready",
   "PLAN_EVIDENCE_ID": "SCPV1-a48d03971a706909",
   "PLAN_CONTENT_HASH": "f57a10ed834afbf688ff47aeda6046391b335caa9840e1d7ae99f99fcdf30332",
-  "PLAN_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.md",
-  "RECEIPT_PATH": "openspec/changes/decision-experiment-memory/scenario-coverage/plan.receipt.json",
+  "PLAN_PATH": "openspec/changes/archive/2026-10-09-decision-experiment-memory/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/archive/2026-10-09-decision-experiment-memory/scenario-coverage/plan.receipt.json",
   "SCENARIO_COUNT": 26,
   "LIFECYCLE_COVERAGE": {
     "covered": [
