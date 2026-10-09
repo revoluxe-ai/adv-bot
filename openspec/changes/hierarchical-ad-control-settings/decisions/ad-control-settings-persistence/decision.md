@@ -14,11 +14,17 @@ identity `(scope, feature_id, schema_version)`, JSONB as representation only.
 
 1. **Configured shop/campaign rows** persist in
    `app/modules/ad_control_settings/persistence/` (SQLAlchemy + Alembic).
-2. **PRODUCT** scope remains adapter-only; no new ProductControl tables.
-3. **ChangeSet** for mutations: `AdControlChangeSetV1` in `wb_sky_control_plane`
-   with dry-run validator `validate_ad_control_changeset` — no production PG writes
-   in validator (Apply Authority wiring = later slice).
-4. Campaign authority in persistence and ChangeSet: `(shop_id, advert_id)`.
+2. **Logical identity**: shop `(shop_id, feature_id)`; campaign
+   `(shop_id, advert_id, feature_id)`. ``schema_version`` is a row attribute only.
+3. **INHERIT** at campaign scope = **row absent**; use `campaign.clear_ad_control_feature`.
+4. **Monotonic `revision`** (BIGINT) is CAS write authority; `state_token` is content
+   fingerprint only (includes revision for audit).
+5. **Precondition**: `expected_revision=None` => absent slot; `int` => must match row.
+6. **ChangeSet** ops: `shop.set_ad_control_feature`, `campaign.set_ad_control_override`,
+   `campaign.disable_ad_control_feature`, `campaign.clear_ad_control_feature`.
+7. **Idempotency**: bind `compute_ad_control_semantic_digest` to Apply Authority
+   `build_idempotency_fingerprint` — no second ledger (runtime Apply unwired in Slice B).
+8. Campaign authority in persistence and ChangeSet: `(shop_id, advert_id)`.
 
 ## Forbidden
 

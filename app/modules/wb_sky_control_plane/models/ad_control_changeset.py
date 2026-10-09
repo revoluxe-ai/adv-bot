@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.modules.ad_control_settings.domain.enums import (
     AdControlFeatureId,
-    AdControlFeatureMode,
     ShopFeatureActivation,
 )
 
@@ -65,24 +64,28 @@ class AdvertCampaignRefV1(BaseModel):
         return value
 
 
-class AdControlPreconditionV1(BaseModel):
-    """Optimistic concurrency для configured row."""
+class AdControlRevisionPreconditionV1(BaseModel):
+    """
+    CAS precondition for authoritative row.
+
+    ``expected_revision=None`` => slot must be absent (create / idempotent clear).
+    ``expected_revision=int`` => row must exist with that monotonic revision.
+    """
 
     model_config = _FROZEN_FORBID
 
-    state_token: str
+    expected_revision: int | None = None
 
-    @field_validator("state_token")
+    @field_validator("expected_revision")
     @classmethod
-    def _validate_token(cls, value: str) -> str:
-        stripped = value.strip()
-        if not stripped:
-            raise ValueError("state_token must be non-empty")
-        return stripped
+    def _validate_revision(cls, value: int | None) -> int | None:
+        if value is not None and value < 1:
+            raise ValueError("expected_revision must be >= 1 when present")
+        return value
 
 
 class ShopAdControlFeaturePayloadV1(BaseModel):
-    """Shop slot mutation body."""
+    """Shop slot mutation body (ENABLED or explicit DISABLED)."""
 
     model_config = _FROZEN_FORBID
 
@@ -92,15 +95,23 @@ class ShopAdControlFeaturePayloadV1(BaseModel):
     payload: dict[str, object] | None = None
 
 
-class CampaignAdControlFeaturePayloadV1(BaseModel):
-    """Campaign slot mutation body."""
+class CampaignFeatureTargetV1(BaseModel):
+    """Campaign feature target without mode (disable / clear)."""
 
     model_config = _FROZEN_FORBID
 
     feature_id: AdControlFeatureId
     schema_version: int = 1
-    mode: AdControlFeatureMode
-    payload: dict[str, object] | None = None
+
+
+class CampaignOverridePayloadV1(BaseModel):
+    """Campaign OVERRIDE body (INHERIT is never persisted)."""
+
+    model_config = _FROZEN_FORBID
+
+    feature_id: AdControlFeatureId
+    schema_version: int = 1
+    payload: dict[str, object]
 
 
 class _AdControlOperationBase(BaseModel):
@@ -108,7 +119,7 @@ class _AdControlOperationBase(BaseModel):
 
     operation_id: str
     reason: str | None = None
-    preconditions: AdControlPreconditionV1
+    preconditions: AdControlRevisionPreconditionV1
 
     @field_validator("operation_id")
     @classmethod
@@ -124,14 +135,31 @@ class SetShopAdControlFeatureOperation(_AdControlOperationBase):
     payload: ShopAdControlFeaturePayloadV1
 
 
-class SetCampaignAdControlFeatureOperation(_AdControlOperationBase):
-    op: Literal["campaign.set_ad_control_feature"] = "campaign.set_ad_control_feature"
+class SetCampaignAdControlOverrideOperation(_AdControlOperationBase):
+    op: Literal["campaign.set_ad_control_override"] = "campaign.set_ad_control_override"
     resource: AdvertCampaignRefV1
-    payload: CampaignAdControlFeaturePayloadV1
+    payload: CampaignOverridePayloadV1
+
+
+class DisableCampaignAdControlFeatureOperation(_AdControlOperationBase):
+    op: Literal["campaign.disable_ad_control_feature"] = (
+        "campaign.disable_ad_control_feature"
+    )
+    resource: AdvertCampaignRefV1
+    payload: CampaignFeatureTargetV1
+
+
+class ClearCampaignAdControlFeatureOperation(_AdControlOperationBase):
+    op: Literal["campaign.clear_ad_control_feature"] = "campaign.clear_ad_control_feature"
+    resource: AdvertCampaignRefV1
+    payload: CampaignFeatureTargetV1
 
 
 AdControlOperationV1 = Annotated[
-    SetShopAdControlFeatureOperation | SetCampaignAdControlFeatureOperation,
+    SetShopAdControlFeatureOperation
+    | SetCampaignAdControlOverrideOperation
+    | DisableCampaignAdControlFeatureOperation
+    | ClearCampaignAdControlFeatureOperation,
     Field(discriminator="op"),
 ]
 

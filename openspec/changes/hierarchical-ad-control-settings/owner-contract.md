@@ -44,8 +44,10 @@ Foundation: `ShopHeadroomState`, eligibility, blockers, bounded proposal interfa
 
 ## Persistence direction
 
-Future: `(scope, feature_id, schema_version)` with typed domain payloads; JSONB storage
-only as representation. **Not in Slice A.**
+Logical keys: shop `(shop_id, feature_id)`; campaign `(shop_id, advert_id, feature_id)`.
+`schema_version` is stored on the authoritative row, not part of identity.
+Campaign INHERIT = no campaign row (`campaign.clear_ad_control_feature`).
+CAS `revision` + `expected_revision` preconditions; Apply idempotency reuses WB Sky ledger.
 
 ## Diagnostics
 

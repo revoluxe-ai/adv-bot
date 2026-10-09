@@ -29,13 +29,13 @@ def upgrade() -> None:
         sa.Column("schema_version", sa.Integer(), nullable=False),
         sa.Column("activation", sa.String(length=16), nullable=False),
         sa.Column("payload_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("revision", sa.BigInteger(), nullable=False),
         sa.Column("state_token", sa.String(length=128), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "shop_id",
             "feature_id",
-            "schema_version",
             name="uq_ad_control_shop_feature_identity",
         ),
     )
@@ -61,6 +61,7 @@ def upgrade() -> None:
         sa.Column("schema_version", sa.Integer(), nullable=False),
         sa.Column("mode", sa.String(length=16), nullable=False),
         sa.Column("payload_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column("revision", sa.BigInteger(), nullable=False),
         sa.Column("state_token", sa.String(length=128), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
@@ -68,7 +69,6 @@ def upgrade() -> None:
             "shop_id",
             "advert_id",
             "feature_id",
-            "schema_version",
             name="uq_ad_control_campaign_feature_identity",
         ),
     )

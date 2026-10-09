@@ -22,6 +22,7 @@ from app.modules.ad_control_settings.domain.registry import (
     assert_scope_supported,
     get_feature_definition,
 )
+from app.modules.ad_control_settings.persistence.cas import AdControlMutationKind
 from app.modules.ad_control_settings.persistence.payload_codec import (
     PayloadCodecError,
     decode_payload_json,
@@ -29,15 +30,18 @@ from app.modules.ad_control_settings.persistence.payload_codec import (
 )
 from app.modules.ad_control_settings.persistence.repository import (
     AdControlPersistenceError,
-    CampaignFeatureUpsert,
+    CampaignDisableUpsert,
+    CampaignOverrideUpsert,
     ShopFeatureUpsert,
-    validate_campaign_upsert,
+    validate_campaign_override_upsert,
     validate_shop_upsert,
 )
 from app.modules.wb_sky_control_plane.models.ad_control_changeset import (
     AdControlChangeSetV1,
     AdControlOperationV1,
-    SetCampaignAdControlFeatureOperation,
+    ClearCampaignAdControlFeatureOperation,
+    DisableCampaignAdControlFeatureOperation,
+    SetCampaignAdControlOverrideOperation,
     SetShopAdControlFeatureOperation,
 )
 from app.modules.wb_sky_control_plane.models.enums import DryRunStatus
@@ -53,11 +57,12 @@ class AdControlShopFeatureSnapshotV1(BaseModel):
     schema_version: int
     activation: ShopFeatureActivation
     payload_json: dict[str, object] | None
+    revision: int
     state_token: str
 
 
 class AdControlCampaignFeatureSnapshotV1(BaseModel):
-    """Authoritative campaign configured row slice."""
+    """Authoritative campaign configured row slice (never INHERIT)."""
 
     model_config = {"frozen": True}
 
@@ -67,18 +72,21 @@ class AdControlCampaignFeatureSnapshotV1(BaseModel):
     schema_version: int
     mode: AdControlFeatureMode
     payload_json: dict[str, object] | None
+    revision: int
     state_token: str
 
 
 class AdControlSemanticDiffV1(BaseModel):
-    """Scalar diff entry для configured mutation."""
+    """Configured mutation diff entry."""
 
     model_config = {"frozen": True}
 
     target_key: str
+    intent: AdControlMutationKind
     field_path: str
     current: str | None
     desired: str | None
+    effective_source_after: str | None = None
 
 
 class AdControlValidationResult(BaseModel):
@@ -96,7 +104,9 @@ class AdControlValidationResult(BaseModel):
 KNOWN_AD_CONTROL_OPS: frozenset[str] = frozenset(
     {
         "shop.set_ad_control_feature",
-        "campaign.set_ad_control_feature",
+        "campaign.set_ad_control_override",
+        "campaign.disable_ad_control_feature",
+        "campaign.clear_ad_control_feature",
     }
 )
 
@@ -112,9 +122,9 @@ def compute_ad_control_semantic_digest(changeset: AdControlChangeSetV1) -> str:
 def validate_ad_control_changeset(
     changeset: AdControlChangeSetV1,
     *,
-    shop_snapshots: dict[tuple[AdControlFeatureId, int], AdControlShopFeatureSnapshotV1],
+    shop_snapshots: dict[AdControlFeatureId, AdControlShopFeatureSnapshotV1],
     campaign_snapshots: dict[
-        tuple[str, int, AdControlFeatureId, int],
+        tuple[str, int, AdControlFeatureId],
         AdControlCampaignFeatureSnapshotV1,
     ],
 ) -> AdControlValidationResult:
@@ -152,33 +162,68 @@ def validate_ad_control_changeset(
             )
             continue
 
-        if isinstance(operation, SetShopAdControlFeatureOperation):
-            diff, op_errors = _validate_shop_operation(
-                changeset=changeset,
-                operation=operation,
-                index=index,
-                shop_snapshots=shop_snapshots,
-            )
-        else:
-            diff, op_errors = _validate_campaign_operation(
-                changeset=changeset,
-                operation=operation,
-                index=index,
-                campaign_snapshots=campaign_snapshots,
-            )
+        op_diffs, op_errors = _validate_operation(
+            changeset=changeset,
+            operation=operation,
+            index=index,
+            shop_snapshots=shop_snapshots,
+            campaign_snapshots=campaign_snapshots,
+        )
         errors.extend(op_errors)
-        if not op_errors and diff is not None:
-            diffs.extend(diff)
+        if not op_errors:
+            diffs.extend(op_diffs)
 
     if errors:
         return _rejected(changeset.changeset_id, digest, errors)
 
-    status = DryRunStatus.NO_OP if not diffs else DryRunStatus.OK
+    actionable = [d for d in diffs if d.intent != AdControlMutationKind.NO_OP]
+    status = DryRunStatus.NO_OP if not actionable else DryRunStatus.OK
     return AdControlValidationResult(
         status=status,
         changeset_id=changeset.changeset_id,
         semantic_digest=digest,
-        diffs=diffs,
+        diffs=actionable,
+    )
+
+
+def _validate_operation(
+    *,
+    changeset: AdControlChangeSetV1,
+    operation: AdControlOperationV1,
+    index: int,
+    shop_snapshots: dict[AdControlFeatureId, AdControlShopFeatureSnapshotV1],
+    campaign_snapshots: dict[
+        tuple[str, int, AdControlFeatureId],
+        AdControlCampaignFeatureSnapshotV1,
+    ],
+) -> tuple[list[AdControlSemanticDiffV1], list[ControlPlaneError]]:
+    if isinstance(operation, SetShopAdControlFeatureOperation):
+        return _validate_shop_operation(
+            changeset=changeset,
+            operation=operation,
+            index=index,
+            shop_snapshots=shop_snapshots,
+        )
+    if isinstance(operation, SetCampaignAdControlOverrideOperation):
+        return _validate_campaign_override(
+            changeset=changeset,
+            operation=operation,
+            index=index,
+            campaign_snapshots=campaign_snapshots,
+        )
+    if isinstance(operation, DisableCampaignAdControlFeatureOperation):
+        return _validate_campaign_disable(
+            changeset=changeset,
+            operation=operation,
+            index=index,
+            campaign_snapshots=campaign_snapshots,
+        )
+    assert isinstance(operation, ClearCampaignAdControlFeatureOperation)
+    return _validate_campaign_clear(
+        changeset=changeset,
+        operation=operation,
+        index=index,
+        campaign_snapshots=campaign_snapshots,
     )
 
 
@@ -217,13 +262,47 @@ def _duplicate_operation_ids(changeset: AdControlChangeSetV1) -> list[ControlPla
 def _operation_slot_key(operation: AdControlOperationV1) -> str:
     if isinstance(operation, SetShopAdControlFeatureOperation):
         body = operation.payload
-        return f"shop:{body.feature_id}:{body.schema_version}"
-    body = operation.payload
+        return f"shop:{body.feature_id}"
     ref = operation.resource
-    return (
-        f"campaign:{ref.shop_id}:{ref.advert_id}:"
-        f"{body.feature_id}:{body.schema_version}"
-    )
+    body = operation.payload
+    return f"campaign:{ref.shop_id}:{ref.advert_id}:{body.feature_id}"
+
+
+def _check_revision_precondition(
+    *,
+    index: int,
+    expected_revision: int | None,
+    snapshot_revision: int | None,
+    feature_label: str,
+) -> ControlPlaneError | None:
+    if snapshot_revision is None:
+        if expected_revision is not None:
+            return ControlPlaneError(
+                code="REVISION_CONFLICT",
+                message="authoritative row absent but revision precondition set",
+                operation_index=index,
+                details={"feature": feature_label},
+            )
+        return None
+    if expected_revision is None:
+        return ControlPlaneError(
+            code="REVISION_CONFLICT",
+            message="authoritative row exists but absent-slot revision expected",
+            operation_index=index,
+            details={"feature": feature_label, "actual_revision": str(snapshot_revision)},
+        )
+    if expected_revision != snapshot_revision:
+        return ControlPlaneError(
+            code="REVISION_CONFLICT",
+            message="stale revision precondition",
+            operation_index=index,
+            details={
+                "feature": feature_label,
+                "expected": str(expected_revision),
+                "actual": str(snapshot_revision),
+            },
+        )
+    return None
 
 
 def _validate_shop_operation(
@@ -231,12 +310,10 @@ def _validate_shop_operation(
     changeset: AdControlChangeSetV1,
     operation: SetShopAdControlFeatureOperation,
     index: int,
-    shop_snapshots: dict[tuple[AdControlFeatureId, int], AdControlShopFeatureSnapshotV1],
-) -> tuple[list[AdControlSemanticDiffV1] | None, list[ControlPlaneError]]:
+    shop_snapshots: dict[AdControlFeatureId, AdControlShopFeatureSnapshotV1],
+) -> tuple[list[AdControlSemanticDiffV1], list[ControlPlaneError]]:
     errors: list[ControlPlaneError] = []
     body = operation.payload
-    if changeset.scope.shop_id != changeset.scope.shop_id:
-        pass  # scope always matches pydantic model
     feature_id = body.feature_id
     schema_version = body.schema_version
     scope_reason = assert_scope_supported(feature_id, AdControlScope.SHOP)
@@ -248,7 +325,7 @@ def _validate_shop_operation(
                 operation_index=index,
             )
         )
-        return None, errors
+        return [], errors
 
     try:
         get_feature_definition(feature_id)
@@ -260,7 +337,7 @@ def _validate_shop_operation(
                 operation_index=index,
             )
         )
-        return None, errors
+        return [], errors
 
     decoded = None
     if body.payload is not None:
@@ -274,7 +351,7 @@ def _validate_shop_operation(
                     operation_index=index,
                 )
             )
-            return None, errors
+            return [], errors
 
     try:
         validate_shop_upsert(
@@ -294,35 +371,60 @@ def _validate_shop_operation(
                 operation_index=index,
             )
         )
-        return None, errors
+        return [], errors
 
-    key = (feature_id, schema_version)
-    snapshot = shop_snapshots.get(key)
-    token = operation.preconditions.state_token
-    if snapshot is not None and snapshot.state_token != token:
-        errors.append(
-            ControlPlaneError(
-                code="STATE_TOKEN_STALE",
-                message="stale shop feature state_token",
-                operation_index=index,
-                details={"feature_id": feature_id.value},
-            )
-        )
-        return None, errors
+    snapshot = shop_snapshots.get(feature_id)
+    rev_err = _check_revision_precondition(
+        index=index,
+        expected_revision=operation.preconditions.expected_revision,
+        snapshot_revision=snapshot.revision if snapshot else None,
+        feature_label=feature_id.value,
+    )
+    if rev_err is not None:
+        return [], [rev_err]
 
     desired_json = (
         encode_payload_json(feature_id, decoded) if decoded is not None else None
     )
-    current_activation = snapshot.activation.value if snapshot else None
+    if snapshot is None:
+        intent = (
+            AdControlMutationKind.DISABLE
+            if body.activation == ShopFeatureActivation.DISABLED
+            else AdControlMutationKind.CREATE
+        )
+        return [
+            AdControlSemanticDiffV1(
+                target_key=f"shop:{feature_id.value}",
+                intent=intent,
+                field_path="activation",
+                current=None,
+                desired=body.activation.value,
+            )
+        ], errors
+
+    current_activation = snapshot.activation.value
     desired_activation = body.activation.value
-    current_json = snapshot.payload_json if snapshot else None
-
+    current_json = snapshot.payload_json
     if current_activation == desired_activation and current_json == desired_json:
-        return [], errors
+        return [
+            AdControlSemanticDiffV1(
+                target_key=f"shop:{feature_id.value}",
+                intent=AdControlMutationKind.NO_OP,
+                field_path="row",
+                current="unchanged",
+                desired="unchanged",
+            )
+        ], errors
 
+    intent = (
+        AdControlMutationKind.DISABLE
+        if body.activation == ShopFeatureActivation.DISABLED
+        else AdControlMutationKind.UPDATE
+    )
     diffs = [
         AdControlSemanticDiffV1(
-            target_key=f"shop:{feature_id.value}:{schema_version}",
+            target_key=f"shop:{feature_id.value}",
+            intent=intent,
             field_path="activation",
             current=current_activation,
             desired=desired_activation,
@@ -331,7 +433,8 @@ def _validate_shop_operation(
     if desired_json != current_json:
         diffs.append(
             AdControlSemanticDiffV1(
-                target_key=f"shop:{feature_id.value}:{schema_version}",
+                target_key=f"shop:{feature_id.value}",
+                intent=intent,
                 field_path="payload",
                 current=_json_preview(current_json),
                 desired=_json_preview(desired_json),
@@ -340,29 +443,21 @@ def _validate_shop_operation(
     return diffs, errors
 
 
-def _validate_campaign_operation(
+def _validate_campaign_override(
     *,
     changeset: AdControlChangeSetV1,
-    operation: SetCampaignAdControlFeatureOperation,
+    operation: SetCampaignAdControlOverrideOperation,
     index: int,
     campaign_snapshots: dict[
-        tuple[str, int, AdControlFeatureId, int],
+        tuple[str, int, AdControlFeatureId],
         AdControlCampaignFeatureSnapshotV1,
     ],
-) -> tuple[list[AdControlSemanticDiffV1] | None, list[ControlPlaneError]]:
+) -> tuple[list[AdControlSemanticDiffV1], list[ControlPlaneError]]:
     errors: list[ControlPlaneError] = []
-    ref = operation.resource
-    if ref.shop_id != changeset.scope.shop_id:
-        errors.append(
-            ControlPlaneError(
-                code="SCOPE_SHOP_MISMATCH",
-                message="campaign resource shop_id must match changeset scope",
-                operation_index=index,
-            )
-        )
-        return None, errors
+    ref, body, scope_err = _campaign_scope_check(changeset, operation, index)
+    if scope_err is not None:
+        return [], [scope_err]
 
-    body = operation.payload
     feature_id = body.feature_id
     schema_version = body.schema_version
     scope_reason = assert_scope_supported(feature_id, AdControlScope.CAMPAIGN)
@@ -374,30 +469,27 @@ def _validate_campaign_operation(
                 operation_index=index,
             )
         )
-        return None, errors
+        return [], errors
 
-    decoded = None
-    if body.payload is not None:
-        try:
-            decoded = decode_payload_json(feature_id, body.payload)
-        except PayloadCodecError as exc:
-            errors.append(
-                ControlPlaneError(
-                    code="INVALID_PAYLOAD",
-                    message=str(exc),
-                    operation_index=index,
-                )
+    try:
+        decoded = decode_payload_json(feature_id, body.payload)
+    except PayloadCodecError as exc:
+        errors.append(
+            ControlPlaneError(
+                code="INVALID_PAYLOAD",
+                message=str(exc),
+                operation_index=index,
             )
-            return None, errors
+        )
+        return [], errors
 
     campaign = CampaignRef(shop_id=ref.shop_id, advert_id=ref.advert_id)
     try:
-        validate_campaign_upsert(
-            CampaignFeatureUpsert(
+        validate_campaign_override_upsert(
+            CampaignOverrideUpsert(
                 campaign=campaign,
                 feature_id=feature_id,
                 schema_version=schema_version,
-                mode=body.mode,
                 payload=decoded,
             )
         )
@@ -409,54 +501,189 @@ def _validate_campaign_operation(
                 operation_index=index,
             )
         )
-        return None, errors
-
-    key = (ref.shop_id, ref.advert_id, feature_id, schema_version)
-    snapshot = campaign_snapshots.get(key)
-    token = operation.preconditions.state_token
-    if snapshot is not None and snapshot.state_token != token:
-        errors.append(
-            ControlPlaneError(
-                code="STATE_TOKEN_STALE",
-                message="stale campaign feature state_token",
-                operation_index=index,
-                details={"advert_id": str(ref.advert_id)},
-            )
-        )
-        return None, errors
-
-    desired_json = (
-        encode_payload_json(feature_id, decoded) if decoded is not None else None
-    )
-    current_mode = snapshot.mode.value if snapshot else None
-    desired_mode = body.mode.value
-    current_json = snapshot.payload_json if snapshot else None
-
-    if current_mode == desired_mode and current_json == desired_json:
         return [], errors
 
-    diffs = [
-        AdControlSemanticDiffV1(
-            target_key=(
-                f"campaign:{ref.advert_id}:{feature_id.value}:{schema_version}"
-            ),
-            field_path="mode",
-            current=current_mode,
-            desired=desired_mode,
-        )
-    ]
-    if desired_json != current_json:
-        diffs.append(
+    key = (ref.shop_id, ref.advert_id, feature_id)
+    snapshot = campaign_snapshots.get(key)
+    rev_err = _check_revision_precondition(
+        index=index,
+        expected_revision=operation.preconditions.expected_revision,
+        snapshot_revision=snapshot.revision if snapshot else None,
+        feature_label=feature_id.value,
+    )
+    if rev_err is not None:
+        return [], [rev_err]
+
+    desired_json = encode_payload_json(feature_id, decoded)
+    if snapshot is None:
+        return [
             AdControlSemanticDiffV1(
-                target_key=(
-                    f"campaign:{ref.advert_id}:{feature_id.value}:{schema_version}"
-                ),
-                field_path="payload",
-                current=_json_preview(current_json),
-                desired=_json_preview(desired_json),
+                target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+                intent=AdControlMutationKind.CREATE,
+                field_path="mode",
+                current=None,
+                desired=AdControlFeatureMode.OVERRIDE.value,
+                effective_source_after="CAMPAIGN_OVERRIDE",
             )
+        ], errors
+
+    if (
+        snapshot.mode == AdControlFeatureMode.OVERRIDE
+        and snapshot.payload_json == desired_json
+        and snapshot.schema_version == schema_version
+    ):
+        return [
+            AdControlSemanticDiffV1(
+                target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+                intent=AdControlMutationKind.NO_OP,
+                field_path="row",
+                current="unchanged",
+                desired="unchanged",
+            )
+        ], errors
+
+    return [
+        AdControlSemanticDiffV1(
+            target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+            intent=AdControlMutationKind.UPDATE,
+            field_path="override",
+            current=_json_preview(snapshot.payload_json),
+            desired=_json_preview(desired_json),
+            effective_source_after="CAMPAIGN_OVERRIDE",
         )
-    return diffs, errors
+    ], errors
+
+
+def _validate_campaign_disable(
+    *,
+    changeset: AdControlChangeSetV1,
+    operation: DisableCampaignAdControlFeatureOperation,
+    index: int,
+    campaign_snapshots: dict[
+        tuple[str, int, AdControlFeatureId],
+        AdControlCampaignFeatureSnapshotV1,
+    ],
+) -> tuple[list[AdControlSemanticDiffV1], list[ControlPlaneError]]:
+    ref, body, scope_err = _campaign_scope_check(changeset, operation, index)
+    if scope_err is not None:
+        return [], [scope_err]
+
+    feature_id = body.feature_id
+    key = (ref.shop_id, ref.advert_id, feature_id)
+    snapshot = campaign_snapshots.get(key)
+    rev_err = _check_revision_precondition(
+        index=index,
+        expected_revision=operation.preconditions.expected_revision,
+        snapshot_revision=snapshot.revision if snapshot else None,
+        feature_label=feature_id.value,
+    )
+    if rev_err is not None:
+        return [], [rev_err]
+
+    if snapshot is None:
+        return [
+            AdControlSemanticDiffV1(
+                target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+                intent=AdControlMutationKind.DISABLE,
+                field_path="mode",
+                current=None,
+                desired=AdControlFeatureMode.DISABLED.value,
+                effective_source_after="CAMPAIGN_DISABLED",
+            )
+        ], []
+
+    if snapshot.mode == AdControlFeatureMode.DISABLED:
+        return [
+            AdControlSemanticDiffV1(
+                target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+                intent=AdControlMutationKind.NO_OP,
+                field_path="row",
+                current="disabled",
+                desired="disabled",
+            )
+        ], []
+
+    return [
+        AdControlSemanticDiffV1(
+            target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+            intent=AdControlMutationKind.DISABLE,
+            field_path="mode",
+            current=snapshot.mode.value,
+            desired=AdControlFeatureMode.DISABLED.value,
+            effective_source_after="CAMPAIGN_DISABLED",
+        )
+    ], []
+
+
+def _validate_campaign_clear(
+    *,
+    changeset: AdControlChangeSetV1,
+    operation: ClearCampaignAdControlFeatureOperation,
+    index: int,
+    campaign_snapshots: dict[
+        tuple[str, int, AdControlFeatureId],
+        AdControlCampaignFeatureSnapshotV1,
+    ],
+) -> tuple[list[AdControlSemanticDiffV1], list[ControlPlaneError]]:
+    ref, body, scope_err = _campaign_scope_check(changeset, operation, index)
+    if scope_err is not None:
+        return [], [scope_err]
+
+    feature_id = body.feature_id
+    key = (ref.shop_id, ref.advert_id, feature_id)
+    snapshot = campaign_snapshots.get(key)
+    rev_err = _check_revision_precondition(
+        index=index,
+        expected_revision=operation.preconditions.expected_revision,
+        snapshot_revision=snapshot.revision if snapshot else None,
+        feature_label=feature_id.value,
+    )
+    if rev_err is not None:
+        return [], [rev_err]
+
+    if snapshot is None:
+        return [
+            AdControlSemanticDiffV1(
+                target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+                intent=AdControlMutationKind.NO_OP,
+                field_path="authority",
+                current="absent",
+                desired="absent",
+                effective_source_after="SHOP_POLICY_OR_INHERIT",
+            )
+        ], []
+
+    prior_mode = snapshot.mode.value
+    return [
+        AdControlSemanticDiffV1(
+            target_key=f"campaign:{ref.advert_id}:{feature_id.value}",
+            intent=AdControlMutationKind.CLEAR_TO_INHERIT,
+            field_path="authority",
+            current=prior_mode,
+            desired="absent",
+            effective_source_after="SHOP_POLICY_OR_INHERIT",
+        )
+    ], []
+
+
+def _campaign_scope_check(
+    changeset: AdControlChangeSetV1,
+    operation: AdControlOperationV1,
+    index: int,
+) -> tuple[
+    object,
+    object,
+    ControlPlaneError | None,
+]:
+    ref = operation.resource  # type: ignore[attr-defined]
+    body = operation.payload  # type: ignore[attr-defined]
+    if ref.shop_id != changeset.scope.shop_id:
+        return ref, body, ControlPlaneError(
+            code="SCOPE_SHOP_MISMATCH",
+            message="campaign resource shop_id must match changeset scope",
+            operation_index=index,
+        )
+    return ref, body, None
 
 
 def _json_preview(data: dict[str, object] | None) -> str | None:
