@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping, Sequence
+from typing import cast
 
 from app.core.di.wb_manager_hub.wb_manager_hub import WBManagerHub
 from app.core.mp.wb.api.domain_managers.promotion.promotion_manager import (
@@ -27,6 +28,7 @@ from app.modules.attribution_facts.membership.history_ch_adapter import (
 )
 from app.modules.attribution_facts.membership.inventory_ch_adapter import (
     ShopCampaignInventoryNmAdapter,
+    ShopCampaignInventoryNmClickHouse,
 )
 from app.modules.full_stat_adv_updater import wb_data_getter
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
@@ -133,7 +135,9 @@ async def run_shop_wide_unmanaged_tick(
     async with get_clickhouse_client() as ch_client:
         ch_adapter = _ClickHouseShopWideClient(ch_client)
         history_port = CampaignSettingsHistoryAsOfAdapter(ch_client)
-        inventory_nm_port = ShopCampaignInventoryNmAdapter(ch_adapter)
+        inventory_nm_port = ShopCampaignInventoryNmAdapter(
+            cast(ShopCampaignInventoryNmClickHouse, ch_adapter)
+        )
         result = await collect_unmanaged_campaign_advertising(
             shop_id=shop_id,
             loader_complex_advs=loader_complex_advs,

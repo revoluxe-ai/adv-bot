@@ -24,6 +24,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
 
+from app.modules.attribution_facts.ports.campaign_settings_history import (
+    CampaignSettingsHistoryAsOfPort,
+)
+from app.modules.attribution_facts.ports.shop_campaign_inventory import (
+    ShopCampaignInventoryNmPort,
+)
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.shop_runner.service_manager.wb_shop_data_manager.dto.complex_adv import (
     ComplexAdv,
@@ -182,8 +188,8 @@ async def collect_unmanaged_campaign_advertising(
     route_resolver: CampaignCollectionRouteResolver | None = None,
     route_reader: ShopCampaignInventoryRouteReader | None = None,
     observed_at: datetime | None = None,
-    attribution_history_port: object | None = None,
-    attribution_inventory_port: object | None = None,
+    attribution_history_port: CampaignSettingsHistoryAsOfPort | None = None,
+    attribution_inventory_port: ShopCampaignInventoryNmPort | None = None,
 ) -> UnmanagedCollectTickResult:
     """Один unmanaged tick: discovery → route → inventory → gated full_adv write.
 

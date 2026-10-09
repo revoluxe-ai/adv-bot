@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Mapping
 from datetime import date, datetime, timezone
-from decimal import Decimal
 from typing import Any
 
 from app.modules.attribution_facts.domain.classification import classify_ordered_nm
