@@ -2,164 +2,315 @@
 
 ## Status
 
-**Proposed** — architecture / evidence only. `PRICE_SEMANTICS_ACCEPTED = NO` until Owner
-closes gaps below.
+**Accepted** (Owner V1, 2026-10-09)
+
+```text
+PRICE_SEMANTICS_ACCEPTED = YES
+PRICE_SEMANTICS_QUALIFIER = V1_ORDER_VALUE_BASIS
+ORDER_VALUE_SEMANTICS_ACCEPTED = YES
+```
+
+This acceptance covers **only** order-value semantics in §3–§6. It does **not**
+implement runtime code, adapters, or production actuation.
 
 ## Context
 
-WB Sky must eventually convert **configured target DRR** + conversion facts + a
-**canonical unit economic basis** into **bounded campaign CPO actuation**. Accepted
-foundation (`product-pricing-and-cpo-ownership`, `product-control-context`,
-`attribution-facts-contract`) deliberately **blocks** price-dependent production
-actuation until this decision closes price meaning, DRR denominator alignment, and
-freshness policy.
+WB Sky must convert **configured target DRR policy** and **scope-specific observed
+DRR** into **bounded campaign CPO proposals** for the V1 hierarchical headroom
+controller (`hierarchical-ad-control-settings` Slice A at parent commit
+`065509c111e96aff88255db479001b9c3da3a0d0`, present on branch ancestry).
 
-This decision is **independent** of: `hierarchical-ad-control-settings`,
-`wb-sky-mcp-read-interface`, `campaign-settings-history`, shop-wide collection.
+Prior drafts incorrectly treated **catalog/list/current product price** as the
+required economic authority for V1 campaign CPO. Owner correction: V1 campaign
+control uses **factual attributed order value**, not `ProductPricingReader`.
 
-## 1. Inventory — price / revenue fields (evidence-backed)
+Accepted foundations remain in force:
 
-| Label (this ADR) | Exists today? | SOURCE | DOCUMENTED SEMANTICS | TIME | SCOPE | H vs C | WB Sky controls? |
-|------------------|---------------|--------|----------------------|------|-------|--------|------------------|
-| **PROMO_ORDER_GMV** (`sum_price`) | YES | WB promotion fullstats → `attribution_facts` `gmv_rub` / `attributed_gmv_rub` | «Сумма заказов, ₽» in promotion stats; reconciled to campaign-day `sum_price` | Calendar `event_date` | `adv_id` × nm × app | Historical factual | NO (read) |
-| **AD_SPEND** | YES | `full_adv_wb_stat` / fullstats `sum` | Authoritative spend numerator for CPO/DRR facts | Per adv/day | Physical adv leg | Historical | NO (read) |
-| **ATTRIBUTED_ORDERS** | YES | fullstats nm `orders` | Attributed order count (not buyout) | Per adv/day/nm | DIRECT/LINKED/UNKNOWN | Historical | NO |
-| **LIST_DISCOUNTED_UNIT** | PARTIAL | Script `a1_sale_price_snapshot.py` → WB `/api/v2/list/goods/filter` sizes `price`, `discountedPrice`, `clubDiscountedPrice` | Candidate **display/list** economics; multi-size aggregation **undefined** | Snapshot `observed_at` | SKU (`nmid`) | Current snapshot | NO (read script only) |
-| **SUPPLIER_SALE_LINE** (`finishedPrice`, `spp`) | YES (model) | `Sale` data class | Supplier sale row fields; **not** wired to control | Sale event | Line item | Historical | NO |
-| **CARD_FUNNEL_ORDERS_SUM** | YES | `wb_common_stat` / CH `orders_sum` | Card funnel revenue aggregate | Daily nm | Shop card | Historical | NO |
-| **BUYOUTS_SUM_RUB** | YES | `wb_common_stat.buyouts_sum_rub` | Redeemed/buyout rub aggregate | Daily nm | Shop card | Historical | NO |
-| **PLAN_PAY_PER_ORDER** | YES | `AdvSetting.target_price_for_order`, `max_price_for_order` | Legacy **campaign** pay-for-order plan (руб./заказ), **not** DRR% and **not** list price | Current PG row | Per `AdvSetting` | Current config | YES (Apply bounded) |
-| **PREDICTED_ORDER_CPO** | YES | `calc_pay_for_order` from conv×CPM | Model CPO at bid point | Tick / ladder | Keyword/campaign | Current compute | NO (shop-runner) |
-| **FACT_PAY_FOR_ORDER** | YES | `spend / orders` (campaign stat, `common_advs_stat`) | Observed cost per **campaign-reported order** | Windowed | Campaign | Historical | NO |
-| **EFFECTIVE_CONTROL_PRICE** | PORT ONLY | `ProductPricingReader` → `EffectiveProductPrice` | Intended **unit** basis for DRR→CPO; **no production adapter** | `observed_at` + staleness policy TBD | `(shop_id, nmid)` | Current | NO (blocked) |
-| **HISTORICAL_SALES_ECONOMICS** | PORT ONLY | `ProductSalesEconomicsReader` (`orders_sum_rub`) | Analytics capacity; **explicitly forbidden** as control price | Period | Product | Historical | NO |
+- `attribution-facts-contract` — DIRECT/LINKED facts, spend join, coverage gates
+- `product-control-context` — `DrrProfile` policy percents, inheritance
+- `product-pricing-and-cpo-ownership` — **catalog price × DRR** path for
+  `ProductCpoResolver` (unchanged; still blocked without price adapter)
+- `orders-or-sales-reports-read-identity` — identity of whole-shop order ledger reads
+- `shop-wide-common-sales-ownership` — funnel collection; **not** V1 shop DRR denominator
 
-**FACT:** Attribution V1 does **not** support attributed buyouts (`ATTRIBUTION_UNSUPPORTED`).
+## Decision
 
-## 2. Canonical economic terms (do not collapse)
+### 1. V1 campaign economic authority (order value, not catalog price)
 
-| Term | Definition in WB Sky |
-|------|----------------------|
-| **DISPLAY_PRICE** | Seller-facing list/discounted unit from Prices API (multi-size TBD). **Not accepted** as control SoT. |
-| **CUSTOMER_PAID_PRICE** | Not modeled end-to-end; supplier `finishedPrice`/`spp` exist but are not control inputs. **EVIDENCE_GAP.** |
-| **ORDER_GMV** | Promotion `sum_price` at order-attribution grain → `attributed_gmv_rub`. |
-| **ATTRIBUTED_GMV** | Sum of `attributed_gmv_rub` for DIRECT or LINKED class in a window. |
-| **BUYOUT_GMV** | `buyouts_sum_rub` at card funnel grain only; **not** in attribution facts V1. |
-| **SELLER_REVENUE / NET_MARGIN** | **Absent** as authoritative control quantities. Commission/logistics/net proceeds **not** in control path. |
+V1 campaign DRR→CPO control **MUST NOT** require catalog/list/current product
+price as canonical economic authority.
 
-## 3. DRR semantics (three families — naming collision risk)
+**Remove `EFFECTIVE_CONTROL_PRICE` from the required V1 campaign CPO control path.**
 
-### A. Policy DRR (`DrrProfile`) — **NEW_PROPOSAL (math accepted, price input not)**
+`ProductPricingReader` / `EffectiveProductPrice` **MAY** remain for:
 
-- **SOURCE:** `DrrProfile.target_drr_percent`, `max_drr_percent` (product-control foundation).
-- **Meaning:** Seller **policy** percent used only in `ProductCpoResolver`:
-  `CPO_rub = EFFECTIVE_CONTROL_PRICE × DRR% / 100` (0.01 RUB HALF_UP).
-- **Denominator implicit in policy:** price must be the **same economic basis** Owner selects for “% of revenue” (not yet chosen).
-- **WB Sky control:** future persistence/actuation blocked until `PRICE_SEMANTICS_ACCEPTED`.
+- diagnostics;
+- future cold-start assistance;
+- future **price-based** product-control semantics (`ProductCpoResolver` path).
 
-### B. Observed DRR facts (`DRR_FACT_*`) — **ACCEPTED_EXISTING_DECISION**
+They are **NOT** required authority for V1 hierarchical **campaign** CPO control.
 
-- **SOURCE:** `attribution-facts-contract` + `compute_drr_fact`.
-- **Formula:** `DRR_FACT_* = AD_SPEND / ATTRIBUTED_GMV` (ratio; consumers may display as %).
-- **Denominator:** `attributed_gmv_rub` from promotion `sum_price` (order-time GMV, not buyout).
-- **Basis:** attributed orders/GMV; cancellations/returns **not** re-stated in V1 contract beyond WB restatement/revision rules.
-- **Lag/window:** window sum over days with `COMPLETE` coverage + reconciliation PASS; spend joined once per `(adv_id, event_date)`.
-- **Aggregation:** per physical `adv_id` by default; Auto+Search pair aggregate opt-in only.
-- **Shop-level actual DRR:** **EVIDENCE_GAP** — AI package `store_drr` family is GAP (`BLOCKED_BY_SHOP_DRR_SOURCE`); not authoritative for control.
+**Canonical V1 economic input:**
 
-### C. Legacy “headroom” (V3 PFO) — **ACCEPTED_EXISTING_BEHAVIOR (not DRR%)**
+```text
+EXPECTED_ATTRIBUTED_ORDER_VALUE_RUB
+  = DIRECT_ATTRIBUTED_ORDER_GMV_RUB / DIRECT_ATTRIBUTED_ORDERS
+```
 
-- **SOURCE:** `campaign_pfo_gates.py`.
-- **Meaning:** ratio × **`max_price_for_order` plan CPO**, comparing **fact pay-for-order** vs plan.
-- **Not** shop DRR%; do not use for DRR denominator proposals.
+for the accepted observation window, subject to deterministic
+freshness / sufficiency / completeness gates (§9).
 
-**PROPOSED_DRR_DENOMINATOR (for observed shop/campaign actual DRR aligned with facts):**
-`advertising_spend / ATTRIBUTED_GMV` at the **same scope and window** as policy evaluation, with DIRECT/LINKED emitted only under attribution coverage rules. Buyout-based DRR is **OUT OF SCOPE** until a new factual source is spec-amended.
+### 2. Campaign actual DRR (V1)
 
-## 4. CPO semantics (disambiguation)
+```text
+campaign_actual_drr
+  = campaign_ad_spend_rub / DIRECT_ATTRIBUTED_ORDER_GMV_RUB
+```
 
-| Name | Meaning | Source |
-|------|---------|--------|
-| **target_cpo_rub / max_cpo_rub** | Policy ceiling from DRR% × unit price | `ProductCpoResolver` |
-| **CPO_FACT_DIRECT / LINKED** | `spend / attributed_orders` | `compute_cpo_fact` |
-| **target_price_for_order / max_price_for_order** | Legacy **plan** pay-per-order (руб.) | `AdvSetting` |
-| **fact_pay_for_order** | `spend / orders` (campaign stat) | shop-runner / `AdvState` |
-| **predicted pay_for_order** | `calc_pay_for_order` from conv×CPM | V3 bid ladder |
-| **keyword bid economics** | Not CPO; bid rub | WB auction |
+- **Numerator:** authoritative campaign-day ad spend (`full_adv_wb_stat` / same
+  join rules as `attribution-facts-contract`).
+- **Denominator:** sum of **DIRECT** `attributed_gmv_rub` only (promotion fullstats
+  `sum_price` grain).
+- **LINKED:** diagnostic / observable only; **MUST NOT** drive V1 CPO authority.
+- **MUST NOT** combine DIRECT + LINKED for CPO authority until a future explicit
+  deduplication / marginal-value decision.
 
-**PROPOSED_CPO_INPUTS (minimum to map shop DRR policy → campaign CPO proposal):**
+Aligns with `DRR_FACT_DIRECT` when coverage is `COMPLETE` and reconciliation PASS.
 
-1. **Effective `DrrProfile`** at product (or inherited shop) — policy percents.
-2. **`EFFECTIVE_CONTROL_PRICE`** per `(shop_id, nmid)` from `ProductPricingReader` with accepted field + aggregation + staleness.
-3. **`ProductCpoResolver` output** → canonical `target_cpo_rub`, `max_cpo_rub`.
-4. **Future `LegacyCampaignCpoAdapter`** mapping to `AdvSetting` plan fields (decision text only today).
-5. **For gating/diagnostics (parallel, not substitutable):** `CPO_FACT_*`, `DRR_FACT_*`, `fact_pay_for_order` on compatible windows.
+### 3. Shop actual DRR (V1)
 
-No single equation may mix (2) with `orders_sum` or `target_price_for_order` as price.
+Shop actual DRR is **not** shop-attributed GMV and **not** reconstructed from
+advertised campaigns.
 
-## 5. Price volatility — **NEW_PROPOSAL (policy skeleton)**
+```text
+shop_actual_drr
+  = total_shop_ad_spend_rub / whole_shop_order_gmv_rub
+```
 
-- **Freshness:** `EffectiveProductPrice.observed_at` MUST be evaluated against an Owner-defined max age; stale → `ProductPriceUnavailable` → `BLOCKED_BY_PRODUCT_PRICE_SOURCE`.
-- **Abrupt changes:** DRR-derived CPO MUST recompute from latest accepted snapshot; no silent carry-forward of old price in actuation path.
-- **Missing price:** fail closed (existing resolver behavior).
-- **Multi-product campaigns:** CPO proposal grain is **`nmid`**; campaign-level aggregation of price **EVIDENCE_GAP** (Owner: min/max/weighted by plan).
-- **Historical attribution at old price:** facts remain historical GMV; policy CPO uses **current** price snapshot only — do not back-adjust attributed GMV to today's price.
-- **Oscillation:** rate-limit / hysteresis for actuation is **OUT OF SCOPE** for this ADR (future controller); semantics require stable price SoT first.
+for the **same measurement window** as shop headroom evaluation.
 
-## 6. Shop DRR → campaign CPO (economic facts only, no allocator)
+**`whole_shop_order_gmv_rub` MUST** come from the canonical **whole-shop order
+factual** source (`ORDERS_OR_SALES_REPORTS_READ` — statistics-api supplier orders
+per `orders-or-sales-reports-read-identity`), aggregated at shop scope.
 
-**Required facts (proposed):**
+- Exclude cancelled orders where the canonical factual row exposes cancellation.
+- **V1 MUST NOT** use buyout / net-margin / seller payout as denominator.
+- **V1 MUST NOT** use `wb_common_stat` / sales-funnel `orders_sum` as the shop
+  DRR denominator (card funnel ≠ whole-shop order ledger).
 
-| Stage | Quantity | Basis |
-|-------|----------|--------|
-| Shop policy | `shop_target_drr_percent` (from shop `DrrProfile` when enrolled) | Policy |
-| Shop observed | `shop_ad_spend / shop_attributed_gmv` | Same GMV semantics as `DRR_FACT_*` aggregated with documented scope |
-| Headroom | `shop_target_drr − shop_actual_drr` (or rub equivalent via GMV) | **OWNER_DECISION_REQUIRED** on sign/units |
-| Product policy CPO | `ProductCpoResolver` per `nmid` | Price × DRR% |
-| Campaign linkage | `CampaignProductBinding` projection | Which nmids participate |
-| Campaign observed | `CPO_FACT_*`, `DRR_FACT_*` per adv leg | Attribution contract |
+**Policy vs observed basis:** `DrrProfile` target/max **percent** MAY inherit from
+shop to campaign (product-control inheritance). **Observed** DRR metrics remain
+**scope-specific** (shop ORDER_GMV vs campaign DIRECT attributed GMV).
 
-**Do not** allocate headroom by applying shop DRR% uniformly to every campaign without per-scope spend/GMV and product price facts.
+### 4. DRR policy → target CPO (V1)
 
-## 7. Acceptance labels
+```text
+expected_attributed_order_value_rub
+  = Σ DIRECT attributed_gmv_rub / Σ DIRECT attributed_orders
 
-| Item | Label |
-|------|--------|
-| Attribution GMV = promotion `sum_price` | **ACCEPTED_EXISTING_DECISION** |
-| CPO_FACT / DRR_FACT formulas | **ACCEPTED_EXISTING_DECISION** |
-| ProductCpoResolver formula | **ACCEPTED_EXISTING_DECISION** |
-| ProductPricingReader vs SalesEconomics split | **ACCEPTED_EXISTING_DECISION** |
-| Effective price WB API field + multi-size rule | **OWNER_DECISION_REQUIRED** |
-| SPP/wallet/customer-paid mapping | **EVIDENCE_GAP** |
-| Shop actual DRR SoT | **EVIDENCE_GAP** |
-| Campaign multi-nm price aggregation | **OWNER_DECISION_REQUIRED** |
-| Staleness TTL | **OWNER_DECISION_REQUIRED** |
-| Buyout-based DRR/CPO | **EVIDENCE_GAP** (unsupported in attribution V1) |
+effective_target_drr_fraction
+  = effective_target_drr_percent / 100
 
-## 8. Compatibility (read-only assessment)
+target_cpo_rub
+  = expected_attributed_order_value_rub × effective_target_drr_fraction
+```
 
-- **ProductControl `DrrProfile`:** unchanged; awaits price SoT.
-- **hierarchical-ad-control-settings:** not in this repo snapshot; any future shop DRR% must use denominators consistent with §3B or remain diagnostics-only until shop SoT exists.
-- **Attribution Facts:** canonical for **observed** CPO/DRR; must not be replaced by `wb_common_stat` denominators.
-- **ChangeSet / Apply:** continues to own `max_price_for_order` mutations; DRR-derived mapping is future adapter.
-- **V3 / AdvSetting:** legacy plan CPO remains until adapter + Owner cutover strategy.
-- **Diagnostics / AI package:** may show `DRR_FACT_*`; `store_drr` remains GAP.
+- Quantize money at **0.01 RUB ROUND_HALF_UP** when mapping to actuation fields
+  (consistent with `ProductCpoResolver` money quant).
+- This is the **accepted V1 economic target** for hierarchical campaign control.
+- It is **NOT**: WB bid, CPC, CPM, catalog `price × DRR%`, or seller net-margin target.
+- Controllers **MAY** derive `max_cpo_rub` as a bounded safety ceiling above
+  `target_cpo_rub` (algorithm separate; not fixed in this ADR).
 
-## Decision outcome
+### 5. Shop headroom (V1) — units and sign
 
-**PRICE_SEMANTICS_ACCEPTED** remains **NO**.
+```text
+configured_shop_target_drr_fraction = configured_shop_target_drr_percent / 100
 
-**IMPLEMENTATION_IMPACT:** No production code in this change. Unblocks future:
-`ProductPricingReader` adapter, staleness policy, shop DRR aggregation spec, `LegacyCampaignCpoAdapter`, headroom controller.
+allowed_shop_ad_spend_rub
+  = whole_shop_order_gmv_rub × configured_shop_target_drr_fraction
+
+shop_headroom_rub
+  = allowed_shop_ad_spend_rub − actual_shop_ad_spend_rub
+```
+
+Interpretation (all amounts in **RUB**):
+
+| Sign | Meaning |
+|------|---------|
+| `> 0` | Economic spend capacity exists under configured shop DRR |
+| `= 0` | At target spend-ratio boundary |
+| `< 0` | Shop exceeds configured spend ratio |
+
+Headroom **does not** prescribe equal CPO increases across campaigns. Allocation /
+ranking is a **separate** controller decision (`HeadroomAllocator` protocol in
+`app/modules/ad_control_settings/domain/headroom.py`).
+
+Compatible with `evaluate_shop_headroom_state` inputs (`allowed_spend_rub`,
+`spend_rub`) when factual ports supply the quantities above.
+
+### 6. Multi-nm / multi-size (V1)
+
+V1 **MUST NOT** require catalog-price aggregation across sizes.
+
+For one physical campaign `(shop_id, physical_adv_id)`:
+
+```text
+expected_attributed_order_value_rub
+  = Σ DIRECT attributed_gmv_rub / Σ DIRECT attributed_orders
+```
+
+across all eligible nmids / orders in the accepted campaign window (weighted
+factual order value). Product/nmid detail remains for diagnostics and future
+allocation.
+
+### 7. Canonical CPO terminology (V1)
+
+| Term | Definition |
+|------|------------|
+| **OBSERVED_CPO_RUB** | `campaign_ad_spend_rub / DIRECT attributed_orders` (window aggregate) |
+| **TARGET_CPO_RUB** | `expected_attributed_order_value_rub × effective_target_drr_fraction` |
+| **MAX_CPO_RUB** | Controller / safety upper limit (bounded proposal; not bid) |
+| **LEGACY_TARGET_PRICE_FOR_ORDER** | `AdvSetting.target_price_for_order` |
+| **LEGACY_MAX_PRICE_FOR_ORDER** | `AdvSetting.max_price_for_order` |
+| **BID / CPC / CPM** | Auction mechanics; **not** aliases for CPO |
+
+Legacy plan fields and V3 `calc_pay_for_order` / CH point CPO remain **parallel**
+runtime paths until explicit migration.
+
+### 8. `ProductCpoResolver` compatibility (explicit dual authority)
+
+| Path | Authority | V1 campaign headroom |
+|------|-----------|----------------------|
+| `ProductCpoResolver` | `effective_product_price_rub × DRR% / 100` | **Not required** |
+| V1 order-value contract (this ADR) | `EXPECTED_ATTRIBUTED_ORDER_VALUE_RUB × DRR%` | **Required** for proposals |
+
+- **ACCEPTED_EXISTING_FOUNDATION:** `ProductCpoResolver` math and
+  `BLOCKED_BY_PRODUCT_PRICE_SOURCE` behavior **remain unchanged** in
+  `product_control` (no silent rewrite in this ADR).
+- **Forbidden:** treating `ProductCpoResolver` output as substitute for V1
+  `TARGET_CPO_RUB` in hierarchical campaign control without an explicit future
+  adapter/reconciliation decision.
+- **Forbidden:** using `wb_common_stat` or `target_price_for_order` as
+  `expected_attributed_order_value_rub`.
+
+### 9. Fail-closed (V1 CPO proposal)
+
+New bounded CPO proposals **MUST NOT** be emitted when any blocker applies:
+
+| Blocker | Typical trigger |
+|---------|-----------------|
+| `DIRECT_ATTRIBUTION_MISSING` | No DIRECT facts in scope/window |
+| `DIRECT_ATTRIBUTION_INSUFFICIENT` | DIRECT sums incomplete (missing ≠ 0) |
+| `ATTRIBUTION_WINDOW_INCOMPLETE` | Coverage not `COMPLETE` or reconciliation fail |
+| `ATTRIBUTION_FACT_STALE` | Observation / sufficiency stale per port policy |
+| `ORDER_VALUE_UNAVAILABLE` | Zero DIRECT orders or undefined order value |
+| `SHOP_ORDER_GMV_INCOMPLETE` | Whole-shop GMV window incomplete |
+| `SHOP_SPEND_INCOMPLETE` | Shop spend numerator incomplete |
+| `REVENUE_BASIS_UNSUPPORTED` | Buyout / net-margin / LINKED actuation requested |
+| `CPO_INPUTS_INCOMPLETE` | Any required input absent |
+
+`PRICE_UNKNOWN` / `PRICE_STALE` **MUST NOT** block V1 **ORDER_VALUE** CPO when all
+required order-value and shop facts are valid. They remain relevant to
+**price-based** `ProductControl` / `ProductCpoResolver` paths only.
+
+Map to hierarchical Slice A where applicable (`PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED`
+is superseded for V1 **order-value** proposals once implementation reads this ADR;
+catalog-price actuation remains blocked until a separate price SoT decision).
+
+### 10. Hierarchical settings compatibility (Slice A)
+
+Repository truth: `app/modules/ad_control_settings/` exists on parent
+`065509c` and on branch `cursor/drr-cpo-price-semantics-22ef`. Cloud sparse
+checkouts **MUST NOT** be treated as absence of Slice A.
+
+| Slice A artifact | Compatibility |
+|------------------|---------------|
+| `ConfiguredTargetDrr` / `ActualDrrObservation` | Policy vs observed split — **aligns** |
+| `ShopHeadroomState` / `evaluate_shop_headroom_state` | **Aligns** when ports supply GMV/spend per §5 |
+| `BoundedCpoProposal.proposed_max_cpo_rub` | V1 uses order-value `TARGET_CPO_RUB`; catalog price not required |
+| `PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED` | Remains for catalog-price actuation; V1 order-value path enabled by this ADR |
+| `HEADROOM_ALLOCATOR_NOT_ACCEPTED` | Unchanged — ranking algorithm still deferred |
+
+### 11. Deferred semantics (explicit OUT OF V1)
+
+- `BUYOUT_GMV` control
+- Seller net revenue / net margin
+- **LINKED** actuation (observation only)
+- Catalog-price authority for campaign CPO
+- Customer-paid / SPP / wallet price semantics for control
+- Margin-based CPO
+- DIRECT+LINKED combined authority without deduplication decision
 
 ## Applies to
 
-- `app/modules/product_control/domain/product_cpo_resolver.py`
-- `app/modules/product_control/application/ports/pricing.py`
-- `app/modules/attribution_facts/domain/derived_metrics.py`
+- Future V1 hierarchical campaign CPO proposal pipeline (read adapters only in
+  separate implementation changes)
+- `app/modules/ad_control_settings/domain/` (headroom / DRR state contracts)
+- `app/modules/attribution_facts/domain/derived_metrics.py` (observed metrics;
+  no formula change required)
+- Diagnostics / AI package (LINKED and `store_drr` families remain non-authoritative
+  for V1 control unless spec-amended)
+
+## Allowed
+
+- V1 `TARGET_CPO_RUB` from DIRECT order value × effective target DRR%
+- Shop headroom rub formula in §5
+- `ProductPricingReader` for non–V1-campaign paths and diagnostics
+- `ProductCpoResolver` unchanged for future price-based product control
+- `DRR_FACT_LINKED` / `CPO_FACT_LINKED` for reporting only
+
+## Forbidden
+
+- Requiring catalog/list price for V1 campaign `TARGET_CPO_RUB`
+- LINKED (or DIRECT+LINKED) denominators for V1 CPO authority
+- Shop DRR denominator from campaign-attributed GMV or `wb_common_stat` funnel sum
+- Buyout / net-margin bases in V1
+- Silent equivalence between `ProductCpoResolver` output and V1 `TARGET_CPO_RUB`
+- LLM or heuristic bypass of §9 blockers
+
+## Examples
+
+Good:
+
+- COMPLETE DIRECT window → `expected_attributed_order_value_rub = 1200` → target DRR 10% → `target_cpo_rub = 120.00`
+- Shop GMV 1_000_000 ₽, target DRR 8%, spend 90_000 ₽ → `allowed = 80_000`, `headroom = −10_000`
+
+Bad:
+
+- `TARGET_CPO_RUB = MIN(discountedPrice) × DRR%` for V1 campaign control
+- Shop `shop_actual_drr` using sum of campaign `DRR_FACT_DIRECT` denominators
+- Emitting CPO proposal when DIRECT orders = 0 without `ORDER_VALUE_UNAVAILABLE`
+
+## Related specs
+
 - `openspec/specs/attribution-facts-contract/spec.md`
-- `openspec/decisions/product-pricing-and-cpo-ownership/decision.md`
+- `openspec/specs/product-control-context/spec.md`
 
-## Related
+## Related decisions
 
-- Evidence scan: `.cursor` store `internal/architecture/drr-cpo-price-semantics-evidence-scan.md` (non-authoritative working notes)
+- `openspec/decisions/product-pricing-and-cpo-ownership/decision.md` (catalog path;
+  not V1 campaign authority)
+- `openspec/decisions/product-control-aggregate-ownership/decision.md`
+- `openspec/decisions/orders-or-sales-reports-read-identity/decision.md`
+- `openspec/decisions/shop-wide-common-sales-ownership/decision.md`
+
+## Related changes
+
+- Parent baseline: `065509c` (`hierarchical-ad-control-settings` Slice A merged)
+- Evidence branch: `cursor/drr-cpo-price-semantics-22ef`
+
+## Review checklist
+
+- [x] Context-first decisions cited
+- [x] Owner V1 order-value semantics encoded (not catalog price)
+- [x] `ProductCpoResolver` compatibility explicit (dual path)
+- [x] Hierarchical Slice A assessed at canonical commit
+- [x] `PRICE_SEMANTICS_ACCEPTED = YES` with qualifier `V1_ORDER_VALUE_BASIS`
+- [x] No production code in this artifact
+
+## Working notes (non-authoritative)
+
+- Project store evidence scan:
+  `internal/drr-cpo-price-semantics/evidence-report.md` (superseded for control
+  semantics by this ADR §3–§9)
