@@ -1,0 +1,104 @@
+DOTO/WORKLOG.md
+  h_267f51d775769b 890-894
+app/modules/wb_sky_control_plane/__init__.py
+  h_267f51d775769b 1-11
+app/modules/wb_sky_control_plane/kernel/__init__.py
+  h_267f51d775769b 1-5
+app/modules/wb_sky_control_plane/kernel/canonical_json.py
+  h_267f51d775769b 1-39
+app/modules/wb_sky_control_plane/kernel/capabilities_eval.py
+  h_267f51d775769b 1-77
+app/modules/wb_sky_control_plane/kernel/classify.py
+  h_267f51d775769b 1-89
+app/modules/wb_sky_control_plane/kernel/domain_validators.py
+  h_267f51d775769b 1-123
+app/modules/wb_sky_control_plane/kernel/mutation_policy.py
+  h_267f51d775769b 1-137
+app/modules/wb_sky_control_plane/kernel/pipeline.py
+  h_267f51d775769b 1-80
+app/modules/wb_sky_control_plane/kernel/planner.py
+  h_267f51d775769b 1-96
+app/modules/wb_sky_control_plane/kernel/preflight.py
+  h_267f51d775769b 1-156
+app/modules/wb_sky_control_plane/kernel/semantic_digest.py
+  h_267f51d775769b 1-58
+app/modules/wb_sky_control_plane/kernel/state_token.py
+  h_267f51d775769b 1-90
+app/modules/wb_sky_control_plane/kernel/validate.py
+  h_267f51d775769b 1-481
+app/modules/wb_sky_control_plane/models/__init__.py
+  h_267f51d775769b 1-61
+app/modules/wb_sky_control_plane/models/capabilities.py
+  h_267f51d775769b 1-39
+app/modules/wb_sky_control_plane/models/changeset.py
+  h_267f51d775769b 1-169
+app/modules/wb_sky_control_plane/models/enums.py
+  h_267f51d775769b 1-104
+app/modules/wb_sky_control_plane/models/errors.py
+  h_267f51d775769b 1-24
+app/modules/wb_sky_control_plane/models/plan.py
+  h_267f51d775769b 1-81
+app/modules/wb_sky_control_plane/models/snapshot.py
+  h_267f51d775769b 1-75
+app/modules/wb_sky_control_plane/ports/__init__.py
+  h_267f51d775769b 1-5
+app/modules/wb_sky_control_plane/ports/wb_read_port.py
+  h_267f51d775769b 1-16
+app/modules/wb_sky_control_plane/read/__init__.py
+  h_267f51d775769b 1-11
+app/modules/wb_sky_control_plane/read/local_policy.py
+  h_267f51d775769b 1-39
+app/modules/wb_sky_control_plane/read/normalizer.py
+  h_267f51d775769b 1-189
+app/modules/wb_sky_control_plane/read/resolver.py
+  h_267f51d775769b 1-181
+app/modules/wb_sky_control_plane/read/scope.py
+  h_267f51d775769b 1-22
+app/modules/wb_sky_control_plane/read/wb_reader.py
+  h_267f51d775769b 1-23
+app/modules/wb_sky_control_plane/registry/__init__.py
+  h_267f51d775769b 1-19
+app/modules/wb_sky_control_plane/registry/anchor.py
+  h_267f51d775769b 1-22
+app/modules/wb_sky_control_plane/registry/backfill.py
+  h_267f51d775769b 1-255
+app/modules/wb_sky_control_plane/registry/model.py
+  h_267f51d775769b 1-35
+openspec/changes/campaign-settings-changeset-contract/specs/campaign-settings-changeset-contract/spec.md
+  h_267f51d775769b 1-207
+pyrightconfig_strict.json
+  h_267f51d775769b 152-153
+tests/unit/wb_sky_control_plane/test_a1_safety_regression.py
+  h_267f51d775769b 1-141
+tests/unit/wb_sky_control_plane/test_campaigns_info_v2_adapter_raw.py
+  h_267f51d775769b 1-100
+tests/unit/wb_sky_control_plane/test_capabilities_and_validate.py
+  h_267f51d775769b 1-123
+tests/unit/wb_sky_control_plane/test_changeset_contract.py
+  h_267f51d775769b 1-78
+tests/unit/wb_sky_control_plane/test_changeset_dry_run.py
+  h_267f51d775769b 1-642
+tests/unit/wb_sky_control_plane/test_normalizer_strict_boundary.py
+  h_267f51d775769b 1-117
+tests/unit/wb_sky_control_plane/test_pipeline_dry_run.py
+  h_267f51d775769b 1-208
+tests/unit/wb_sky_control_plane/test_preflight_before_io.py
+  h_267f51d775769b 1-111
+tests/unit/wb_sky_control_plane/test_registry_backfill.py
+  h_267f51d775769b 1-176
+tests/unit/wb_sky_control_plane/test_semantic_digest_and_state_token.py
+  h_267f51d775769b 1-302
+tests/unit/wb_sky_control_plane/test_wb_reader_delegation.py
+  h_267f51d775769b 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d0e44e36f49240ed8767ee5fbc76885b638a0a50",
+  "prompts": {},
+  "humans": {
+    "h_267f51d775769b": {
+      "author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
