@@ -45,7 +45,7 @@ def _async_url() -> str:
     return raw
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def async_engine() -> AsyncEngine:
     engine = create_async_engine(_async_url(), echo=False)
     async with engine.begin() as conn:
