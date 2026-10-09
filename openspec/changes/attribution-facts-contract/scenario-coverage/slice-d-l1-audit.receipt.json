@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "change_id": "attribution-facts-contract",
+  "scope": "slice_d_l1_only",
+  "producer": "slice-d-final-certification",
+  "executed_cert_subject_head": "5baf182f3",
+  "certification_guards": {
+    "SPEND_COMPLETENESS_GATE": "PASS",
+    "MISSING_SPEND_NOT_ZERO": "PASS",
+    "CPO_ORDER_DENOMINATOR": "PASS",
+    "DRR_GMV_DENOMINATOR": "PASS",
+    "MISSING_DENOMINATOR_NOT_ZERO": "PASS",
+    "DIRECT_LINKED_ISOLATION": "PASS",
+    "CH_CLIENT_LIFECYCLE": "PASS",
+    "PAIR_FAIL_CLOSED": "PASS"
+  },
+  "gates_executed_at_subject": {
+    "attribution_unit": "poetry run pytest -m unit tests/unit/attribution_facts/ -q → 61 passed",
+    "ai_package_analysis_unit": "poetry run pytest -m unit tests/unit/ai_package_v1/analysis/ -q → 43 passed",
+    "multi_window": "poetry run pytest -m unit tests/unit/ai_package_v1/analysis/test_multi_window_scenarios.py -q → 27 passed",
+    "ruff": "poetry run ruff check (touched paths) → pass",
+    "openspec_strict": "npx @fission-ai/openspec@1.6.0 validate attribution-facts-contract --type change --strict → valid"
+  },
+  "scenarios": {
+    "S15": {
+      "status": "PASS",
+      "evidence": "tests/unit/ai_package_v1/analysis/test_attribution_consumption.py::test_s15_complete_direct_and_linked_metrics_emitted + test_partial_blocks_numeric_cpo"
+    },
+    "S16": {
+      "status": "PASS",
+      "evidence": "tests/unit/ai_package_v1/analysis/test_attribution_consumption.py::test_s16_package_scope_attribution_scope_mismatch"
+    }
+  },
+  "regression_matrix": "tests/unit/ai_package_v1/analysis/test_attribution_economics_matrix.py",
+  "ch_client_lifecycle_test": "tests/unit/ai_package_v1/analysis/test_ch_attribution_reader_lifecycle.py",
+  "deployment_prerequisite": "ClickHouse migration 008 must be applied via migration control plane before production runtime use of ChAttributionFactsReader; not executed in this certification."
+}

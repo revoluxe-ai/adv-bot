@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+from app.modules.attribution_facts.domain.models import AttributionQueryResult
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.keyword_performance.domain.models import KeywordWindowRowV1
 from app.modules.ai_package_v1.scope.dto import ExportScopeAdv
@@ -29,6 +30,15 @@ class CampaignDailyFact:
 
 
 @dataclass(frozen=True, slots=True)
+class AnalysisAttributionLegEvidence:
+    """Pre-fetched AttributionFactsReader result for physical leg × analysis window."""
+
+    window_id: str
+    physical_adv_id: int
+    query_result: AttributionQueryResult
+
+
+@dataclass(frozen=True, slots=True)
 class AnalysisBuildRequest:
     """Всё, что нужно сервису, без обращения к БД или транспорту.
 
@@ -46,3 +56,4 @@ class AnalysisBuildRequest:
     keyword_history_last: date | None = None
     campaign_source_complete_through: date | None = None
     keyword_source_complete_through: date | None = None
+    attribution_by_leg_window: tuple[AnalysisAttributionLegEvidence, ...] = ()
