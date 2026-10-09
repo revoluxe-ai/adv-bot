@@ -29,6 +29,9 @@ from app.modules.ai_package_v1.domain.enums import (
     ReasonCode,
 )
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.export.export_service import ExportService
 from app.modules.ai_package_v1.keyword_performance.export.keyword_assembler import (
     KeywordAssemblyResult,
@@ -271,6 +274,7 @@ class _World:
             freshness_reader=_NoOp(),  # type: ignore[arg-type]
             settings_assembler=_Settings(),  # type: ignore[arg-type]
             keyword_assembler=_Keywords(huge),
+            analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         )
         redis = cast(AsyncKv, self.redis)
         store = OAuthRedisStore(
@@ -890,7 +894,7 @@ async def test_ai_package_reuses_export_service_and_omits_oversize() -> None:
     assert "UNKNOWN" in coverages
     gaps = body["package_family_gaps"]["gaps"]
     assert gaps
-    assert all(item["status"] == "GAP" for item in gaps)
+    assert all(item["family_status"] == "GAP" for item in gaps)
     huge = next(item for item in body["files"] if item["logical_name"].endswith("huge.csv"))
     assert huge["status"] == "OMITTED_OVER_BUDGET"
     assert "inline_text" not in huge
@@ -907,7 +911,7 @@ async def test_ai_package_reuses_export_service_and_omits_oversize() -> None:
         if card["dataset_id"] == "keyword_windows"
     )
     assert unknown_card["coverage"] == "UNKNOWN"
-    assert unknown_card["row_count"] is None
+    assert unknown_card.get("row_count") is None
 
 
 @pytest.mark.asyncio
