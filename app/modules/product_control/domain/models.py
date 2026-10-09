@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.modules.product_control.domain.invariants_drr import (
+    DrrProfileInvariantError,
+    validate_drr_profile_fields,
+)
 from app.modules.product_control.domain.enums import (
     DrrResolutionTier,
     EffectiveControlOutcomeKind,
@@ -36,6 +40,17 @@ class DrrProfile:
 
     target_drr_percent: Decimal
     max_drr_percent: Decimal
+
+    def __post_init__(self) -> None:
+        try:
+            validate_drr_profile_fields(
+                self.target_drr_percent,
+                self.max_drr_percent,
+            )
+        except DrrProfileInvariantError:
+            raise
+        except (TypeError, ValueError) as exc:
+            raise DrrProfileInvariantError(str(exc)) from exc
 
 
 @dataclass(frozen=True, slots=True)

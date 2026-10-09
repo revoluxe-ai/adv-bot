@@ -51,6 +51,9 @@ def resolve_control_product_for_complex(
         ControlProductResolved при ровно одном nmID или явном authority;
         иначе ControlProductAmbiguous.
     """
+    if not nmids:
+        return ControlProductAmbiguous()
+
     unique = tuple(dict.fromkeys(nmids))
     if len(unique) == 1:
         return ControlProductResolved(

@@ -21,6 +21,20 @@ def test_missing_effective_price_blocked() -> None:
     assert result.reason == ProductControlBlockerReason.BLOCKED_BY_PRODUCT_PRICE_SOURCE
 
 
+def test_zero_effective_price_blocked() -> None:
+    profile = drr_profile_from_percent(10, 15)
+    result = ProductCpoResolver.resolve(profile, Decimal("0"))
+    assert isinstance(result, ProductCpoBlocked)
+    assert result.reason == ProductControlBlockerReason.BLOCKED_BY_PRODUCT_PRICE_SOURCE
+
+
+def test_negative_effective_price_blocked() -> None:
+    profile = drr_profile_from_percent(10, 15)
+    result = ProductCpoResolver.resolve(profile, Decimal("-1"))
+    assert isinstance(result, ProductCpoBlocked)
+    assert result.reason == ProductControlBlockerReason.BLOCKED_BY_PRODUCT_PRICE_SOURCE
+
+
 def test_cpo_rounding_half_up() -> None:
     profile = drr_profile_from_percent(10, 15)
     price = Decimal("999.99")
