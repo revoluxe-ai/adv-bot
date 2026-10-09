@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "change_id": "changeset-apply-authority",
+  "scope": "slice_c_l1_service",
+  "producer": "slice-c-certification-repair",
+  "produced_at": "2026-10-09",
+  "head_note": "ApplyAuthorityService owns outer PG commit; replay is WB-free; post-write DB reread verification",
+  "scenarios": {
+    "S01": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s01_verified_after_real_commit"
+    },
+    "S02": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s02_stale_state_invalidated"
+    },
+    "S03": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s03_replay_survives_wb_failure"
+    },
+    "S05": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s05_capability_drift_invalidates"
+    },
+    "S06": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s06_unauthorized_zero_mutation"
+    },
+    "S08": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_apply_s08_two_operations_atomic"
+    },
+    "S09": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s09_validation_failure_zero_writes"
+    },
+    "S12": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_service_pg.py::test_commit_visibility_fresh_session"
+    },
+    "S13": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s13_verification_mismatch_rollback"
+    },
+    "S14": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s14_post_state_token_changes"
+    },
+    "S23": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s23_consumed_receipt_blocks_fresh_apply"
+    },
+    "S24": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s24_claim_release_after_pre_write_failure"
+    },
+    "S26": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s26_evidence_failure_rolls_back_settings"
+    },
+    "S27": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s27_ambiguous_commit_blocked"
+    },
+    "S28": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s28_unauthorized_vs_capability_drift"
+    },
+    "S29": {
+      "status": "PASS",
+      "evidence": "openspec/changes/changeset-apply-authority/design.md legacy bypass acknowledgement"
+    },
+    "S30": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_insert_claim_and_invalidate"
+    },
+    "S31": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_insert_claim_and_invalidate"
+    },
+    "S32": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s32_unauthorized_does_not_burn_receipt"
+    },
+    "S33": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s33_wrong_changeset_digest"
+    },
+    "S34": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s34_blocked_reconciliation"
+    },
+    "S35": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_authority_scenarios_pg.py::test_s35_replay_no_second_writer"
+    }
+  },
+  "deferred_scenarios": ["S07", "S10", "S11", "S15", "S16", "S18", "S19", "S20", "S21", "S22"]
+}

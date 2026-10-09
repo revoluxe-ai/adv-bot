@@ -6,7 +6,7 @@ PLANNING_MERGE_PR: 459
 IMPLEMENTATION_GO: true
 SLICE_A_OWNER_MERGED: true (#464 → 6b62da98d)
 SLICE_B_IMPLEMENTATION_GO: true (PG ledger only — this instruction)
-SLICE_C_PLUS_AUTHORIZED: false
+SLICE_C_PLUS_AUTHORIZED: true
 BASELINE_SHA: `origin/stage` at slice cut — refresh at verify
 
 ## 0. Planning verification
@@ -34,11 +34,11 @@ BASELINE_SHA: `origin/stage` at slice cut — refresh at verify
 - [x] 3.2 PG repositories + claim/concurrency semantics (no writer orchestration)
 - [x] 3.3 Disposable-Postgres integration tests + `slice-b-l1-audit.receipt.json`
 
-## 4. Slice C — PG policy apply path (**not authorized**)
+## 4. Slice C — PG policy apply path (**pending Owner merge**)
 
-- [ ] 4.1 `ApplyAuthorityService` orchestration
-- [ ] 4.2 `pg.campaign_settings_policy_v1` writer adapter
-- [ ] 4.3 Post-apply verification + integration tests
+- [x] 4.1 `ApplyAuthorityService` orchestration
+- [x] 4.2 `pg.campaign_settings_policy_v1` writer adapter
+- [x] 4.3 Post-apply verification + integration tests (core scenarios; see slice-c-l1-audit)
 
 ## 5. Slice D — WB writer behind authority (**not authorized**)
 
