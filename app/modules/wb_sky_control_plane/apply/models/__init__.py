@@ -1,5 +1,6 @@
 """Pydantic models Apply Authority contract."""
 
+from app.modules.wb_sky_control_plane.apply.models.attempt import ApplyAttemptRecordV1
 from app.modules.wb_sky_control_plane.apply.models.binding import ApplyBindingHintsV1
 from app.modules.wb_sky_control_plane.apply.models.context import (
     ApplyInvocationContext,
@@ -17,6 +18,7 @@ from app.modules.wb_sky_control_plane.apply.models.receipt import (
 from app.modules.wb_sky_control_plane.apply.models.request import ApplyRequestV1
 
 __all__ = [
+    "ApplyAttemptRecordV1",
     "ApplyBindingHintsV1",
     "ApplyEvidenceV1",
     "ApplyInvocationContext",

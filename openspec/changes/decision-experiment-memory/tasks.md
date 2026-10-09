@@ -6,25 +6,26 @@
 - [x] 1.3 Owner contract review — architecture accepted.
 - [x] 1.4 Scenario coverage plan + receipt (`scenario-coverage/`).
 - [x] 1.5 Spec repair: INVALID/INCONCLUSIVE mapping, `experiment_design`, abort projection.
-- [ ] 1.6 `/opsx-planning-review change=decision-experiment-memory` PASS.
+- [ ] 1.6 `/opsx-planning-review change=decision-experiment-memory` — not recorded PASS
+      in change artifacts (Owner accepted planning via PR #457 merge; formal command
+      receipt still open if required pre-archive).
 - [x] 1.7 ADL promoted to `openspec/decisions/decision-experiment-memory-ownership/`.
-- [ ] 1.4 ADL promotion deferred until Owner accepts planning + post-review.
 
 ## 2. Slice A — domain vocabulary only (no PG, no Apply runtime)
 
 **`SLICE_A_BLOCKED_BY_APPLY = NO`** — `ApplyEvidenceRef` types + invariants only.
 
-- [ ] 2.1 Domain types: `DecisionMemoryRecord`, `ExperimentRecordV1`, `ExperimentPlan`,
+- [x] 2.1 Domain types: `DecisionMemoryRecord`, `ExperimentRecordV1`, `ExperimentPlan`,
   `treatment_mode`, `ApplyEvidenceRef`, WindowModel, MetricSpecRef, ExposureModel,
   FactualResult, Interpretation, PostHocAnalysisRecord, ValiditySnapshot,
   EvaluationProvenance, InterventionSignature.
-- [ ] 2.2 Event taxonomy + projection rules (execution_state, outcome, plan freeze);
+- [x] 2.2 Event taxonomy + projection rules (execution_state, outcome, plan freeze);
   cardinality 0..N compatible, V1 writer may enforce 0..1.
-- [ ] 2.3 `DecisionMemoryReader` + repository protocols; **test-only in-memory fake**
+- [x] 2.3 `DecisionMemoryReader` + repository protocols; **test-only in-memory fake**
   (not production store).
-- [ ] 2.4 Unit tests: invariants (EVALUATED+INCONCLUSIVE, freeze gate, exposure gate,
+- [x] 2.4 Unit tests: invariants (EVALUATED+INCONCLUSIVE, freeze gate, exposure gate,
   validity blocks SUCCEEDED/FAILED, observational causal level).
-- [ ] 2.5 **Vocabulary freeze sign-off** before Slice B schema.
+- [x] 2.5 **Vocabulary freeze sign-off** before Slice B schema (`SLICE-A-VOCABULARY-FREEZE.md`).
 
 ## 3. Slice B — PostgreSQL persistence
 

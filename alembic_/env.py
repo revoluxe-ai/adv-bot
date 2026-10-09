@@ -20,6 +20,7 @@ from app.utils.db.models import *
 from app.modules.wb_adv_updater.modules.balance_exp_informer.models import *
 from app.modules.billing.event_manager.models import *
 from app.modules.rentgen_access.models import *  # noqa: F401
+from app.modules.wb_sky_control_plane.apply.persistence.models import *  # noqa: F401
 from app.modules.wb_sky_mcp.models import McpConnection  # noqa: F401
 from app.utils.db.base import BaseTable as Base
 from app.utils.db.session_maker import get_alchemy_row_for_migration

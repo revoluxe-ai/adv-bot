@@ -85,7 +85,7 @@ def build_packet(
     )
     block_sha = guard.allowed_run_block_sha256(block)
     return {
-        "packet_evidence_id": "PROVIDER-PACKET-v4",
+        "packet_evidence_id": "PROVIDER-PACKET-v5",
         "audited_head": head,
         "audited_status_sha256": status,
         "audited_tracked_diff_sha256": diff,

@@ -7,7 +7,7 @@ Accepted
 ## Context
 
 WB Sky separates settings snapshots (`campaign-settings-history`), ChangeSet
-validation (`wb_sky_control_plane` dry-run), and (planned) Apply Authority.
+validation (`wb_sky_control_plane` dry-run), and Apply Authority (PG-only V1).
 `ChangeSetMetadataV1` already carries optional `decision_id` / `experiment_id` but
 no durable semantic store exists. AI Package and future MCP agents need a single
 read contract for WHY / EXPECT / OUTCOME without becoming mutation authority.

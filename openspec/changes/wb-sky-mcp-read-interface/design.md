@@ -37,7 +37,7 @@ PR #449 (ChangeSet, не влит) и PR #450 (ремонт Full AI Package) э�
 - Сайт логина, внешний IdP, scope записи.
 - `validate_changeset`, `dry_run_changeset`, `apply_changeset`, мутации WB,
   эксперименты, депозит, пауза, ставки, минус-фразы, размещения.
-- Боевой endpoint, правка бота, миграции и код в этом планировании.
+- Production rollout GO, production OAuth enablement и deploy без отдельного Owner GO.
 - Обязательный ZIP в ответе MCP.
 - Гранулярные read tools. Они допустимы позже тем же адаптером, но не входят
   в первую версию.
@@ -258,7 +258,7 @@ HOW it is read / recovered: access token проверяется подписью
 затем маршруты и ветка бота. Откат — выключить маршруты флагом и отозвать
 строки подключений. Этот план не выполняется в текущем change.
 
-Боевой MCP не включается этим планированием.
+Production MCP enablement остаётся за пределами provider-cert: cert подтверждает read-only контур на disposable инфраструктуре, не prod rollout.
 
 ## Open Questions
 

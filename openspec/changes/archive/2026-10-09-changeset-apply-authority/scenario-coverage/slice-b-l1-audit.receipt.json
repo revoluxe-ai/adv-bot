@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "change_id": "changeset-apply-authority",
+  "scope": "slice_b_l1_only",
+  "producer": "slice-b-certification-repair",
+  "produced_at": "2026-10-09",
+  "head_note": "PG ledger + concurrency; full apply service scenarios deferred to Slice C",
+  "scenarios": {
+    "S03": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_concurrency.py::test_verified_replay_ready_after_commit",
+      "note": "Durable REPLAY_READY + evidence resolve; writer non-reexecution is Slice C"
+    },
+    "S04": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_concurrency.py::test_idempotency_concurrent_first_insert_different_fingerprint"
+    },
+    "S17": {
+      "status": "CONTRIBUTION",
+      "evidence": "app/modules/wb_sky_control_plane/apply/persistence/IMMUTABILITY_BOUNDARY.md + test_evidence_insert_only_immutable",
+      "note": "Repository insert/read-only boundary; not DB trigger immutability"
+    },
+    "S23": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_concurrency.py::test_consumed_receipt_claim_is_terminal",
+      "note": "CONSUMED persistence; distinct-apply service rejection is Slice C"
+    },
+    "S24": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_concurrency.py::test_release_claim_returns_to_issued",
+      "note": "Claim release persistence; orchestrated rollback path is Slice C"
+    },
+    "S25": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_attempt_lifecycle_separate_from_evidence"
+    },
+    "S30": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_insert_claim_and_invalidate"
+    },
+    "S31": {
+      "status": "PASS",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_insert_claim_and_invalidate"
+    },
+    "S34": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_pg.py::test_receipt_blocked_reconciliation_persists",
+      "note": "Durable blocked state; retry rejection orchestration is Slice C"
+    },
+    "S35": {
+      "status": "CONTRIBUTION",
+      "evidence": "tests/integration/wb_sky_control_plane/apply/test_apply_ledger_concurrency.py::test_verified_replay_ready_after_commit",
+      "note": "Persistence foundation only; authorized replay without writer is Slice C"
+    }
+  },
+  "deferred_scenarios": [
+    "S22",
+    "S01",
+    "S02",
+    "S05",
+    "S06",
+    "S07",
+    "S08",
+    "S09",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S15",
+    "S16",
+    "S18",
+    "S19",
+    "S26",
+    "S27",
+    "S28",
+    "S29",
+    "S32",
+    "S33"
+  ],
+  "pytest_command": "poetry run pytest -m 'integration and destructive_local' tests/integration/wb_sky_control_plane/apply/",
+  "full_change_cert_deferred": true
+}
