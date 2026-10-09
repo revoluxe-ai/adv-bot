@@ -3,7 +3,7 @@
 Planning artifact. Implementation via `/opsx-apply` after Owner implementation GO.
 
 ```text
-TASKS_STATUS: SLICE_C_COMPLETE
+TASKS_STATUS: SLICE_D_COMPLETE
 PLANNING_READY: yes
 APPLY_READY: slice_a_applied
 OWNER_CONTRACT_STATUS: ACCEPTED (Owner GO Slice A)
