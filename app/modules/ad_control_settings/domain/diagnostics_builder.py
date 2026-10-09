@@ -7,6 +7,10 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.modules.ad_control_settings.domain.configured import DrrPolicyParamsV1
+from app.modules.ad_control_settings.domain.configured_state import (
+    project_configured_campaign_features,
+    project_configured_shop_features,
+)
 from app.modules.ad_control_settings.domain.diagnostics import (
     AdControlDiagnosticsReportV1,
 )
@@ -29,6 +33,7 @@ from app.modules.ad_control_settings.domain.headroom_eval import (
 )
 from app.modules.ad_control_settings.domain.provenance import ProvenanceEntry
 from app.modules.ad_control_settings.domain.reason_codes import AdControlReasonCode
+from app.modules.ad_control_settings.domain.registry import FEATURE_REGISTRY
 from app.modules.ad_control_settings.domain.resolver import AdControlSettingsResolver
 from app.modules.ad_control_settings.domain.resolver_models import (
     ResolvedFeaturePolicy,
@@ -78,25 +83,29 @@ class AdControlDiagnosticsBuilder:
                     provenance=drr_resolved.provenance,
                 )
 
-        dynamic = AdControlSettingsResolver.resolve_feature(
-            context,
-            AdControlFeatureId.DYNAMIC_DRR_CONTROL,
-        )
-        dynamic_enabled = False
-        if isinstance(dynamic, ResolverBlocked):
-            blockers.extend(dynamic.blockers)
-        else:
-            effective_features.append(dynamic)
-            provenance_entries.append(dynamic.provenance)
-            from app.modules.ad_control_settings.domain.configured import (
-                DynamicDrrControlParamsV1,
-            )
+        for feature_id in FEATURE_REGISTRY:
+            if feature_id == AdControlFeatureId.DRR_POLICY:
+                continue
+            resolved = AdControlSettingsResolver.resolve_feature(context, feature_id)
+            if isinstance(resolved, ResolverBlocked):
+                reason_codes.extend(resolved.reason_codes)
+                blockers.extend(resolved.blockers)
+                continue
+            effective_features.append(resolved)
+            provenance_entries.append(resolved.provenance)
 
-            if dynamic.active and isinstance(
-                dynamic.payload,
-                DynamicDrrControlParamsV1,
+        dynamic_enabled = False
+        from app.modules.ad_control_settings.domain.configured import (
+            DynamicDrrControlParamsV1,
+        )
+
+        for eff in effective_features:
+            if (
+                eff.feature_id == AdControlFeatureId.DYNAMIC_DRR_CONTROL
+                and eff.active
+                and isinstance(eff.payload, DynamicDrrControlParamsV1)
             ):
-                dynamic_enabled = dynamic.payload.enabled
+                dynamic_enabled = eff.payload.enabled
 
         shop_eff = None
         shop_headroom = None
@@ -164,11 +173,14 @@ class AdControlDiagnosticsBuilder:
         if blockers:
             decision = "BLOCKED"
 
+        configured_shop = project_configured_shop_features(context)
+        configured_campaign = project_configured_campaign_features(context)
+
         return AdControlDiagnosticsReportV1(
             shop_id=context.shop_id,
             campaign=context.campaign,
-            configured_shop_features=(),
-            configured_campaign_overrides=(),
+            configured_shop_features=configured_shop,
+            configured_campaign_overrides=configured_campaign,
             effective_features=tuple(effective_features),
             configured_target_drr=configured_target,
             actual_drr=actual_drr,

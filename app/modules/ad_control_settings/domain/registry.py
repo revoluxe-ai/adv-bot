@@ -21,6 +21,10 @@ from app.modules.ad_control_settings.domain.enums import (
     AdControlFeatureId,
     AdControlScope,
 )
+from app.modules.ad_control_settings.domain.min_data_sufficiency import (
+    MinObservedDataSufficiencyRequirement,
+    validate_min_observed_requirement,
+)
 from app.modules.ad_control_settings.domain.reason_codes import AdControlReasonCode
 
 
@@ -36,6 +40,12 @@ class FeatureDefinition:
     schema_version: int
     supported_scopes: frozenset[AdControlScope]
     validate_payload: Callable[[ConfiguredFeaturePayload], None]
+
+
+def _validate_min_observed_field(value: object) -> None:
+    if not isinstance(value, MinObservedDataSufficiencyRequirement):
+        raise FeatureValidationError("min_data_sufficiency must be bounded enum")
+    validate_min_observed_requirement(value)
 
 
 def _validate_drr_policy(payload: ConfiguredFeaturePayload) -> None:
@@ -59,6 +69,7 @@ def _validate_cpo_increase(payload: ConfiguredFeaturePayload) -> None:
         raise FeatureValidationError("cooldown_ticks must be >= 0")
     if payload.maximum_increase_per_iteration_rub < 0:
         raise FeatureValidationError("maximum_increase_per_iteration must be >= 0")
+    _validate_min_observed_field(payload.min_data_sufficiency)
 
 
 def _validate_cpo_decrease(payload: ConfiguredFeaturePayload) -> None:
@@ -66,6 +77,7 @@ def _validate_cpo_decrease(payload: ConfiguredFeaturePayload) -> None:
         raise FeatureValidationError("CPO_DECREASE_ON_OVERSPEND requires v1 payload")
     if payload.cooldown_ticks < 0:
         raise FeatureValidationError("cooldown_ticks must be >= 0")
+    _validate_min_observed_field(payload.min_data_sufficiency)
 
 
 def _validate_cpo_bounds(payload: ConfiguredFeaturePayload) -> None:

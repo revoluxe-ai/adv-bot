@@ -8,6 +8,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from app.modules.ad_control_settings.domain.campaign_ref import CampaignRef
+from app.modules.ad_control_settings.domain.configured_state import (
+    ConfiguredCampaignFeatureState,
+    ConfiguredShopFeatureState,
+)
 from app.modules.ad_control_settings.domain.drr_state import (
     ActualDrrObservation,
     CampaignEffectiveControlDrr,
@@ -33,8 +37,8 @@ class AdControlDiagnosticsReportV1:
 
     shop_id: str
     campaign: CampaignRef | None
-    configured_shop_features: tuple[ResolvedFeaturePolicy, ...]
-    configured_campaign_overrides: tuple[ResolvedFeaturePolicy, ...]
+    configured_shop_features: tuple[ConfiguredShopFeatureState, ...]
+    configured_campaign_overrides: tuple[ConfiguredCampaignFeatureState, ...]
     effective_features: tuple[ResolvedFeaturePolicy, ...]
     configured_target_drr: ConfiguredTargetDrr | None
     actual_drr: ActualDrrObservation | None

@@ -9,6 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from app.modules.ad_control_settings.domain.min_data_sufficiency import (
+    MinObservedDataSufficiencyRequirement,
+)
 from app.modules.product_control.domain.models import DrrProfile
 
 
@@ -36,7 +39,7 @@ class CpoIncreaseOnHeadroomParamsV1:
     minimum_headroom_rub: Decimal
     maximum_increase_per_iteration_rub: Decimal
     cooldown_ticks: int
-    min_data_sufficiency: str
+    min_data_sufficiency: MinObservedDataSufficiencyRequirement
     schema_version: int = 1
 
 
@@ -46,7 +49,7 @@ class CpoDecreaseOnOverspendParamsV1:
 
     maximum_decrease_per_iteration_rub: Decimal
     cooldown_ticks: int
-    min_data_sufficiency: str
+    min_data_sufficiency: MinObservedDataSufficiencyRequirement
     schema_version: int = 1
 
 

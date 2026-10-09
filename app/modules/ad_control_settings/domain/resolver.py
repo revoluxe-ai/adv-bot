@@ -135,17 +135,9 @@ class AdControlSettingsResolver:
             )
 
         if shop_slot.payload is None:
-            return ResolvedFeaturePolicy(
-                feature_id=feature_id,
-                active=False,
-                payload=None,
-                provenance=ProvenanceEntry(
-                    feature_id=feature_id,
-                    source_kind=EffectiveSourceKind.SYSTEM_LEGACY_DEFAULT,
-                    source_scope=AdControlScope.SYSTEM_LEGACY,
-                    schema_version=1,
-                ),
-                reason_codes=(AdControlReasonCode.OK,),
+            return ResolverBlocked(
+                reason_codes=(AdControlReasonCode.SHOP_ENABLED_MISSING_PAYLOAD,),
+                blockers=(f"shop_enabled_missing_payload:{feature_id}",),
             )
 
         validate_feature_payload(feature_id, shop_slot.payload)

@@ -26,6 +26,9 @@ from app.modules.ad_control_settings.domain.enums import (
     ShopFeatureActivation,
 )
 from app.modules.ad_control_settings.domain.headroom_eval import control_action_allowed
+from app.modules.ad_control_settings.domain.min_data_sufficiency import (
+    MinObservedDataSufficiencyRequirement,
+)
 from app.modules.ad_control_settings.domain.reason_codes import AdControlReasonCode
 from app.modules.ad_control_settings.domain.registry import (
     FeatureValidationError,
@@ -47,17 +50,29 @@ def test_cpo_increase_and_decrease_are_independent_payload_types() -> None:
         minimum_headroom_rub=Decimal(100),
         maximum_increase_per_iteration_rub=Decimal(5),
         cooldown_ticks=2,
-        min_data_sufficiency="SUFFICIENT",
+        min_data_sufficiency=MinObservedDataSufficiencyRequirement.SUFFICIENT,
     )
     dec = CpoDecreaseOnOverspendParamsV1(
         maximum_decrease_per_iteration_rub=Decimal(3),
         cooldown_ticks=1,
-        min_data_sufficiency="SUFFICIENT",
+        min_data_sufficiency=MinObservedDataSufficiencyRequirement.SUFFICIENT,
     )
     validate_feature_payload(AdControlFeatureId.CPO_INCREASE_ON_HEADROOM, inc)
     validate_feature_payload(AdControlFeatureId.CPO_DECREASE_ON_OVERSPEND, dec)
     with pytest.raises(FeatureValidationError):
         validate_feature_payload(AdControlFeatureId.CPO_INCREASE_ON_HEADROOM, dec)
+
+
+@pytest.mark.unit
+def test_cpo_min_data_sufficiency_rejects_freeform_string() -> None:
+    bad = CpoIncreaseOnHeadroomParamsV1(
+        minimum_headroom_rub=Decimal(1),
+        maximum_increase_per_iteration_rub=Decimal(1),
+        cooldown_ticks=0,
+        min_data_sufficiency="SUFFICIENT",  # type: ignore[arg-type]
+    )
+    with pytest.raises(FeatureValidationError):
+        validate_feature_payload(AdControlFeatureId.CPO_INCREASE_ON_HEADROOM, bad)
 
 
 @pytest.mark.unit
