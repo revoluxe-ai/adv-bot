@@ -59,6 +59,7 @@ def build_packet(
         "--tb=short",
     ]
     pytest_targets = list(guard.extract_pytest_targets_from_argv(tuple(pytest_argv)))
+    argv_sha = guard.canonical_pytest_argv_sha256(tuple(pytest_argv))
     block = (
         "set -euo pipefail\n"
         "cd \"$(git rev-parse --show-toplevel)\"\n"
@@ -75,20 +76,27 @@ def build_packet(
         "pg_isready -h 127.0.0.1 -p 5433 -U test_user -d test_adv_bot_db\n"
         "curl -fsS http://127.0.0.1:8124/ping >/dev/null\n"
         f"# PYTEST_TARGETS: {pytest_targets[0]}\n"
+        f"# CANONICAL_PYTEST_ARGV_SHA256: {argv_sha}\n"
         "poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet "
         f".opsx/runs/scenario-coverage/{change_id}/provider-run-packet.json --repo .\n"
         "poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet "
         f".opsx/runs/scenario-coverage/{change_id}/provider-run-packet.json --repo .\n"
         "docker compose -f tests/docker-compose.test.yml down\n"
     )
+    block_sha = guard.allowed_run_block_sha256(block)
     return {
-        "packet_evidence_id": "PROVIDER-PACKET-v3",
+        "packet_evidence_id": "PROVIDER-PACKET-v4",
         "audited_head": head,
         "audited_status_sha256": status,
         "audited_tracked_diff_sha256": diff,
         "audited_untracked_manifest_sha256": manifest,
-        "allowed_run_block_sha256": guard.allowed_run_block_sha256(block),
+        "allowed_run_block_sha256": block_sha,
         "allowed_run_block_text": block,
+        "canonical_pytest_argv_sha256": argv_sha,
+        "run_spec_sha256": guard.provider_run_spec_sha256(
+            allowed_run_block_sha256=block_sha,
+            canonical_pytest_argv_sha256=argv_sha,
+        ),
         "pytest_argv": pytest_argv,
         "pytest_targets": pytest_targets,
         "provider_test_ids": _default_test_ids(),

@@ -34,14 +34,32 @@ guard = _load_guard()
 _TEST_AUTH_ID = guard.one_shot_authorization_token_sha256(_TEST_LIVE_TOKEN)
 
 
+def _default_pytest_argv(
+    target: str = "tests/integration/wb_sky_mcp/",
+) -> tuple[str, ...]:
+    return (
+        "poetry",
+        "run",
+        "pytest",
+        target,
+        "-m",
+        "destructive_local",
+        "-vv",
+        "--tb=short",
+    )
+
+
 def _minimal_block(
     *,
     host: str = "127.0.0.1",
     port: int = 5433,
     dbname: str = "test_adv_bot_db",
     target: str = "tests/integration/wb_sky_mcp/",
+    pytest_argv: tuple[str, ...] | None = None,
     include_unguarded_pytest: bool = False,
 ) -> str:
+    argv = pytest_argv if pytest_argv is not None else _default_pytest_argv(target)
+    argv_sha = guard.canonical_pytest_argv_sha256(argv)
     lines = [
         f"export POSTGRES_MASTER_HOST={host}",
         f"export POSTGRES_PORT={port}",
@@ -49,6 +67,7 @@ def _minimal_block(
         "export REDIS_HOST=127.0.0.1",
         "export REDIS_PORT=6379",
         f"# PYTEST_TARGETS: {target}",
+        f"# CANONICAL_PYTEST_ARGV_SHA256: {argv_sha}",
         "poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet pkt.json --repo .",
         "poetry run python .opsx/tools/opsx_provider_run_guard.py run --packet pkt.json --repo .",
     ]
@@ -67,16 +86,7 @@ def _packet(
     status: str = "status_hash",
     diff: str = "diff_hash",
     manifest: str = "manifest_hash",
-    pytest_argv: tuple[str, ...] = (
-        "poetry",
-        "run",
-        "pytest",
-        "tests/integration/wb_sky_mcp/",
-        "-m",
-        "destructive_local",
-        "-vv",
-        "--tb=short",
-    ),
+    pytest_argv: tuple[str, ...] | None = None,
     test_ids: tuple[str, ...] = (
         "tests/integration/wb_sky_mcp/test_mcp_pg_connection_repository.py::test_x",
     ),
@@ -85,6 +95,9 @@ def _packet(
     port: int = 5433,
     dbname: str = "test_adv_bot_db",
 ) -> guard.ProviderRunPacket:
+    resolved_argv = pytest_argv if pytest_argv is not None else _default_pytest_argv(
+        pytest_targets[0]
+    )
     return guard.ProviderRunPacket(
         audited_head=head,
         audited_status_sha256=status,
@@ -92,7 +105,8 @@ def _packet(
         audited_untracked_manifest_sha256=manifest,
         allowed_run_block_sha256=guard.allowed_run_block_sha256(block),
         allowed_run_block_text=block,
-        pytest_argv=pytest_argv,
+        canonical_pytest_argv_sha256=guard.canonical_pytest_argv_sha256(resolved_argv),
+        pytest_argv=resolved_argv,
         pytest_targets=pytest_targets,
         provider_test_ids=test_ids,
         postgres_host=host,
@@ -257,17 +271,18 @@ def test_command_and_db_coords_mismatch_rejects() -> None:
     assert verdict.status == "BLOCKED_FINGERPRINT_MISMATCH"
     assert verdict.mismatch_field == "postgres_port_in_block"
 
-    other_block = _minimal_block(target="tests/other/")
+    other_argv = (
+        "poetry",
+        "run",
+        "pytest",
+        "tests/other/",
+        "-m",
+        "destructive_local",
+    )
+    other_block = _minimal_block(target="tests/other/", pytest_argv=other_argv)
     packet_cmd = _packet(
         other_block,
-        pytest_argv=(
-            "poetry",
-            "run",
-            "pytest",
-            "tests/other/",
-            "-m",
-            "destructive_local",
-        ),
+        pytest_argv=other_argv,
         pytest_targets=("tests/other/",),
     )
     verdict_cmd = guard.verify_provider_run_packet(
@@ -462,7 +477,9 @@ def test_verify_failure_does_not_consume_authorization(tmp_path: Path) -> None:
         compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
         live_token=_TEST_LIVE_TOKEN,
     )
-    ledger = guard.authorization_ledger_path(repo, packet.change_id)
+    ledger = guard.authorization_ledger_path(
+        repo, packet.change_id, packet.one_shot_authorization_id
+    )
     assert not ledger.is_file()
 
 
@@ -612,5 +629,145 @@ def test_fingerprint_mismatch_does_not_consume(tmp_path: Path) -> None:
     )
     assert verdict.status == "BLOCKED_FINGERPRINT_MISMATCH"
     assert not guard.authorization_ledger_path(
-        tmp_path, packet.change_id
+        tmp_path, packet.change_id, packet.one_shot_authorization_id
     ).is_file()
+
+
+@pytest.mark.unit
+def test_canonical_pytest_argv_sha256_mismatch_rejects() -> None:
+    block = _minimal_block()
+    packet = _packet(block)
+    packet = replace(
+        packet,
+        canonical_pytest_argv_sha256="0" * 64,
+    )
+    verdict = guard.verify_provider_run_packet(
+        Path("/tmp"),
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.mismatch_field == "canonical_pytest_argv_sha256"
+
+
+@pytest.mark.unit
+def test_python_m_pytest_in_block_rejected() -> None:
+    block = _minimal_block()
+    lines = block.splitlines()
+    lines.insert(
+        -2,
+        "python -m pytest tests/integration/wb_sky_mcp/ -m destructive_local",
+    )
+    bad_block = "\n".join(lines) + "\n"
+    packet = _packet(bad_block)
+    verdict = guard.verify_provider_run_packet(
+        Path("/tmp"),
+        packet,
+        compute_head=_identity_compute(packet.audited_head),
+        compute_status=_identity_compute(packet.audited_status_sha256),
+        compute_diff=_identity_compute(packet.audited_tracked_diff_sha256),
+        compute_manifest=_identity_compute(packet.audited_untracked_manifest_sha256),
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert verdict.mismatch_field == "unguarded_pytest_in_block"
+
+
+def _mp_try_claim_worker(repo_str: str, packet: guard.ProviderRunPacket, token: str) -> str:
+    mod = _load_guard()
+    return mod.try_claim_one_shot_authorization(
+        Path(repo_str),
+        packet,
+        live_token=token,
+    )
+
+
+@pytest.mark.unit
+def test_concurrent_one_shot_claim_exactly_one_winner(tmp_path: Path) -> None:
+    from concurrent.futures import ProcessPoolExecutor
+
+    block = _minimal_block()
+    packet = _packet(block)
+    repo = str(tmp_path)
+    with ProcessPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(_mp_try_claim_worker, repo, packet, _TEST_LIVE_TOKEN),
+            pool.submit(_mp_try_claim_worker, repo, packet, _TEST_LIVE_TOKEN),
+        ]
+        results = [f.result() for f in futures]
+    assert results.count("CLAIMED") == 1
+    assert results.count("ALREADY_CONSUMED") == 1
+    state = guard.resolve_authorization_state(
+        tmp_path,
+        packet,
+        live_token=_TEST_LIVE_TOKEN,
+    )
+    assert state == "AUTHORIZED_CONSUMED"
+
+
+def _mp_run_guarded_worker(
+    repo_str: str,
+    packet: guard.ProviderRunPacket,
+    token: str,
+    counter_path: str,
+) -> dict[str, object]:
+    import os
+
+    mod = _load_guard()
+
+    def _counting_runner(argv, cwd, env, check=False):  # type: ignore[no-untyped-def]
+        path = Path(counter_path)
+        prior = int(path.read_text(encoding="utf-8")) if path.is_file() else 0
+        path.write_text(str(prior + 1), encoding="utf-8")
+        return subprocess.CompletedProcess(list(argv), 0)
+
+    base_kw = {
+        "compute_head": lambda _r: packet.audited_head,
+        "compute_status": lambda _r: packet.audited_status_sha256,
+        "compute_diff": lambda _r: packet.audited_tracked_diff_sha256,
+        "compute_manifest": lambda _r: packet.audited_untracked_manifest_sha256,
+        "live_token": token,
+    }
+    verdict = mod.run_guarded_pytest(
+        Path(repo_str),
+        packet,
+        subprocess_runner=_counting_runner,
+        **base_kw,
+    )
+    return verdict.to_dict()
+
+
+@pytest.mark.unit
+def test_concurrent_run_guarded_exactly_one_provider_spawn(tmp_path: Path) -> None:
+    from concurrent.futures import ProcessPoolExecutor
+
+    block = _minimal_block()
+    packet = _packet(block)
+    counter = tmp_path / "spawn.count"
+    counter.write_text("0", encoding="utf-8")
+    repo = str(tmp_path)
+    with ProcessPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(
+                _mp_run_guarded_worker,
+                repo,
+                packet,
+                _TEST_LIVE_TOKEN,
+                str(counter),
+            ),
+            pool.submit(
+                _mp_run_guarded_worker,
+                repo,
+                packet,
+                _TEST_LIVE_TOKEN,
+                str(counter),
+            ),
+        ]
+        verdicts = [f.result() for f in futures]
+    spawned = sum(1 for v in verdicts if v.get("provider_spawned"))
+    blocked = sum(1 for v in verdicts if v.get("status") == "BLOCKED_AUTHORIZATION")
+    assert int(counter.read_text(encoding="utf-8")) == 1
+    assert spawned == 1
+    assert blocked == 1

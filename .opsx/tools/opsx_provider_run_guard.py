@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import Callable, Mapping, Sequence
@@ -48,7 +49,13 @@ AuthorizationState = Literal[
     "EXPIRED_OR_INVALID",
 ]
 
+OneShotClaimResult = Literal["CLAIMED", "ALREADY_CONSUMED", "NOT_ELIGIBLE"]
+
 EXIT_BLOCKED_AUTHORIZATION = 4
+
+_CANONICAL_PYTEST_ARGV_SHA256_LINE = re.compile(
+    r"^#\s*CANONICAL_PYTEST_ARGV_SHA256:\s*([0-9a-f]{64})\s*$"
+)
 
 
 class ProviderSubprocessError(RuntimeError):
@@ -65,6 +72,7 @@ class ProviderRunPacket:
     audited_untracked_manifest_sha256: str
     allowed_run_block_sha256: str
     allowed_run_block_text: str
+    canonical_pytest_argv_sha256: str
     pytest_argv: tuple[str, ...]
     pytest_targets: tuple[str, ...]
     provider_test_ids: tuple[str, ...]
@@ -103,6 +111,11 @@ class ProviderRunPacket:
         redis_port_raw = _req("redis_port")
         redis_port = int(redis_port_raw)
 
+        canonical_sha = str(_req("canonical_pytest_argv_sha256"))
+        computed_argv_sha = canonical_pytest_argv_sha256(pytest_argv)
+        if canonical_sha != computed_argv_sha:
+            raise ValueError("canonical_pytest_argv_sha256_mismatch")
+
         return cls(
             audited_head=str(_req("audited_head")),
             audited_status_sha256=str(_req("audited_status_sha256")),
@@ -112,6 +125,7 @@ class ProviderRunPacket:
             ),
             allowed_run_block_sha256=str(_req("allowed_run_block_sha256")),
             allowed_run_block_text=str(_req("allowed_run_block_text")),
+            canonical_pytest_argv_sha256=canonical_sha,
             pytest_argv=pytest_argv,
             pytest_targets=pytest_targets,
             provider_test_ids=provider_test_ids,
@@ -209,16 +223,61 @@ def provider_test_id_within_targets(
     return False
 
 
+def canonical_pytest_argv_sha256(argv: Sequence[str]) -> str:
+    """Stable hash of the exact provider subprocess argv tuple."""
+
+    payload = json.dumps(list(argv), separators=(",", ":"), ensure_ascii=True)
+    return sha256_bytes(payload.encode("utf-8"))
+
+
+def provider_run_spec_sha256(
+    *,
+    allowed_run_block_sha256: str,
+    canonical_pytest_argv_sha256: str,
+) -> str:
+    """Hash binding frozen orchestration block to canonical executable argv."""
+
+    payload = json.dumps(
+        {
+            "allowed_run_block_sha256": allowed_run_block_sha256,
+            "canonical_pytest_argv_sha256": canonical_pytest_argv_sha256,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return sha256_bytes(payload.encode("utf-8"))
+
+
 def block_has_unguarded_pytest_invocation(block_text: str) -> bool:
     """True when a non-comment line would spawn pytest outside guard run."""
 
+    pytest_token = re.compile(r"(^|[^\w])(pytest|py\.test)([^\w]|$)", re.IGNORECASE)
     for line in block_text.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        if stripped.startswith("poetry run pytest"):
+        if "opsx_provider_run_guard.py" in stripped:
+            continue
+        lowered = stripped.lower()
+        if pytest_token.search(stripped):
+            return True
+        if "python" in lowered and "-m pytest" in lowered:
+            return True
+        if lowered.startswith("poetry run pytest"):
             return True
     return False
+
+
+def canonical_pytest_argv_sha256_in_block(
+    block_text: str,
+) -> str | None:
+    """Extract sealed canonical argv hash comment from frozen block, if present."""
+
+    for line in block_text.splitlines():
+        match = _CANONICAL_PYTEST_ARGV_SHA256_LINE.match(line.strip())
+        if match:
+            return match.group(1)
+    return None
 
 
 def allowed_run_block_sha256(block_text: str) -> str:
@@ -349,8 +408,12 @@ def one_shot_authorization_token_sha256(token: str) -> str:
     return sha256_bytes(token.encode("utf-8"))
 
 
-def authorization_ledger_path(repo_root: Path, change_id: str) -> Path:
-    """Durable one-shot consumption ledger (not certification evidence)."""
+def authorization_ledger_path(
+    repo_root: Path,
+    change_id: str,
+    one_shot_authorization_id: str,
+) -> Path:
+    """Per-token durable consumption claim file (cross-process one-shot)."""
 
     return (
         repo_root
@@ -358,7 +421,8 @@ def authorization_ledger_path(repo_root: Path, change_id: str) -> Path:
         / "runs"
         / "scenario-coverage"
         / change_id
-        / "one_shot_authorization.json"
+        / "authorizations"
+        / f"{one_shot_authorization_id}.json"
     )
 
 
@@ -368,18 +432,15 @@ def _load_authorization_ledger(path: Path) -> dict[str, Any] | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _save_authorization_ledger(
-    path: Path,
+def _authorization_ledger_payload(
     *,
     one_shot_authorization_id: str,
-    authorization_state: AuthorizationState,
-) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+) -> bytes:
     payload = {
         "one_shot_authorization_id": one_shot_authorization_id,
-        "authorization_state": authorization_state,
+        "authorization_state": "AUTHORIZED_CONSUMED",
     }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
 
 def resolve_authorization_state(
@@ -395,7 +456,13 @@ def resolve_authorization_state(
     token_id = one_shot_authorization_token_sha256(live_token)
     if token_id != packet.one_shot_authorization_id:
         return "EXPIRED_OR_INVALID"
-    ledger_path = authorization_ledger_path(repo_root, packet.change_id)
+    ledger_path = authorization_ledger_path(
+        repo_root,
+        packet.change_id,
+        packet.one_shot_authorization_id,
+    )
+    if not ledger_path.is_file():
+        return "AUTHORIZED_UNUSED"
     ledger = _load_authorization_ledger(ledger_path)
     if ledger is None:
         return "AUTHORIZED_UNUSED"
@@ -405,9 +472,41 @@ def resolve_authorization_state(
         return "EXPIRED_OR_INVALID"
     if stored_state == "AUTHORIZED_CONSUMED":
         return "AUTHORIZED_CONSUMED"
-    if stored_state == "AUTHORIZED_UNUSED":
-        return "AUTHORIZED_UNUSED"
     return "EXPIRED_OR_INVALID"
+
+
+def try_claim_one_shot_authorization(
+    repo_root: Path,
+    packet: ProviderRunPacket,
+    *,
+    live_token: str,
+) -> OneShotClaimResult:
+    """Atomically claim one-shot authorization (O_CREAT|O_EXCL); never rolls back."""
+
+    state = resolve_authorization_state(repo_root, packet, live_token=live_token)
+    if state != "AUTHORIZED_UNUSED":
+        if state == "AUTHORIZED_CONSUMED":
+            return "ALREADY_CONSUMED"
+        return "NOT_ELIGIBLE"
+    ledger_path = authorization_ledger_path(
+        repo_root,
+        packet.change_id,
+        packet.one_shot_authorization_id,
+    )
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = _authorization_ledger_payload(
+        one_shot_authorization_id=packet.one_shot_authorization_id,
+    )
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    try:
+        fd = os.open(str(ledger_path), flags)
+        try:
+            _ = os.write(fd, payload)
+        finally:
+            os.close(fd)
+        return "CLAIMED"
+    except FileExistsError:
+        return "ALREADY_CONSUMED"
 
 
 def consume_one_shot_authorization(
@@ -416,18 +515,18 @@ def consume_one_shot_authorization(
     *,
     live_token: str,
 ) -> AuthorizationState:
-    """Mark token consumed at spawn boundary; never rolls back on pytest failure."""
+    """Legacy wrapper: successful claim → AUTHORIZED_CONSUMED."""
 
-    state = resolve_authorization_state(repo_root, packet, live_token=live_token)
-    if state != "AUTHORIZED_UNUSED":
-        return state
-    ledger_path = authorization_ledger_path(repo_root, packet.change_id)
-    _save_authorization_ledger(
-        ledger_path,
-        one_shot_authorization_id=packet.one_shot_authorization_id,
-        authorization_state="AUTHORIZED_CONSUMED",
+    claim = try_claim_one_shot_authorization(
+        repo_root,
+        packet,
+        live_token=live_token,
     )
-    return "AUTHORIZED_CONSUMED"
+    if claim == "CLAIMED":
+        return "AUTHORIZED_CONSUMED"
+    if claim == "ALREADY_CONSUMED":
+        return "AUTHORIZED_CONSUMED"
+    return resolve_authorization_state(repo_root, packet, live_token=live_token)
 
 
 def _blocked_authorization(
@@ -587,9 +686,27 @@ def verify_provider_run_packet(
             ",".join(extracted_targets),
         )
 
-    for target in packet.pytest_targets:
-        if target not in block:
-            return _blocked("pytest_targets_in_block", target, "missing")
+    computed_argv_sha = canonical_pytest_argv_sha256(packet.pytest_argv)
+    if computed_argv_sha != packet.canonical_pytest_argv_sha256:
+        return _blocked(
+            "canonical_pytest_argv_sha256",
+            packet.canonical_pytest_argv_sha256,
+            computed_argv_sha,
+        )
+
+    block_argv_sha = canonical_pytest_argv_sha256_in_block(block)
+    if block_argv_sha is None:
+        return _blocked(
+            "canonical_pytest_argv_sha256_in_block",
+            packet.canonical_pytest_argv_sha256,
+            "missing",
+        )
+    if block_argv_sha != packet.canonical_pytest_argv_sha256:
+        return _blocked(
+            "canonical_pytest_argv_sha256_in_block",
+            packet.canonical_pytest_argv_sha256,
+            block_argv_sha,
+        )
 
     guard_run_fragment = (
         "opsx_provider_run_guard.py run --packet"
@@ -601,7 +718,7 @@ def verify_provider_run_packet(
         return _blocked(
             "unguarded_pytest_in_block",
             "forbidden",
-            "poetry run pytest present",
+            "direct_pytest_invocation",
         )
 
     for node_id in packet.provider_test_ids:
@@ -671,13 +788,25 @@ def run_guarded_pytest(
     if not live_token:
         return _blocked_authorization("NOT_AUTHORIZED", mismatch_field="AUTH_NOT_AUTHORIZED")
 
-    consumed = consume_one_shot_authorization(
+    claim = try_claim_one_shot_authorization(
         repo_root,
         packet,
         live_token=live_token,
     )
-    if consumed != "AUTHORIZED_CONSUMED":
-        return _blocked_authorization(consumed, mismatch_field="AUTH_CONSUMED")
+    if claim != "CLAIMED":
+        state = resolve_authorization_state(
+            repo_root,
+            packet,
+            live_token=live_token,
+        )
+        if claim == "NOT_ELIGIBLE" and state == "NOT_AUTHORIZED":
+            return _blocked_authorization(state, mismatch_field="AUTH_NOT_AUTHORIZED")
+        if claim == "NOT_ELIGIBLE" and state == "EXPIRED_OR_INVALID":
+            return _blocked_authorization(state, mismatch_field="AUTH_INVALID")
+        return _blocked_authorization(
+            "AUTHORIZED_CONSUMED",
+            mismatch_field="AUTH_CONSUMED",
+        )
 
     runner = subprocess_runner or subprocess.run
     env = build_provider_subprocess_env(packet, extra_env=extra_env)
