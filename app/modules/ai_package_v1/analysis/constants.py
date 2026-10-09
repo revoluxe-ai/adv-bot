@@ -28,6 +28,7 @@ SHOP_DRR_BLOCKERS: tuple[str, ...] = (
     "BLOCKED_BY_SHOP_DRR_SOURCE",
 )
 ATTRIBUTION_BLOCKERS: tuple[str, ...] = ("BLOCKED_BY_ATTRIBUTION_FACTS",)
+CAMPAIGN_SPEND_INCOMPLETE: str = "CAMPAIGN_SPEND_INCOMPLETE"
 SHOP_SPEND_BLOCKERS: tuple[str, ...] = ("BLOCKED_BY_SHOP_WIDE_CAMPAIGN_COVERAGE",)
 SKU_ECONOMICS_BLOCKERS: tuple[str, ...] = (
     "BLOCKED_BY_COMMON_SALES",
@@ -36,10 +37,8 @@ SKU_ECONOMICS_BLOCKERS: tuple[str, ...] = (
 
 FORBIDDEN_NUMERIC_METRICS: frozenset[str] = frozenset(
     {
-        "CPO_FACT_DIRECT",
-        "DRR_FACT_DIRECT",
-        "CPO_FACT_LINKED",
-        "DRR_FACT_LINKED",
+        # Campaign/keyword fold must not invent shop/SKU economics or attribution.
+        # Attribution CPO/DRR are emitted only via AttributionFactsReader path.
         "SHOP_DRR",
         "ALL_SHOP_AD_SPEND",
         "SHOP_AD_SPEND",

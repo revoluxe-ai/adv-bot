@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.modules.ai_package_v1.domain.campaign_stat import (
     assert_no_synthetic_merge,
@@ -19,11 +19,18 @@ from app.modules.ai_package_v1.domain.funnel_orders_boundary import (
     FunnelOrdersMetric,
     assert_funnel_orders_do_not_populate_shop_product_orders,
 )
+from app.modules.ai_package_v1.analysis.attribution_reader import (
+    AnalysisAttributionReaderProtocol,
+    ChAnalysisAttributionReader,
+    collect_attribution_evidence,
+)
+from app.modules.ai_package_v1.analysis.aggregate import legs_from_scope
 from app.modules.ai_package_v1.analysis.campaign_reader import (
     AnalysisCampaignReaderProtocol,
     ChAnalysisCampaignReader,
 )
-from app.modules.ai_package_v1.analysis.models import AnalysisBuildRequest
+from app.modules.ai_package_v1.analysis.catalog import build_analysis_windows
+from app.modules.ai_package_v1.analysis.models import AnalysisBuildRequest, CampaignDailyFact
 from app.modules.ai_package_v1.analysis.service import (
     AnalysisAggregationService,
     annotate_data_map,
@@ -105,6 +112,7 @@ class ExportService:
         settings_assembler: CampaignSettingsAssembler | None = None,
         keyword_assembler: KeywordAssemblerProtocol | None = None,
         analysis_campaign_reader: AnalysisCampaignReaderProtocol | None = None,
+        analysis_attribution_reader: AnalysisAttributionReaderProtocol | None = None,
     ) -> None:
         """Собирает read-only зависимости export.
 
@@ -130,6 +138,9 @@ class ExportService:
         else:
             self._keyword_assembler = KeywordPerformanceAssembler()
         self._analysis_reader = analysis_campaign_reader or ChAnalysisCampaignReader()
+        self._analysis_attribution_reader = (
+            analysis_attribution_reader or ChAnalysisAttributionReader()
+        )
         self._analysis_service = AnalysisAggregationService()
 
     async def export(
@@ -280,6 +291,20 @@ class ExportService:
             adv_ids=adv_ids,
             end_date=cutoff.package_cutoff_date,
         )
+        source_first, source_last = _campaign_fact_bounds(tuple(analysis_facts))
+        windows = build_analysis_windows(
+            cutoff,
+            campaign_first=source_first,
+            campaign_last=source_last,
+            requested_period=period,
+        )
+        legs = legs_from_scope(tuple(scope))
+        attribution_evidence = await collect_attribution_evidence(
+            self._analysis_attribution_reader,
+            shop_id=manifest_shop_id,
+            windows=windows,
+            legs=legs,
+        )
         analysis = self._analysis_service.build(
             AnalysisBuildRequest(
                 shop_id=manifest_shop_id,
@@ -290,6 +315,7 @@ class ExportService:
                 keyword_windows=tuple(keyword_result.windows),
                 keyword_history_first=keyword_result.keyword_history_first,
                 keyword_history_last=keyword_result.keyword_history_last,
+                attribution_by_leg_window=attribution_evidence,
             )
         )
         payloads = [
@@ -327,6 +353,15 @@ class ExportService:
             files=build_file_descriptors(payloads),
         )
         return ExportResult(manifest=manifest, payloads=payloads)
+
+
+def _campaign_fact_bounds(
+    facts: tuple[CampaignDailyFact, ...],
+) -> tuple[date | None, date | None]:
+    if not facts:
+        return None, None
+    dates = [fact.stat_date for fact in facts]
+    return min(dates), max(dates)
 
 
 def _with_analysis_data_map(payloads: tuple[DomainPayload, ...]) -> list[DomainPayload]:

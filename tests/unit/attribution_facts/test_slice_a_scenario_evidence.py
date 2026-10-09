@@ -133,8 +133,8 @@ def test_s07_unknown_class_facts_do_not_emit_direct_linked_cpo() -> None:
     )
     assert cpo_direct.value is None
     assert cpo_linked.value is None
-    assert AttributionReasonCode.DENOMINATOR_ZERO in cpo_direct.reason_codes
-    assert AttributionReasonCode.DENOMINATOR_ZERO in cpo_linked.reason_codes
+    assert AttributionReasonCode.ATTRIBUTION_SOURCE_MISSING in cpo_direct.reason_codes
+    assert AttributionReasonCode.ATTRIBUTION_RELATION_UNKNOWN in cpo_linked.reason_codes
 
 
 @pytest.mark.asyncio

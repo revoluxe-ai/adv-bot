@@ -5,6 +5,9 @@ from __future__ import annotations
 from datetime import date
 from unittest.mock import AsyncMock
 
+from app.modules.ai_package_v1.analysis.attribution_reader import (
+    EmptyAnalysisAttributionReader,
+)
 from app.modules.ai_package_v1.analysis.campaign_reader import (
     EmptyAnalysisCampaignReader,
 )
@@ -63,6 +66,7 @@ def build_export_service_for_zip(
         funnel_reader=NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=NoOpReader(),  # type: ignore[arg-type]
         analysis_campaign_reader=EmptyAnalysisCampaignReader(),
+        analysis_attribution_reader=EmptyAnalysisAttributionReader(),
         settings_assembler=assembler,
         keyword_assembler=keyword,
     )

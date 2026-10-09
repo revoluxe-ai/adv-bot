@@ -173,6 +173,19 @@ def test_fact_key_excludes_advertised_nm() -> None:
     assert not hasattr(key, "advertised_nm_id")
 
 
+def test_missing_orders_not_denominator_zero() -> None:
+    """None orders → missing reason, not DENOMINATOR_ZERO."""
+    coverage = AttributionCoverage(status=AttributionCoverageStatus.COMPLETE)
+    facts = (
+        _fact(1, 1, None, Decimal(100), AttributionClass.DIRECT),
+        _fact(1, 2, None, Decimal(50), AttributionClass.DIRECT),
+    )
+    spend = (CampaignDaySpendReference(1, _DAY, Decimal(100)),)
+    result = compute_cpo_fact("CPO_FACT_DIRECT", facts, spend, AttributionClass.DIRECT, coverage)
+    assert result.value is None
+    assert AttributionReasonCode.DENOMINATOR_ZERO not in result.reason_codes
+
+
 def test_denominator_zero_cpo() -> None:
     """CPO absent + DENOMINATOR_ZERO при нулевых direct orders."""
     coverage = AttributionCoverage(status=AttributionCoverageStatus.COMPLETE)

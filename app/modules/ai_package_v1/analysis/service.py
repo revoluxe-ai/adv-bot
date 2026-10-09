@@ -29,7 +29,12 @@ from app.modules.ai_package_v1.analysis.documents import (
     build_analysis_contract,
     build_analysis_guide,
 )
-from app.modules.ai_package_v1.analysis.models import AnalysisBuildRequest, CampaignDailyFact
+from app.modules.ai_package_v1.analysis.models import (
+    AnalysisAttributionLegEvidence,
+    AnalysisBuildRequest,
+    CampaignDailyFact,
+)
+from app.modules.attribution_facts.domain.models import AttributionQueryResult
 from app.modules.ai_package_v1.domain.dataset_card import DatasetCard, Provenance
 from app.modules.ai_package_v1.domain.enums import (
     CollectionOutcome,
@@ -95,6 +100,7 @@ class AnalysisAggregationService:
         )
         legs = legs_from_scope(tuple(request.scope))
         forced = custom_period_includes_watermark(request.period, cutoff)
+        attribution_index = _attribution_index(request.attribution_by_leg_window)
         campaign_rows = fold_campaign_windows(
             shop_id=request.shop_id,
             cutoff=cutoff,
@@ -105,6 +111,7 @@ class AnalysisAggregationService:
             source_first=source_first,
             source_last=source_last,
             custom_forced_partial=forced,
+            attribution_by_leg_window=attribution_index,
         )
         package_rows = fold_package_scope(
             campaign_rows,
@@ -349,6 +356,14 @@ def _fact_bounds(
         return None, None
     dates = [fact.stat_date for fact in facts]
     return min(dates), max(dates)
+
+
+def _attribution_index(
+    evidence: tuple[AnalysisAttributionLegEvidence, ...],
+) -> dict[tuple[str, int], AttributionQueryResult]:
+    return {
+        (item.window_id, item.physical_adv_id): item.query_result for item in evidence
+    }
 
 
 def _iso(value: object) -> str | None:

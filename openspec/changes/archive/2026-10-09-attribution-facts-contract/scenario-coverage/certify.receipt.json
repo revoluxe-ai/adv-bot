@@ -1,0 +1,42 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "attribution-facts-contract",
+  "MODE": "certify",
+  "FOUNDATION_SCOPE": "SLICES_A_B_C_D",
+  "VERDICT": "PASS",
+  "PRODUCT_ACCEPTANCE_STATUS": "PASS",
+  "PRODUCER": "slice-d-final-full-change-certify",
+  "produced_at": "2026-10-09",
+  "executed_cert_subject_head": "5baf182f3",
+  "slice_receipts": [
+    "scenario-coverage/slice-a-l1-audit.receipt.json",
+    "scenario-coverage/slice-b-l1-audit.receipt.json",
+    "scenario-coverage/slice-c-l1-audit.receipt.json",
+    "scenario-coverage/slice-d-l1-audit.receipt.json"
+  ],
+  "destructive_ch": {
+    "status": "PASS",
+    "evidence_head": "677a0606f",
+    "note": "Slice D consumer-only; CH storage semantics unchanged — reuse Slice C destructive_local receipt"
+  },
+  "scenarios": {
+    "S01": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py"},
+    "S02": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py"},
+    "S03": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py"},
+    "S04": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_reconciliation_and_coverage.py"},
+    "S05": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_membership_as_of_temporal.py"},
+    "S06": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_membership_as_of_temporal.py"},
+    "S07": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py::test_s07_unknown_class_facts_do_not_emit_direct_linked_cpo"},
+    "S08": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_raw_fullstats_missing_metrics.py"},
+    "S09": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_raw_fullstats_missing_metrics.py"},
+    "S10": {"status": "PASS", "evidence": "slice-a receipt + domain/versioning"},
+    "S11": {"status": "PASS", "evidence": "slice-c destructive_local + integration test_ch_observation_store"},
+    "S12": {"status": "PASS", "evidence": "slice-c destructive_local correction test"},
+    "S13": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py::test_s13_reader_partial_coverage_exposes_reason_codes"},
+    "S14": {"status": "PASS", "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py::test_s14_package_cutoff_does_not_imply_complete_coverage"},
+    "S15": {"status": "PASS", "evidence": "slice-d receipt S15"},
+    "S16": {"status": "PASS", "evidence": "slice-d receipt S16"}
+  },
+  "deployment_prerequisite": "Production ClickHouse migration 008 apply is NOT part of this change archive; required under separate production GO before ChAttributionFactsReader deployment."
+}
