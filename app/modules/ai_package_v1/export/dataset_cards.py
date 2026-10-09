@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from app.modules.ai_package_v1.domain.coverage_rules import coverage_for_empty_campaign_stat
+from app.modules.ai_package_v1.domain.coverage_rules import (
+    coverage_for_empty_campaign_stat,
+    reason_codes_for_campaign_physical_legs,
+)
 from app.modules.ai_package_v1.domain.dataset_card import DatasetCard, Provenance
 from app.modules.ai_package_v1.domain.enums import (
     CollectionOutcome,
@@ -78,22 +81,36 @@ def build_campaign_full_stat_card(
     scoped_adv_ids: list[int],
     row_count: int,
     freshness: FreshnessStatus,
+    observed_adv_ids: list[int] | None = None,
 ) -> DatasetCard:
     """
     Карточка campaign stat с fail-closed coverage (пустой срез ≠ FULL).
 
+    Неполный набор физических adv_id (есть Auto, нет Search или наоборот)
+    остаётся PARTIAL и получает ``PARTIAL_COLLECTION``. Отсутствующая нога
+    не представлена нулевыми строками.
+
     Args:
         period: Период export.
-        scoped_adv_ids: adv_id из PG scope.
+        scoped_adv_ids: Ожидаемые физические adv_id из PG scope.
         row_count: Количество строк payload.
         freshness: Сигнал CH freshness (не вывод coverage).
+        observed_adv_ids: campaign_id, реально попавшие в срез. ``None`` —
+            не оценивать expected-vs-observed (только пустой срез → NO_DATA).
 
     Returns:
         DatasetCard для manifest.
     """
-    reason_codes: list[ReasonCode] = []
-    if row_count == 0:
-        reason_codes.append(ReasonCode.NO_DATA)
+    if observed_adv_ids is None:
+        reason_codes: list[ReasonCode] = (
+            [ReasonCode.NO_DATA] if row_count == 0 else []
+        )
+    else:
+        reason_codes = reason_codes_for_campaign_physical_legs(
+            scoped_adv_ids=scoped_adv_ids,
+            observed_adv_ids=observed_adv_ids,
+            row_count=row_count,
+        )
     coverage = coverage_for_empty_campaign_stat(
         scoped_adv_ids=scoped_adv_ids,
         row_count=row_count,
@@ -106,12 +123,19 @@ def build_campaign_full_stat_card(
         collection_outcome = CollectionOutcome.UNKNOWN
         coverage = Coverage.NONE
         reason_codes = [ReasonCode.NO_DATA]
+    if ReasonCode.PARTIAL_COLLECTION in reason_codes:
+        collection_outcome = CollectionOutcome.PARTIAL
+        if coverage == Coverage.FULL:
+            coverage = Coverage.PARTIAL
     return DatasetCard(
         dataset_id=DatasetId.CAMPAIGN_FULL_STAT,
         provenance=Provenance(
             primary_source=PrimarySource.CLICKHOUSE_FULL_ADV_WB_STAT,
             grain="adv_id + date",
-            notes="Auto and Search adv_id rows preserved separately",
+            notes=(
+                "Auto and Search adv_id rows preserved separately; "
+                "a missing physical leg is omitted, not zero-filled"
+            ),
         ),
         period=period,
         collection_outcome=collection_outcome,

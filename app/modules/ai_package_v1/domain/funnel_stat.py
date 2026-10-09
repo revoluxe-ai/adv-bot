@@ -6,11 +6,13 @@ from datetime import date
 
 from pydantic import BaseModel
 
+from app.modules.ai_package_v1.domain.shop_id import AuthoritativeShopId
+
 
 class FunnelStatRow(BaseModel):
     """Строка ``default_db.wb_common_stat`` на зерне nmid + date."""
 
-    shop_id: int
+    shop_id: AuthoritativeShopId
     nmid: int
     date: date
     open_card: int = 0

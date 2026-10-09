@@ -7,11 +7,13 @@ from datetime import date
 
 from pydantic import BaseModel
 
+from app.modules.ai_package_v1.domain.shop_id import AuthoritativeShopId
+
 
 class CampaignStatRow(BaseModel):
     """Строка ``default_db.full_adv_wb_stat`` на зерне campaign_id + date."""
 
-    shop_id: int
+    shop_id: AuthoritativeShopId
     campaign_id: int
     date: date
     views: int = 0
@@ -26,9 +28,17 @@ class ScopedAdvIds:
     auction_adv_id: int | None
 
 
-def rows_for_shop(rows: list[CampaignStatRow], shop_id: int) -> list[CampaignStatRow]:
+def rows_for_shop(rows: list[CampaignStatRow], shop_id: str) -> list[CampaignStatRow]:
     """Shop isolation: только строки запрошенного магазина."""
     return [r for r in rows if r.shop_id == shop_id]
+
+
+def permitted_physical_adv_ids(auto_id: int, search_id: int | None) -> set[int]:
+    """Физические WB adv_id одной ComplexAdv: Auto и Search, без синтетического id."""
+    allowed = {auto_id}
+    if search_id is not None:
+        allowed.add(search_id)
+    return allowed
 
 
 def preserve_distinct_adv_ids(
@@ -36,35 +46,35 @@ def preserve_distinct_adv_ids(
     scoped: ScopedAdvIds,
 ) -> list[CampaignStatRow]:
     """
-    Фильтрует строки по известным adv_id, не сливая Auto и Search в один id.
+    Оставляет строки известных физических adv_id.
 
-    Raises:
-        ValueError: если в выходе остался только один id при двух исходных.
+    Отсутствие одной ноги не ошибка: missing leg не превращается в нулевую
+    строку и не считается синтетическим слиянием. Чужие id здесь только
+    отфильтровываются; отказ по ним делает ``assert_no_synthetic_merge``.
     """
     allowed: set[int] = set()
     if scoped.auto_adv_id is not None:
         allowed.add(scoped.auto_adv_id)
     if scoped.auction_adv_id is not None:
         allowed.add(scoped.auction_adv_id)
-    filtered = [r for r in rows if r.campaign_id in allowed]
-    present_ids = {r.campaign_id for r in filtered}
-    if (
-        scoped.auto_adv_id is not None
-        and scoped.auction_adv_id is not None
-        and scoped.auto_adv_id != scoped.auction_adv_id
-        and len(present_ids) < 2
-        and len(filtered) >= 2
-    ):
-        raise ValueError("campaign stat rows must not collapse Auto and Search ids")
-    if len(present_ids) == 1 and scoped.auto_adv_id != scoped.auction_adv_id:
-        if scoped.auto_adv_id and scoped.auction_adv_id:
-            if scoped.auto_adv_id in present_ids and scoped.auction_adv_id in present_ids:
-                return filtered
-            if scoped.auto_adv_id in allowed and scoped.auction_adv_id in allowed:
-                missing = allowed - present_ids
-                if missing:
-                    return filtered
-    return filtered
+    return [row for row in rows if row.campaign_id in allowed]
+
+
+def assert_observed_ids_are_physical(
+    observed_ids: set[int],
+    permitted_ids: set[int],
+) -> None:
+    """
+    Запрещает campaign_id вне разрешённых физических adv_id scope.
+
+    Raises:
+        ValueError: если наблюдаемый id не входит в permitted physical set.
+    """
+    unexpected = sorted(observed_ids - permitted_ids)
+    if not unexpected:
+        return
+    shown = ", ".join(str(campaign_id) for campaign_id in unexpected)
+    raise ValueError(f"synthetic campaign_id {shown} replaces Auto/Search originals")
 
 
 def assert_no_synthetic_merge(
@@ -73,24 +83,19 @@ def assert_no_synthetic_merge(
     search_id: int,
 ) -> None:
     """
-    Контракт: оба оригинальных campaign_id должны встречаться раздельно.
+    Отклоняет campaign_id вне физических Auto/Search.
+
+    Допустимые состояния присутствия данных: обе ноги, только Auto, только
+    Search, ни одной. Missing leg не является доказательством synthetic merge
+    и не требует нулевой строки отсутствующей ноги.
 
     Raises:
-        ValueError: если все строки ссылаются на один synthetic id.
+        ValueError: если в строках есть id вне ``{auto_id, search_id}``.
     """
-    ids = {r.campaign_id for r in rows}
-    if auto_id == search_id:
-        return
-    if auto_id in ids and search_id in ids:
-        return
-    if not rows:
-        return
-    if len(ids) == 1:
-        only = next(iter(ids))
-        if only not in (auto_id, search_id):
-            raise ValueError(f"synthetic campaign_id {only} replaces Auto/Search originals")
-        if auto_id != search_id:
-            raise ValueError("silent merge: only one of Auto/Search adv_id present in export")
+    assert_observed_ids_are_physical(
+        {row.campaign_id for row in rows},
+        permitted_physical_adv_ids(auto_id, search_id),
+    )
 
 
 def campaign_stat_sort_key(row: CampaignStatRow) -> tuple[str, int, str]:

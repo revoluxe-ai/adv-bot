@@ -66,6 +66,7 @@ from .user_interface.handlers import (
     cpm_builder,
     download_keywords,
     adv_excel_roundtrip,
+    shop_ai_package_export,
     exceptions,
     favorite_advs_for_users,
     get_shop_for_admin,
@@ -166,6 +167,7 @@ common_router.include_routers(clusters.router)
 # common_router.include_routers(start.router)  # Уже подключен в global_router.py
 common_router.include_routers(download_keywords.router)
 common_router.include_routers(adv_excel_roundtrip.router)
+common_router.include_routers(shop_ai_package_export.router)
 common_router.include_routers(adv_setting.router)
 common_router.include_routers(campaign_activity.router)
 common_router.include_routers(auto_shelf_bid_control_menu.router)

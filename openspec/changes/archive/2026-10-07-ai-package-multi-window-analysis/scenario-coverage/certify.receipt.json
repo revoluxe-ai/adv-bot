@@ -1,0 +1,19 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "ai-package-multi-window-analysis",
+  "MODE": "certify",
+  "TASK_ID": "WB-SKY-MULTI-WINDOW-SCENARIO-CERTIFY-20261006-REBASE",
+  "VERDICT": "PASS",
+  "PASS_SCOPE": "TARGET_REGRESSION",
+  "SCENARIOS_TOTAL": 26,
+  "SCENARIOS_PASS": 26,
+  "SCENARIOS_FAIL": 0,
+  "SCENARIOS_BLOCKED": 0,
+  "PLAN_EVIDENCE_ID": "SCPV1-56cb1ebe559693c3",
+  "SCENARIO_PLAN_FRESH": true,
+  "PRODUCER_COMMAND": "poetry run pytest -m unit tests/unit/ai_package_v1/analysis/test_multi_window_scenarios.py",
+  "HEAD": "19f2da863",
+  "EXECUTED_AT": "2026-10-06T23:20:00Z",
+  "NOTES": "Post-rebase onto origin/stage@6a01885b; supersedes pre-rebase certification bound to e55d94c."
+}

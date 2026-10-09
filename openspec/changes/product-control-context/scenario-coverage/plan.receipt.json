@@ -1,0 +1,54 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "product-control-context",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-f69ac65248391a28",
+  "PLAN_CONTENT_HASH": "c06b7d6fc0a68bd15fb368f3eeb78a301bc9d2227c6a615b4f7ee2827e585339",
+  "PLAN_PATH": "openspec/changes/product-control-context/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/product-control-context/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 22,
+  "SOURCE_SPEC_SHA": "5b84390799a413946486f63d9cb125664f1c00e239d95bbfe332e6460b0a1876",
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S03,S16",
+      "L2:S06,S13,S18,S19,S20",
+      "L3:S07,S08,S09,S10,S21",
+      "L4:S11,S12,S16,S22",
+      "L5:S04,S14,S15,S06",
+      "L6:S01,S02,S05,S17"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/product-control-context/design.md",
+      "content_hash": "438b82341c354c94b34b36a1c27f46e8c49ce6919e2194fca4d36b1852ae2fc4"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/product-control-context/specs/product-control-context/spec.md",
+        "content_hash": "e21f473feca2add61543b45fdf866db0a1e50288446d8a5eb566b016487aa7a3"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/product-control-context/design.md#derived-lifecycle",
+      "content_hash": "438b82341c354c94b34b36a1c27f46e8c49ce6919e2194fca4d36b1852ae2fc4"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/product-control-context/owner-contract.md",
+      "content_hash": "1328bfd70c5f6ad20c979dafcc156cdc27975ff5ce5d66256cd679d1243994e3"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "438b82341c354c94b34b36a1c27f46e8c49ce6919e2194fca4d36b1852ae2fc4",
+    "SPEC_REVISION": [
+      "e21f473feca2add61543b45fdf866db0a1e50288446d8a5eb566b016487aa7a3"
+    ],
+    "LIFECYCLE_REVISION": "438b82341c354c94b34b36a1c27f46e8c49ce6919e2194fca4d36b1852ae2fc4",
+    "OWNER_CONTRACT_REVISION": "1328bfd70c5f6ad20c979dafcc156cdc27975ff5ce5d66256cd679d1243994e3"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

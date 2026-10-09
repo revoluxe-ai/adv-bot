@@ -5,6 +5,8 @@
 -- Таблица(и): default_db.keyword_position_from_api
 -- Параметры: nmids, position_first_available, package_cutoff_date, cutoff_instant_ms
 -- Вызывается: ChKeywordPositionReader.fetch_rows
+-- Примечание: внешний alias — max_version, не version. Alias version
+--   подставляется в uniqExact/any и даёт CH Code 184 ILLEGAL_AGGREGATION.
 -- ============================================================================
 WITH latest_version AS (
     SELECT
@@ -40,7 +42,9 @@ SELECT
     nmid,
     text,
     date,
-    max(version) AS version,
+    -- Alias must not be `version`: ClickHouse rewrites that name inside
+    -- uniqExact/any and raises Code 184 (max nested in another aggregate).
+    max(version) AS max_version,
     uniqExact(
         (avr_position, total_views, orders, version)
     ) AS tuple_variants_at_max_version,

@@ -7,6 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.domain.enums import DatasetId
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.export.export_service import ExportService
@@ -83,6 +86,7 @@ def _default_export_service() -> ExportService:
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=settings,
     )
 
@@ -97,7 +101,7 @@ async def test_default_keyword_assembler_no_wb_at_boundary() -> None:
         assembler = KeywordPerformanceAssembler()
         _ = await assembler.assemble(
             shop_id=SHOP_ID,
-            manifest_shop_id=1,
+            manifest_shop_id="1",
             period=PERIOD,
             generated_at=GENERATED_AT,
         )
@@ -111,7 +115,7 @@ async def test_default_keyword_assembler_no_store_writes_at_boundary() -> None:
         assembler = KeywordPerformanceAssembler()
         result = await assembler.assemble(
             shop_id=SHOP_ID,
-            manifest_shop_id=1,
+            manifest_shop_id="1",
             period=PERIOD,
             generated_at=GENERATED_AT,
         )

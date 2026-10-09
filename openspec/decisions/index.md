@@ -89,6 +89,11 @@ architecture decisions belong here.
   - Scope: canonical campaign settings field registry ownership; fail-closed
     classification for history and Excel projections; PostgreSQL remains
     current-settings authority.
+- [campaign-settings-changeset-ownership](campaign-settings-changeset-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `ChangeSetV1`, dry-run validation, `sd1`/`st1`, and `wb_sky_control_plane`
+    ownership; no production writes from dry-run; registry reuse only from
+    `campaign_settings_contract`.
 - [shop-runner-shop-wide-collection](shop-runner-shop-wide-collection/decision.md)
   - Status: Accepted
   - Scope: shop-wide campaign ad data collection executor is shop-runner only;
@@ -109,7 +114,13 @@ architecture decisions belong here.
   - Scope: ownership/layering for AI Package v1 read-only export under
     `app/modules/ai_package_v1/`; `READ_ONLY_NO_MUTATION`; forbidden WB API,
     shop-runner orchestrator, and collector triggers on export path; CLI/Job
-    entry only (no TG/GUI).
+    entry plus a transport-only Telegram adapter that calls
+    `PackageZipAssembler` (no second exporter).
+- [decision-experiment-memory-ownership](decision-experiment-memory-ownership/decision.md)
+  - Status: Accepted
+  - Scope: semantic ownership of decision/experiment memory (plans, lifecycle,
+    validity, factual results, interpretation linkage); refs-only for settings,
+    Apply, metrics, attribution; not production write authority.
 
 ## Change Requirements
 

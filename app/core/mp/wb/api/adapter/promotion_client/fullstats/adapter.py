@@ -102,6 +102,11 @@ class FullstatsAdapter(BaseSectionAdapter):
             chunk: list[int], b: date, e: date
         ) -> list[FullAdvStat]:
             items = await self._request_chunk(chunk, b, e)
+            from app.modules.attribution_facts.ingest.seam import (
+                maybe_ingest_fullstats_chunk,
+            )
+
+            await maybe_ingest_fullstats_chunk(list(items))
             return [
                 full_stats_item_to_full_adv_stat(item, b, e) for item in items
             ]

@@ -31,6 +31,7 @@
     "updater.py",
     "app/modules/wb_adv_updater/modules/balance_exp_informer",
     "app/modules/billing/event_manager",
+    "app/modules/attribution_facts",
     "app/modules/auto_budget_manager",
     "app/modules/shop_runner/service_manager/services/update_commot_bid_in_search_advs_manager",
     "app/modules/shop_runner/wb_shop.py",
@@ -149,6 +150,8 @@
     "tools/wb_api_master_map.py",
     "app/modules/campaign_settings_contract",
     "app/modules/campaign_settings_history",
+    "app/modules/wb_sky_control_plane",
+    "tests/unit/wb_sky_control_plane",
     "scripts/clickhouse_migration_control_plane",
     "tests/unit/clickhouse_migration_contract_fixture.py",
     "tests/unit/test_clickhouse_migration_legacy_baseline.py",
@@ -162,7 +165,8 @@
     "app/modules/ai_package_v1",
     "tests/unit/ai_package_v1",
     "app/modules/wb_sky_mcp",
-    "tests/unit/wb_sky_mcp"
+    "tests/unit/wb_sky_mcp",
+    "tests/unit/attribution_facts"
   ],
   "exclude": [
     "app/core/mp/wb/api/generated",

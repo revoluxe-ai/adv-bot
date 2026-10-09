@@ -22,28 +22,28 @@ def validate_export_period(period: ExportPeriod) -> None:
         )
 
 
-def validate_export_shop_id(shop_id: str) -> int:
+def validate_export_shop_id(shop_id: str) -> str:
     """
-    Проверяет PG ``shop_id`` и возвращает manifest int.
+    Проверяет PG ``shop_id`` и возвращает ту же authoritative строку.
 
     Args:
         shop_id: ``WBCabinet.shop_id``.
 
     Returns:
-        Целочисленный shop id для manifest/CH.
+        Та же строка для manifest и dataset rows.
 
     Raises:
-        ValueError: если shop_id не numeric (fail-closed v1).
+        ValueError: пустой shop_id или не-str (fail-closed).
     """
     return manifest_shop_id(shop_id)
 
 
-def validate_export_inputs(shop_id: str, period: ExportPeriod) -> int:
+def validate_export_inputs(shop_id: str, period: ExportPeriod) -> str:
     """
     Единая точка валидации ``export(shop_id, period)``.
 
     Returns:
-        Manifest shop id после успешной проверки.
+        Authoritative shop id после успешной проверки.
     """
     manifest_id = validate_export_shop_id(shop_id)
     validate_export_period(period)

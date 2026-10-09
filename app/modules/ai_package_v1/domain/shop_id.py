@@ -1,27 +1,57 @@
-"""Согласование ``WBCabinet.shop_id`` (str) с ``ExportManifest.shop_id`` (int)."""
+"""Authoritative ``WBCabinet.shop_id`` для AI Package v1 без числового coercion.
+
+PG хранит идентификатор магазина как ``str`` (UUID и иные валидные значения).
+Manifest, dataset rows, PACKAGE_SUMMARY и keyword payloads обязаны нести ту же
+строку. Отдельный numeric/hash surrogate запрещён.
+"""
 
 from __future__ import annotations
 
+from typing import Annotated
 
-def manifest_shop_id(pg_shop_id: str) -> int:
+from pydantic import BeforeValidator
+
+
+def require_authoritative_shop_id(value: object) -> str:
     """
-    Преобразует authoritative PG ``shop_id`` в int для manifest и CH строк.
+    Принимает только непустую строку и возвращает её без нормализации.
 
-    ``WBCabinet.shop_id`` типизирован как ``str``; manifest v1 хранит ``shop_id``
-    как int для согласованности с ``CampaignStatRow.shop_id``.
+    Args:
+        value: Кандидат shop identity (JSON, модель или вход export).
+
+    Returns:
+        Та же строка, что пришла, включая значимые символы.
+
+    Raises:
+        ValueError: не-str (в том числе int), пустая или whitespace-only строка.
+    """
+    if isinstance(value, bool) or not isinstance(value, str):
+        raise ValueError(
+            "shop_id must be an authoritative string; numeric coercion is forbidden"
+        )
+    if value.strip() == "":
+        raise ValueError("shop_id must be a non-blank authoritative string")
+    return value
+
+
+AuthoritativeShopId = Annotated[str, BeforeValidator(require_authoritative_shop_id)]
+
+
+def manifest_shop_id(pg_shop_id: str) -> str:
+    """
+    Возвращает authoritative PG ``shop_id`` для manifest и payload rows.
+
+    Не приводит десятичные строки к ``int`` и не обрезает идентификатор:
+    whitespace внутри или по краям легитимного значения сохраняется.
+    Пустая строка fail-closed.
 
     Args:
         pg_shop_id: Значение ``WBCabinet.shop_id``.
 
     Returns:
-        Целочисленный идентификатор магазина.
+        Та же строка.
 
     Raises:
-        ValueError: если строка не является десятичным целым (fail-closed v1).
+        ValueError: пустой идентификатор или попытка передать не-str.
     """
-    stripped = pg_shop_id.strip()
-    if not stripped.isdigit():
-        raise ValueError(
-            f"shop_id must be numeric for manifest v1, got {pg_shop_id!r}"
-        )
-    return int(stripped)
+    return require_authoritative_shop_id(pg_shop_id)
