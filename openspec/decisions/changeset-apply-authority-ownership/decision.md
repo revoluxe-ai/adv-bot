@@ -82,7 +82,7 @@ Writer adapters MUST NOT contain business policy (capabilities, tokens, authz).
 
 ## Related changes
 
-- `openspec/changes/archive/<date>-changeset-apply-authority` (path set on archive)
+- `openspec/changes/archive/2026-10-09-changeset-apply-authority`
 
 ## Review checklist
 
