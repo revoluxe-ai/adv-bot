@@ -39,6 +39,24 @@ eligibility, diagnostics contract, reason codes, exhaustive unit tests.
 - `AdControlChangeSetV1` ops `shop.set_ad_control_feature`,
   `campaign.set_ad_control_override` / `disable` / `clear` + dry-run validator (read-only).
 
+## Task 4.1 runtime
+
+Read-only shop evaluation lives in `app/modules/ad_control_settings/runtime/`.
+Shop-runner calls it from `hierarchical_ad_control_diagnostics` and does not
+apply changes. One `ReportsManager.get_supplier_orders` pagination per shop
+and closed window. Shop spend is `full_adv_wb_stat` over
+`shop_campaign_inventory`. Campaign economics use `AttributionFactsReader`
+DIRECT facts only. Campaign ids prefer settings history, then inventory.
+
+Decisions:
+
+- `openspec/decisions/drr-cpo-price-semantics/decision.md` (`V1_ORDER_VALUE_BASIS`)
+- `openspec/changes/hierarchical-ad-control-settings/decisions/shop-order-gmv-runtime-authority/decision.md`
+- `openspec/changes/hierarchical-ad-control-settings/decisions/hierarchical-ad-control-settings-ownership/decision.md`
+
+`HEADROOM_ALLOCATOR_NOT_ACCEPTED` stays. Catalog-price CPO stays blocked when
+the builder is not on the order-value path. No migration and no 4.2 UI edits.
+
 ## Non-merge
 
 Isolated from `wb-sky-mcp-read-interface`, `decision-experiment-memory`,

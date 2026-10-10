@@ -17,7 +17,7 @@
 
 ## 4. Future slices
 
-- [ ] 4.1 Runtime shop-runner integration
+- [x] 4.1 Runtime shop-runner integration
 - [ ] 4.2 UI Advertising Control + Diagnostics
   - 4.2A Telegram configured/effective surface and dry-run preview is implemented. Checkbox stays open: 4.2B economic diagnostics still depend on task 4.1.
 - [ ] 4.3 Headroom production allocator (Owner algorithm GO)

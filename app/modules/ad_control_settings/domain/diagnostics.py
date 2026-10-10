@@ -52,3 +52,4 @@ class AdControlDiagnosticsReportV1:
     blockers: tuple[str, ...]
     dry_run_diff_available: bool
     provenance_index: tuple[ProvenanceEntry, ...]
+    campaign_observed_drr: ActualDrrObservation | None = None

@@ -39,8 +39,9 @@ class BoundedCpoProposal:
     """
     Bounded proposal contract (semantic); не production actuation.
 
-    ``proposed_max_cpo_rub`` допускается только когда price semantics accepted
-    (иначе None + reason code).
+    ``proposed_max_cpo_rub`` для V1 — order-value ``TARGET_CPO_RUB``.
+    Catalog-price actuation остаётся заблокированной. Allocator не заполняет
+    это поле (``HEADROOM_ALLOCATOR_NOT_ACCEPTED``).
     """
 
     campaign: CampaignRef
