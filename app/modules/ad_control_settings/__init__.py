@@ -1,8 +1,9 @@
 """
 Иерархические настройки автоматического рекламного контроля WB Sky (foundation).
 
-Чистый домен: registry, resolver, DRR/headroom state, diagnostics contract.
-Без persistence, runtime writers и transport.
+Домен и persistence configured policy, плюс Telegram-экран 4.2A
+(чтение и dry-run). Экран не вызывает Apply и не пишет слоты.
+Runtime-экономика (DRR/headroom/CPO) в этот транспорт не входит.
 """
 
 from app.modules.ad_control_settings.domain.campaign_ref import CampaignRef
