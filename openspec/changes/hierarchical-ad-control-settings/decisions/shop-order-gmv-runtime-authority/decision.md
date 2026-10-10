@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (change `hierarchical-ad-control-settings`, Task 4.1 blocker). Implementation: NO.
+Accepted (2026-10-10; change `hierarchical-ad-control-settings`, Task 4.1 blocker). Implementation: NO.
 
 ## Context
 

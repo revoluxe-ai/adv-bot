@@ -14,6 +14,7 @@ from app.modules.predict_ctr_exponent_settings import (
     ChangeExponentSettinginAdvSettingRouter,
 )
 from app.modules.hide_zero_views_toggle import HideZeroViewsToggleRouter
+from app.modules.ad_control_settings.telegram import router as ad_control_telegram_router
 from app.modules.sales_plan_settings import SalesPlanSettingsMenuRouter
 from app.modules.white_list_mode_settings import router as WhiteListModeSettingsRouter
 from app.modules.shop_runner.auction_boost_mode_settings import (
@@ -148,6 +149,7 @@ common_router.include_routers(individual_keywords_target_place_toggle.router)
 common_router.include_routers(incremental_stats_toggle_router)
 common_router.include_routers(BidderAutoModeRouter)
 common_router.include_routers(SalesPlanSettingsMenuRouter)
+common_router.include_routers(ad_control_telegram_router)
 common_router.include_routers(AuctionBoostModeSettingsRouter)
 common_router.include_routers(ChangeExponentSettinginAdvSettingRouter)
 common_router.include_routers(HideZeroViewsToggleRouter)

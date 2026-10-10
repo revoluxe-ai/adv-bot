@@ -1,8 +1,9 @@
 """
 Иерархические настройки автоматического рекламного контроля WB Sky (foundation).
 
-Домен, persistence, read-only runtime (shop DRR/headroom/CPO) и Telegram 4.2A.
-Runtime не пишет в WB и не вызывает Apply. Экран 4.2A не является runtime writer.
+Домен, persistence и read-only runtime (shop DRR/headroom/CPO).
+Telegram-экран 4.2A читает configured/effective state и dry-run и не пишет слоты.
+Runtime не вызывает Apply и не входит в транспорт экрана.
 """
 
 from app.modules.ad_control_settings.domain.campaign_ref import CampaignRef

@@ -46,6 +46,7 @@ from app.client_bot.user_interface.views.callbacks import (
     TurnBot,
     UiModeToggle,
 )
+from app.modules.ad_control_settings.telegram.callbacks import AdcShop
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
 from app.modules.common_slaves.wildberries.models import (
@@ -112,6 +113,13 @@ def build_shop_main_keyboard(
             callback_data=ChoiceAdvPaginator(
                 wb_user_cabinet_original_id=wb_user_cabinet.id, page=1
             ).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="Рекламный контроль",
+            callback_data=AdcShop(cab=wb_user_cabinet.id).pack(),
         )
     )
 
