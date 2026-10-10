@@ -163,5 +163,9 @@ def configuration_identity(
     feature_id: AdControlFeatureId,
     schema_version: int,
 ) -> tuple[AdControlScope, AdControlFeatureId, int]:
-    """Versioned configuration identity для будущей persistence."""
+    """
+    Logical persistence key is ``(scope, feature_id)``; ``schema_version`` is row attribute.
+
+    Tuple retained for registry/diagnostics correlation (includes schema_version).
+    """
     return (scope, feature_id, schema_version)

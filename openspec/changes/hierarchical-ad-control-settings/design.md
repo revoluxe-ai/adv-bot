@@ -1,4 +1,4 @@
-# Design — hierarchical-ad-control-settings (Slice A)
+# Design — hierarchical-ad-control-settings (Slice A + B)
 
 ## Architecture Decision References
 
@@ -16,19 +16,28 @@
 | Per-function automation registry + resolver | `app/modules/ad_control_settings/` |
 | Product DrrProfile semantics | `app/modules/product_control/` (adapter only) |
 | Campaign settings field classification | `campaign_settings_contract` |
-| ChangeSet dry-run / Apply | `wb_sky_control_plane` (future ops) |
+| ChangeSet dry-run (ad control) | `wb_sky_control_plane` (`AdControlChangeSetV1`) |
+| Configured persistence | `app/modules/ad_control_settings/persistence/` |
 
 Checklist:
 
 - [x] context-first decision lookup performed
 - [x] relevant decisions cited
 - [x] new placement in dedicated module (no fork of product_control)
-- [x] implementation layer matches decision (pure domain only)
+- [x] implementation layer matches decision (domain + persistence; Apply unwired)
 
 ## Slice A deliverables
 
 Registry, scope model, resolver, product adapter, DRR triple types, headroom state +
 eligibility, diagnostics contract, reason codes, exhaustive unit tests.
+
+## Slice B deliverables
+
+- PG tables with logical identity shop `(shop_id, feature_id)` and campaign
+  `(shop_id, advert_id, feature_id)`; `schema_version` column on the authoritative row.
+- `payload_codec` + `AdControlSettingsRepository` (validate via `FEATURE_REGISTRY`).
+- `AdControlChangeSetV1` ops `shop.set_ad_control_feature`,
+  `campaign.set_ad_control_override` / `disable` / `clear` + dry-run validator (read-only).
 
 ## Non-merge
 

@@ -2,9 +2,10 @@
 
 ## Purpose
 
-Normative **foundation** semantics for hierarchical advertising automation settings:
+Normative semantics for hierarchical advertising automation settings:
 per-function modes at SHOP and CAMPAIGN, live inheritance, DRR triple separation,
-headroom eligibility, diagnostics contract. Persistence and runtime are out of scope.
+headroom eligibility, diagnostics contract. Slice B adds configured persistence and
+ChangeSet dry-run; runtime shop-runner and UI remain out of scope.
 
 ## ADDED Requirements
 
@@ -55,14 +56,55 @@ emit new control actions from hierarchical evidence.
 - **WHEN** `control_action_allowed` runs
 - **THEN** result MUST be disallowed with `ACTUAL_DRR_STALE`
 
-### Requirement: Price semantics boundary
+### Requirement: Price semantics boundary (Slice A foundation)
 
-Foundation MUST NOT perform authoritative price-dependent CPO production actuation
-while `PRICE_SEMANTICS_ACCEPTED = NO`.
+Slice A catalog-price CPO diagnostics MUST remain fail-closed while
+`CATALOG_PRICE_SEMANTICS_ACCEPTED = NO`. V1 order-value acceptance on stage MUST
+NOT imply catalog-price authority. Slice B MUST NOT perform runtime CPO actuation.
 
-#### Scenario: Diagnostics proposal blocked
+#### Scenario: Catalog-price CPO actuation still blocked in foundation diagnostics
 
-- **GIVEN** diagnostic build with valid configured DRR
-- **WHEN** proposed CPO is requested semantically
-- **THEN** `proposed_max_cpo_rub` MUST be withheld with
-  `PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED`
+- **GIVEN** diagnostic build without accepted catalog-price semantics
+- **WHEN** proposed CPO is requested on catalog-price authority
+- **THEN** proposal MUST remain blocked with an explicit reason code
+
+### Requirement: Configured persistence logical identity
+
+Configured shop and campaign policy MUST persist exactly one authoritative row per
+logical feature slot. Shop identity MUST be `(shop_id, feature_id)`. Campaign
+identity MUST be `(shop_id, advert_id, feature_id)`. `schema_version` MUST be stored
+on that row as an attribute only and MUST NOT be part of logical identity.
+Unsupported or newer `schema_version` values MUST fail closed. Multiple rows for one
+feature solely because schema versions differ MUST be forbidden. JSONB MUST be decoded
+only through domain registry validators.
+
+#### Scenario: Shop row round-trip
+
+- **GIVEN** ENABLED `DRR_POLICY` payload at shop scope
+- **WHEN** payload is encoded to JSONB and decoded
+- **THEN** typed payload MUST match registry validation for schema_version 1
+
+### Requirement: Ad control ChangeSet dry-run
+
+`AdControlChangeSetV1` mutations MUST be validated by
+`validate_ad_control_changeset` without PostgreSQL or WB writes. Concurrency authority
+MUST be `expected_revision` only; `state_token` MUST remain a semantic fingerprint for
+snapshots and diagnostics and MUST NOT be a second CAS precondition.
+
+#### Scenario: Stale revision rejected
+
+- **GIVEN** an existing shop feature snapshot at authoritative revision `N`
+- **WHEN** a ChangeSet presents `expected_revision` not equal to `N`
+- **THEN** dry-run MUST return `REJECTED` with `REVISION_CONFLICT`
+
+#### Scenario: Absent row with revision precondition
+
+- **GIVEN** no authoritative row for the feature slot
+- **WHEN** a ChangeSet presents `expected_revision` that is not null
+- **THEN** dry-run MUST return `REJECTED` with `REVISION_CONFLICT`
+
+#### Scenario: Existing row without create revision
+
+- **GIVEN** an authoritative row exists for the feature slot
+- **WHEN** a ChangeSet presents `expected_revision` null
+- **THEN** dry-run MUST return `REJECTED` with `REVISION_CONFLICT`
