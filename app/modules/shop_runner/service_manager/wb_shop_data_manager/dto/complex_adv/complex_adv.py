@@ -8,7 +8,7 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from app.core.mp.wb.dto import AdvMinNmidsBids
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -30,7 +30,8 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost
 from app.shared.domains.wb.utils.promo_plan_multiplier import EffectivePromoPlan
 
-
+if TYPE_CHECKING:
+    from app.modules.shop_runner.wb_stat_manager.leg_cpo import LegCpoSnapshot
 
 
 def resolve_auto_shelf_bid_control_strategy(
@@ -146,6 +147,8 @@ class ComplexAdv:
         self._min_nmids_bids: AdvMinNmidsBids | None = min_nmids_bids
         self._traffic_clicks_dto: TrafficClicksDTO | None = None
         self._fact_pay_for_order: float | None = fact_pay_for_order
+        # leg-cpo-economics: aggregate fact остаётся отдельным от Auto/Search CPO.
+        self._leg_cpo_snapshot: LegCpoSnapshot | None = None
         self._fact_predict_orders: float | None = fact_predict_orders
         self._resolve_cpo: float | None = resolve_cpo
         self._original_max_cpo = original_max_cpo
@@ -617,8 +620,42 @@ class ComplexAdv:
 
     @property
     def fact_pay_for_order(self) -> float | None:
-        """Фактическое CPO кампании (cost per order) из plan-fact статистики."""
+        """Aggregate CPO комплекса из plan-fact; не использовать как leg CPO."""
         return self._fact_pay_for_order
+
+    def attach_leg_cpo(self, snapshot: LegCpoSnapshot) -> None:
+        """Пришить read-only Auto/Search CPO snapshot для spec leg-cpo-economics."""
+        if int(snapshot.auto_adv_id) != int(self.auto_adv_id):
+            raise ValueError(
+                f"leg CPO snapshot auto_adv_id={snapshot.auto_adv_id} "
+                f"does not match complex adv {self.auto_adv_id}"
+            )
+        expected_search = (
+            int(self.search_adv_id) if self.search_adv_id is not None else None
+        )
+        if snapshot.search_adv_id != expected_search:
+            raise ValueError(
+                f"leg CPO snapshot search_adv_id={snapshot.search_adv_id} "
+                f"does not match complex adv search {expected_search}"
+            )
+        self._leg_cpo_snapshot = snapshot
+
+    @property
+    def leg_cpo_snapshot(self) -> LegCpoSnapshot | None:
+        """Вернуть attached snapshot без пересчёта и hidden fallback."""
+        return self._leg_cpo_snapshot
+
+    @property
+    def auto_fact_cpo(self) -> float | None:
+        """Фактический CPO structural Auto leg."""
+        snapshot = self._leg_cpo_snapshot
+        return snapshot.auto_cpo if snapshot is not None else None
+
+    @property
+    def search_fact_cpo(self) -> float | None:
+        """Фактический CPO structural Search leg либо None при unavailable."""
+        snapshot = self._leg_cpo_snapshot
+        return snapshot.search_cpo if snapshot is not None else None
 
     @property
     def fact_predict_orders(self) -> float | None:

@@ -172,7 +172,8 @@ async def test_pbh002_a_prime_hold_tick_restores_on_when_pfo_recovers() -> None:
         shop_id=1,
         card_ab_hold_mode=CardAbHoldMode.ACTIVE.value,
         adv_setting=adv_setting,
-        fact_pay_for_order=50.0,  # recovered — not deep overspend
+        fact_pay_for_order=999.0,  # aggregate CPO intentionally bad; must be ignored here
+        search_fact_cpo=50.0,  # Search recovered — not deep overspend
         get_keywords=AsyncMock(return_value=[recovered]),
     )
 

@@ -7,8 +7,9 @@ gate-before-side-effect, non-retryable classification и teardown semantics
 
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -22,6 +23,7 @@ from tests.support.destructive_lifecycle import (
     classify_lifecycle_error,
     discover_resource_needs_from_fixturenames,
     discover_session_resource_needs,
+    is_reuse_mode_enabled,
     run_with_bounded_retry,
 )
 from tests.support.destructive_pg_dsn import DestructiveTestDatabaseError
@@ -55,6 +57,8 @@ def _lifecycle(
     docker_preflight=None,
     validate_pg=None,
     validate_ch=None,
+    probe_pg=None,
+    probe_ch=None,
     init_pg=None,
     init_ch=None,
     raise_stage=None,
@@ -81,6 +85,8 @@ def _lifecycle(
         docker_preflight=docker_preflight or MagicMock(return_value=["docker", "compose"]),
         validate_pg=validate_pg or MagicMock(),
         validate_ch=validate_ch or MagicMock(),
+        probe_pg=probe_pg,
+        probe_ch=probe_ch,
         init_pg_schema=init_pg or MagicMock(),
         init_ch_schema=init_ch or MagicMock(),
         raise_docker_stage=raise_stage or _default_raise,
@@ -360,12 +366,120 @@ def test_teardown_raises_cleanup_when_no_primary() -> None:
 def test_reuse_mode_skips_compose_down() -> None:
     """TEST_INFRA_REUSE: pytest не останавливает containers."""
     sync_run = MagicMock(side_effect=_make_sync_mock())
-    lc = _lifecycle(sync_run=sync_run, reuse_mode=True)
+    lc = _lifecycle(
+        sync_run=sync_run,
+        reuse_mode=True,
+        probe_pg=MagicMock(),
+    )
     lc.ensure_resources(TestResourceNeeds(needs_pg=True))
     lc.teardown()
     down_calls = [c for c in sync_run.call_args_list if "down" in c.args]
     assert down_calls == []
     assert lc.state.compose_down_count == 0
+
+
+@pytest.mark.unit
+def test_reuse_mode_skips_docker_preflight_and_compose() -> None:
+    """TEST_INFRA_REUSE: loopback probe only — no docker info / compose up."""
+    preflight = MagicMock()
+    sync_run = MagicMock()
+    probe_pg = MagicMock()
+    init_pg = MagicMock()
+    lc = _lifecycle(
+        docker_preflight=preflight,
+        sync_run=sync_run,
+        probe_pg=probe_pg,
+        init_pg=init_pg,
+        reuse_mode=True,
+    )
+    with patch.dict(
+        os.environ,
+        {"ALLOW_DESTRUCTIVE_TEST_SUBPROCESS": "0"},
+        clear=False,
+    ):
+        lc.ensure_resources(TestResourceNeeds(needs_pg=True))
+    preflight.assert_not_called()
+    sync_run.assert_not_called()
+    probe_pg.assert_called_once()
+    init_pg.assert_called_once()
+    assert lc.state.compose_up_count == 0
+    assert COMPOSE_SERVICE_PG in lc.state.started_services
+
+
+@pytest.mark.unit
+def test_reuse_mode_probe_failure_fails_closed_without_compose() -> None:
+    """Unhealthy PG probe → NON_RETRYABLE, no Docker side effects."""
+    from tests.support.destructive_pg_dsn import DestructiveTestDatabaseError
+
+    preflight = MagicMock()
+    sync_run = MagicMock()
+    probe_pg = MagicMock(
+        side_effect=DestructiveTestDatabaseError(
+            "TEST_INFRA_REUSE: PostgreSQL endpoint unhealthy"
+        )
+    )
+    lc = _lifecycle(
+        docker_preflight=preflight,
+        sync_run=sync_run,
+        probe_pg=probe_pg,
+        reuse_mode=True,
+    )
+    with pytest.raises(DestructiveTestDatabaseError, match="endpoint unhealthy"):
+        lc.ensure_resources(TestResourceNeeds(needs_pg=True))
+    preflight.assert_not_called()
+    sync_run.assert_not_called()
+    assert lc.state.compose_up_count == 0
+
+
+@pytest.mark.unit
+def test_reuse_mode_missing_probe_runner_fails_closed() -> None:
+    """Explicit reuse without probe runner → deterministic RuntimeError."""
+    lc = _lifecycle(reuse_mode=True, probe_pg=None)
+    with pytest.raises(RuntimeError, match="TEST_INFRA_REUSE requires probe_pg"):
+        lc.ensure_resources(TestResourceNeeds(needs_pg=True))
+
+
+@pytest.mark.unit
+def test_reuse_mode_validation_still_before_probe() -> None:
+    """Static DSN validation fails before loopback probe in reuse mode."""
+    validate_pg = MagicMock(
+        side_effect=DestructiveTestDatabaseError("refuse connect")
+    )
+    probe_pg = MagicMock()
+    lc = _lifecycle(validate_pg=validate_pg, probe_pg=probe_pg, reuse_mode=True)
+    with pytest.raises(DestructiveTestDatabaseError, match="refuse connect"):
+        lc.ensure_resources(TestResourceNeeds(needs_pg=True))
+    probe_pg.assert_not_called()
+
+
+@pytest.mark.unit
+def test_default_mode_still_requires_subprocess_opt_in() -> None:
+    """Non-reuse path unchanged: missing subprocess opt-in blocks compose."""
+    preflight = MagicMock()
+    sync_run = MagicMock()
+    lc = _lifecycle(docker_preflight=preflight, sync_run=sync_run, reuse_mode=False)
+    with patch.dict(
+        os.environ,
+        {
+            "ALLOW_DESTRUCTIVE_TEST_SUBPROCESS": "0",
+            "ALLOW_DESTRUCTIVE_TEST_DB": "0",
+            "ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE": "0",
+        },
+        clear=False,
+    ):
+        with pytest.raises(RuntimeError, match="ALLOW_DESTRUCTIVE_TEST_SUBPROCESS"):
+            lc.ensure_resources(TestResourceNeeds(needs_pg=True))
+    preflight.assert_not_called()
+    sync_run.assert_not_called()
+
+
+@pytest.mark.unit
+def test_is_reuse_mode_enabled_truthy_values() -> None:
+    """TEST_INFRA_REUSE opt-in parsing."""
+    assert is_reuse_mode_enabled(environ={"TEST_INFRA_REUSE": "1"})
+    assert is_reuse_mode_enabled(environ={"TEST_INFRA_REUSE": "true"})
+    assert not is_reuse_mode_enabled(environ={})
+    assert not is_reuse_mode_enabled(environ={"TEST_INFRA_REUSE": "0"})
 
 
 @pytest.mark.unit

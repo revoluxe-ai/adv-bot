@@ -31,6 +31,7 @@ from app.shared.enums.wb_adv_active_status import WBAdvActiveStatus
 _SERVICE_MODULE = (
     "app.modules.shop_runner.service_manager.services.auto_adv_active_control.auto_adv_active_control_service"
 )
+_AUTO_FACT_UNSET = object()
 
 
 async def _run_tasks_for_tests(
@@ -163,6 +164,8 @@ class _FakeComplexAdv:
         rec_system_mode: bool = True,
         auto_adv_bid_control_enable: bool = False,
         auto_shelf_bid_control_enabled: bool = False,
+        auto_fact_cpo: Any = None,
+        search_fact_cpo: Any = None,
         bidder_coroutine_type: BidderCoroutineType = (
             BidderCoroutineType.OLD_UPDATE_CPM_BIDDER
         ),
@@ -195,6 +198,8 @@ class _FakeComplexAdv:
         self._search_auto_budget_total_limit = search_auto_budget_total_limit
         self._common_budget_total_limit = common_budget_total_limit
         self.auto_adv_bid_control_enable = auto_adv_bid_control_enable
+        self.auto_fact_cpo = auto_fact_cpo
+        self.search_fact_cpo = search_fact_cpo
 
     @property
     def adv_setting(self):
@@ -246,7 +251,12 @@ async def _run_auto_cost_rule_case(
     resolved_target_cost: object = 100,
     auto_shelf_bid_control_enabled: bool = False,
     selected_cpo_contract: AutoShelfBidSelectedCpoContract | None = None,
+    auto_fact_cpo: object = _AUTO_FACT_UNSET,
+    search_fact_cpo: object | None = None,
 ) -> MagicMock:
+    resolved_auto_fact_cpo = (
+        fact_pay_for_order if auto_fact_cpo is _AUTO_FACT_UNSET else auto_fact_cpo
+    )
     adv = _FakeComplexAdv(
         auto_limit=100,
         auto_status=auto_status,
@@ -257,6 +267,8 @@ async def _run_auto_cost_rule_case(
         target_price_for_order=100,
         max_price_for_order=200,
         auto_shelf_bid_control_enabled=auto_shelf_bid_control_enabled,
+        auto_fact_cpo=resolved_auto_fact_cpo,
+        search_fact_cpo=search_fact_cpo,
     )
     wb_modifier = MagicMock()
     wb_modifier.start_auto_campaign = AsyncMock()
@@ -333,6 +345,34 @@ async def _run_auto_cost_rule_case(
     wb_modifier.selected_cpo_provider = selected_cpo_provider
     wb_modifier.legacy_avg_cost_mock = legacy_avg_cost_mock
     return wb_modifier
+
+
+@pytest.mark.asyncio
+async def test_auto_cost_rule_ignores_bad_search_and_aggregate_when_auto_cpo_is_good() -> None:
+    """leg-cpo-economics: Auto decision читает Auto CPO, а не Search/common CPO."""
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=999.0,
+        auto_fact_cpo=80.0,
+        search_fact_cpo=999.0,
+        resolved_target_cost=100.0,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_auto_cost_rule_missing_auto_cpo_does_not_fallback_to_aggregate() -> None:
+    """Missing Auto CPO fail-closed: высокий aggregate CPO не заменяет Auto CPO."""
+    wb_modifier = await _run_auto_cost_rule_case(
+        avg_cost=150.0,
+        fact_pay_for_order=999.0,
+        auto_fact_cpo=None,
+        search_fact_cpo=999.0,
+        resolved_target_cost=100.0,
+    )
+
+    wb_modifier.pause_auto_campaign.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -1022,6 +1062,7 @@ async def test_auto_shelf_disabled_preserves_legacy_behavior():
         target_price_for_order=300,
         max_price_for_order=400,
         auto_shelf_bid_control_enabled=False,
+        auto_fact_cpo=383.87,
     )
     wb_modifier = MagicMock()
     wb_modifier.pause_auto_campaign = AsyncMock()

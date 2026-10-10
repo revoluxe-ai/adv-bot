@@ -1342,9 +1342,8 @@ class AutoAdvActiveControlService:
             auto_adv_id=auto_adv_id,
             auto_shelf_view=auto_shelf_view,
         )
-        fact_pay_for_order = (
-            plan_fact_summary.fact_pay_for_order if plan_fact_summary else None
-        )
+        # leg-cpo-economics: Auto activity подтверждается только Auto-leg CPO.
+        fact_pay_for_order = getattr(adv, "auto_fact_cpo", None)
         target_cost_value = _as_finite_cost_number(target_cost)
         avg_cost_value = _as_finite_cost_number(avg_cost)
 
@@ -1438,7 +1437,7 @@ class AutoAdvActiveControlService:
             else:
                 logger.info(
                     "Auto watchdog: pausing auto campaign%s due to high cost "
-                    "%.2f and total CPO %.2f vs target %.2f adv_id=%s shop_id=%s",
+                    "%.2f and Auto CPO %.2f vs target %.2f adv_id=%s shop_id=%s",
                     cost_log_suffix,
                     cost_value_for_log,
                     fact_pay_for_order_value,

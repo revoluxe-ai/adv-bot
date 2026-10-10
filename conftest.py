@@ -453,6 +453,84 @@ def _validate_ch_preflight() -> None:
     )
 
 
+def _probe_pg_test_endpoint() -> None:
+    """Live loopback probe для ``TEST_INFRA_REUSE`` без Docker API.
+
+    Вызывается только после ``validate_destructive_test_database_url``.
+    """
+    from tests.support.destructive_pg_dsn import (
+        DestructiveTestDatabaseError,
+        validate_destructive_test_database_url,
+    )
+
+    validate_destructive_test_database_url(TEST_DB_POSTGRES_URL, environ=dict(os.environ))
+    engine = create_engine(
+        TEST_DB_POSTGRES_URL,
+        poolclass=NullPool,
+        connect_args={"connect_timeout": 5},
+    )
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except DestructiveTestDatabaseError:
+        raise
+    except Exception as exc:
+        raise DestructiveTestDatabaseError(
+            "TEST_INFRA_REUSE: PostgreSQL endpoint unhealthy on validated "
+            f"loopback test port — {type(exc).__name__}"
+        ) from exc
+    finally:
+        engine.dispose()
+
+
+def _probe_ch_test_endpoint() -> None:
+    """Live loopback HTTP probe для ``TEST_INFRA_REUSE`` без Docker API."""
+    import base64
+    import urllib.error
+    import urllib.request
+
+    from tests.support.destructive_clickhouse import (
+        ALLOWED_CH_DATABASE,
+        DestructiveTestClickHouseError,
+        validate_destructive_clickhouse_endpoint,
+    )
+
+    host = os.environ.get("CLICK_HOUSE_HOST", _TEST_PG_HOST)
+    port = os.environ.get("CLICKHOUSE_PORT", "8124")
+    username = os.environ.get("CLICK_HOUSE_USER", "CLICK_HOUSE_USER")
+    password = os.environ.get("CLICK_HOUSE_PASSWORD", "password")
+    validate_destructive_clickhouse_endpoint(
+        host=host,
+        port=port,
+        database=ALLOWED_CH_DATABASE,
+        username=username,
+        environ=dict(os.environ),
+    )
+    ping_url = f"http://{host}:{port}/ping"
+    req = urllib.request.Request(ping_url, method="GET")
+    token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
+    req.add_header("Authorization", f"Basic {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status != 200:
+                raise DestructiveTestClickHouseError(
+                    "TEST_INFRA_REUSE: ClickHouse /ping returned "
+                    f"status {resp.status} on validated loopback test port"
+                )
+    except DestructiveTestClickHouseError:
+        raise
+    except urllib.error.URLError as exc:
+        raise DestructiveTestClickHouseError(
+            "TEST_INFRA_REUSE: ClickHouse endpoint unhealthy on validated "
+            f"loopback test port — {type(exc).__name__}"
+        ) from exc
+    except Exception as exc:
+        raise DestructiveTestClickHouseError(
+            "TEST_INFRA_REUSE: ClickHouse endpoint probe failed on validated "
+            f"loopback test port — {type(exc).__name__}"
+        ) from exc
+
+
 def _run_pg_schema_bootstrap() -> None:
     """Session-once PG DROP/CREATE + create_all + baseline seed + Alembic verify.
 
@@ -526,6 +604,8 @@ def _build_test_infra_lifecycle():
         docker_preflight=_docker_compose_preflight_or_raise,
         validate_pg=_validate_pg_preflight,
         validate_ch=_validate_ch_preflight,
+        probe_pg=_probe_pg_test_endpoint,
+        probe_ch=_probe_ch_test_endpoint,
         init_pg_schema=_run_pg_schema_bootstrap,
         init_ch_schema=_run_ch_schema_bootstrap,
         raise_docker_stage=_raise_docker_stage_error,

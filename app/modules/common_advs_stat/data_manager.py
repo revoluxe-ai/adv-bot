@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import cast
 from . import clickhouse_manager
 from sqlalchemy import select
 from app.modules.common_slaves.wildberries.models import AdvSetting
@@ -8,6 +9,7 @@ from app.modules.common_slaves.wildberries.models.enums import OrdersSourceForAu
 from app.modules.common_slaves.wildberries.models.fact_methods_enum import FactMethods
 from app.modules.full_stat_adv_updater.types.full_adv_stat import SmallFullAdvStat
 from app.modules.shop_runner.wb_stat_manager.clickhouse_manager import full_wb_adv_stat
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import compute_leg_cpo
 from app.modules.shop_runner.wb_statistic_manager.backend import common_stat_manager
 from app.modules.shop_runner.wb_statistic_manager.backend.types.common_card_stat import (
     CommonCardStat,
@@ -34,7 +36,7 @@ class CommonAdvsStatData:
     auction_cpm: int | None
     total_spend: float
     addition_spend_in_adv: float
-    all_orders_for_last_days: int | None
+    all_orders_for_last_days: float | None
     mean_orders_for_last_days: float | None
     mean_price_for_order: float | None
     spend_for_inner_advs: float | None
@@ -43,6 +45,10 @@ class CommonAdvsStatData:
     common_stat: CommonCardStat | None
     sales_predict_method: FactMethods
     cost_per_order_from_additional_last_week: float | None
+    auto_cpo: float | None = None
+    search_cpo: float | None = None
+    stat_start_date: datetime | None = None
+    stat_end_date: datetime | None = None
 
 
 class CommonAdvsStatDataManager:
@@ -69,22 +75,28 @@ class CommonAdvsStatDataManager:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=pass_days)
 
-        async def _auction_adv_ch_stat() -> SmallFullAdvStat:
-            sid = adv_setting.search_adv_id
-            if not sid:
-                return SmallFullAdvStat(0, 0, 0.0, 0, 0, 0.0)
-            return await full_wb_adv_stat.get_stats_by_last_days(
-                [sid], start_date, end_date
-            )
-
-        (
-            full_adv_stat_for_last_days_for_auto_adv,
-            full_adv_stat_for_last_days_for_auction,
-        ) = await asyncio.gather(
-            full_wb_adv_stat.get_stats_by_last_days(
-                [adv_setting.adv_id], start_date, end_date
-            ),
-            _auction_adv_ch_stat(),
+        auto_adv_id = int(adv_setting.adv_id)
+        search_adv_id = (
+            int(adv_setting.search_adv_id)
+            if adv_setting.search_adv_id is not None
+            else None
+        )
+        leg_adv_ids = [auto_adv_id]
+        if search_adv_id is not None:
+            leg_adv_ids.append(search_adv_id)
+        stats_by_adv_id = await full_wb_adv_stat.get_stats_by_adv_ids_last_days(
+            leg_adv_ids,
+            start_date,
+            end_date,
+        )
+        empty_stat = SmallFullAdvStat(0, 0, 0.0, 0, 0, 0.0)
+        full_adv_stat_for_last_days_for_auto_adv = stats_by_adv_id.get(
+            auto_adv_id, empty_stat
+        )
+        full_adv_stat_for_last_days_for_auction = (
+            stats_by_adv_id.get(search_adv_id, empty_stat)
+            if search_adv_id is not None
+            else empty_stat
         )
 
         # Общий расход
@@ -98,6 +110,9 @@ class CommonAdvsStatDataManager:
                 int(adv_setting.nmids[0]), pass_days
             )
         )
+        # Legacy runtime уже безусловно читает orders/add_to_cart ниже. Cast только
+        # фиксирует существующий contract для strict typing, не меняя failure semantics.
+        common_stat_required = cast(CommonCardStat, common_stat)
 
         # Рассчитываем дополнительные метрики
         all_orders_from_advs = (
@@ -115,7 +130,7 @@ class CommonAdvsStatDataManager:
             == OrdersSourceForAutoMode.COMMON_STATISTIC
         ):
             # Используем общую статистику (по умолчанию)
-            base_common_orders = common_stat.orders
+            base_common_orders = common_stat_required.orders
             if base_common_orders < all_orders_from_advs:
                 base_common_orders = all_orders_from_advs
             spend_for_inner_advs_for_days = full_spend_for_all_advs
@@ -128,7 +143,7 @@ class CommonAdvsStatDataManager:
         #  хотя их нет вообще. Варианты как решить задачу тут docks/forecast_strategy.md
         if base_common_orders == 0:
             base_common_orders = 0.06
-        base_common_carts = common_stat.add_to_cart
+        base_common_carts: float = common_stat_required.add_to_cart
         # TODO: Здесь ошибка ушла в прод, нужно сделать тест, сделал HOT-FIX, проверить логику
         if base_common_carts == 0:
             base_common_carts = 0.2
@@ -181,13 +196,21 @@ class CommonAdvsStatDataManager:
             common_stat=common_stat,
             sales_predict_method=adv_setting.sales_predict_method,
             cost_per_order_from_additional_last_week=cost_per_order_from_additional_last_week,
+            auto_cpo=compute_leg_cpo(stats_by_adv_id.get(auto_adv_id)),
+            search_cpo=(
+                compute_leg_cpo(stats_by_adv_id.get(search_adv_id))
+                if search_adv_id is not None
+                else None
+            ),
+            stat_start_date=start_date,
+            stat_end_date=end_date,
         )
 
     async def _get_predict_orders_for_day(
         self,
         adv: AdvSetting,
-        base_common_orders: int,
-        base_common_carts: int,
+        base_common_orders: float,
+        base_common_carts: float,
 
     ) -> float:
         # TODO: Переделать вычисление, где будет не только конвертация в корзину, но и

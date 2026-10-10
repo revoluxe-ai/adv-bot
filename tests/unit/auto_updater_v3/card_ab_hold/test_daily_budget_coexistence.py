@@ -135,6 +135,7 @@ async def test_auto_budget_watchdog_passes_unfiltered_advs_to_active_control() -
     mgr.shop_id = "shop"
     mgr._wb_shop_data_manager = MagicMock()
     mgr._wb_shop_data_manager.get_complex_advs = AsyncMock(return_value=pool)
+    mgr._wb_shop_data_manager.attach_leg_cpo = AsyncMock()
     mgr._auto_budget_service = MagicMock()
     mgr._auto_budget_service.refresh_promo_state = AsyncMock()
     control = AsyncMock()
@@ -155,6 +156,7 @@ async def test_auto_budget_watchdog_passes_unfiltered_advs_to_active_control() -
     ):
         await fn(mgr, only_bot_active=True)
 
+    mgr._wb_shop_data_manager.attach_leg_cpo.assert_awaited_once_with(pool)
     control.assert_awaited_once_with(pool)
     stale_filter.assert_not_called()
 

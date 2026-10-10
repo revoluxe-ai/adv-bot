@@ -337,3 +337,57 @@ async def test_get_spend_by_last_days_with_argmax(
     )
 
     assert value == pytest.approx(75.0 + 55.0)
+
+
+@pytest.mark.integration
+async def test_get_stats_by_adv_ids_last_days_keeps_legs_separate(
+    clickhouse_client: get_async_client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Spec leg-cpo-economics: production CH query не должен суммировать Auto/Search ноги."""
+    auto_adv_id = 9101
+    search_adv_id = 9202
+    start_date = dt.datetime(2026, 9, 28)
+    end_date = dt.datetime(2026, 9, 29)
+
+    await clickhouse_client.command(
+        "TRUNCATE TABLE test_adv_bot_clickhouse.full_adv_wb_stat"
+    )
+    await clickhouse_client.insert(
+        "test_adv_bot_clickhouse.full_adv_wb_stat",
+        [
+            (auto_adv_id, dt.date(2026, 9, 28), 100, 10, 300.0, 2, 1, 1000.0, 1.0),
+            (auto_adv_id, dt.date(2026, 9, 29), 120, 12, 300.0, 3, 1, 1200.0, 1.0),
+            (search_adv_id, dt.date(2026, 9, 28), 80, 8, 100.0, 2, 1, 800.0, 1.0),
+            (search_adv_id, dt.date(2026, 9, 29), 90, 9, 200.0, 2, 2, 900.0, 1.0),
+        ],
+        column_names=[
+            "adv_id",
+            "date",
+            "views",
+            "clicks",
+            "spend",
+            "added_to_cart",
+            "orders",
+            "sum_price_orders",
+            "version",
+        ],
+    )
+
+    patch_get_clickhouse_client(
+        monkeypatch,
+        [full_wb_adv_stat_module],
+        clickhouse_client,
+    )
+
+    result = await full_wb_adv_stat.get_stats_by_adv_ids_last_days(
+        [auto_adv_id, search_adv_id],
+        start_date,
+        end_date,
+    )
+
+    assert set(result) == {auto_adv_id, search_adv_id}
+    assert result[auto_adv_id].spend == pytest.approx(600.0)
+    assert result[auto_adv_id].orders == 2
+    assert result[search_adv_id].spend == pytest.approx(300.0)
+    assert result[search_adv_id].orders == 3

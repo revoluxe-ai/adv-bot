@@ -1,0 +1,45 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "separate-auto-search-cpo",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPLAN-49f4ee71d860e462b991",
+  "PLAN_CONTENT_HASH": "5a929c58e3a31a5cd353655ee1ae77ee56fcc4a7f09eae4420eddb90b6af1b4d",
+  "PLAN_PATH": "openspec/changes/separate-auto-search-cpo/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/separate-auto-search-cpo/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 10,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/separate-auto-search-cpo/design.md",
+      "content_hash": "39f3083a2b13510152b3d2ea53b229ac174c846d07413ec9b9b709b4eac802e8"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/separate-auto-search-cpo/specs/leg-cpo-economics/spec.md",
+        "content_hash": "19b3c335e5f8d13d94f2617300af5abcf5086e905e26a3521f8cc667b76b13e4"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "non_temporal:openspec/changes/separate-auto-search-cpo/design.md",
+      "content_hash": "39f3083a2b13510152b3d2ea53b229ac174c846d07413ec9b9b709b4eac802e8"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/separate-auto-search-cpo/owner-contract.md",
+      "content_hash": "673cadf71b1bc4090a30bb2874d5faac45165ca4320ce2a86898287c5460a59a"
+    }
+  },
+  "GENERATED_FROM": {
+    "design": "39f3083a2b13510152b3d2ea53b229ac174c846d07413ec9b9b709b4eac802e8",
+    "specs": [
+      "19b3c335e5f8d13d94f2617300af5abcf5086e905e26a3521f8cc667b76b13e4"
+    ],
+    "owner_contract": "673cadf71b1bc4090a30bb2874d5faac45165ca4320ce2a86898287c5460a59a"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

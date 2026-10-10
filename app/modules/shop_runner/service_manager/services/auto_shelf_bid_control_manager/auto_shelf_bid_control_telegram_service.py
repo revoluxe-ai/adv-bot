@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import logging
 from types import SimpleNamespace
 from typing import Protocol, cast
 
@@ -24,6 +25,7 @@ from app.shared.domains.wb.utils.cost_resolver import resolve_target_cost_from_s
 from app.modules.shop_runner.service_manager.services.plan_fact_controller.plan_fact_reader import (
     PlanFactReader,
 )
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import load_leg_cpo_snapshot
 
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_increment_manager.redis_auto_recommendations_bid_value_manager import (
     RedisAutoRecommendationsBidValueManager,
@@ -41,6 +43,9 @@ from .auto_shelf_bid_setter import (
 )
 from .bid_units import format_bid_minor_for_telegram, rubles_to_bid_minor
 from .dto import AutoShelfBidControlViewDTO
+
+
+logger = logging.getLogger(__name__)
 
 
 class _WbManagerHubProtocol(Protocol):
@@ -176,6 +181,19 @@ class AutoShelfBidControlTelegramService:
         if cached_bid is not None:
             actual_bid_minor = int(cached_bid.bid_minor)
         plan_fact_summary = await PlanFactReader().get_latest_plan_fact(int(adv.adv_id))
+        auto_fact_cpo: float | None = None
+        try:
+            leg_snapshot = await load_leg_cpo_snapshot(
+                auto_adv_id=int(adv.adv_id),
+                search_adv_id=getattr(adv, "search_adv_id", None),
+            )
+            auto_fact_cpo = leg_snapshot.auto_cpo
+        except Exception:
+            logger.warning(
+                "auto_shelf_telegram: Auto CPO unavailable adv_id=%s",
+                adv.adv_id,
+                exc_info=True,
+            )
         normalized_strategy = resolve_auto_shelf_bid_control_strategy(
             getattr(adv, "auto_shelf_bid_control_strategy", None)
         )
@@ -192,6 +210,7 @@ class AutoShelfBidControlTelegramService:
             fact_pay_for_order=(
                 plan_fact_summary.fact_pay_for_order if plan_fact_summary else None
             ),
+            auto_fact_cpo=auto_fact_cpo,
             resolve_cpo=resolve_target_cost_from_summary(
                 plan_fact_summary,
                 plan_orders=int(adv.plan_for_sales_for_day or 0),
