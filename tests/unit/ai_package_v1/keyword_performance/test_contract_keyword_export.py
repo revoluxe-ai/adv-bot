@@ -9,6 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    EmptyAnalysisCampaignReader,
+)
 from app.modules.ai_package_v1.domain.enums import DatasetId
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.domain.manifest import DomainPayload
@@ -119,7 +122,7 @@ async def test_keyword_export_no_wb(fake_deps: FakeKeywordDeps) -> None:
     with patch.dict("sys.modules", {"app.core.mp.wb.api": wb_spy}):
         _ = await assembler.assemble(
             shop_id=SHOP_ID,
-            manifest_shop_id=1,
+            manifest_shop_id="1",
             period=PERIOD,
             generated_at=GENERATED_AT,
         )
@@ -146,7 +149,7 @@ async def test_keyword_export_no_writes(fake_deps: FakeKeywordDeps) -> None:
     ):
         _ = await assembler.assemble(
             shop_id=SHOP_ID,
-            manifest_shop_id=1,
+            manifest_shop_id="1",
             period=PERIOD,
             generated_at=GENERATED_AT,
         )
@@ -271,7 +274,7 @@ async def test_export_no_store_writes(fake_deps: FakeKeywordDeps) -> None:
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=PERIOD,
         generated_at=GENERATED_AT,
     )
@@ -295,7 +298,7 @@ async def test_datamap_in_manifest_files(fake_deps: FakeKeywordDeps) -> None:
     """S31: DATA_MAP payload present in assembler output."""
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     logical = {p.logical_name for p in result.payloads}
     assert "DATA_MAP.json" in logical
@@ -307,7 +310,7 @@ async def test_injected_fake_reader(fake_deps: FakeKeywordDeps) -> None:
     fake_deps.daily_raw.append(make_daily_raw(stat_date=date(2026, 2, 1), views=42))
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     daily = next(p for p in result.payloads if p.dataset_id == "keyword_daily")
     assert b'"views": 42' in daily.content or b'"views":42' in daily.content
@@ -321,6 +324,7 @@ async def test_keyword_cards_in_manifest(fake_deps: FakeKeywordDeps) -> None:
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=MagicMock(),
         keyword_assembler=build_fake_assembler(fake_deps),
     )
@@ -341,7 +345,7 @@ async def test_contract_full_history(fake_deps: FakeKeywordDeps) -> None:
     fake_deps.daily_raw.append(make_daily_raw(stat_date=date(2026, 3, 1)))
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     daily = next(p for p in result.payloads if p.dataset_id == "keyword_daily")
     lines = daily.content.decode("utf-8").strip().split("\n")
@@ -357,7 +361,7 @@ async def test_contract_rebound_scope(fake_deps: FakeKeywordDeps) -> None:
     fake_deps.daily_raw.append(make_daily_raw(adv_id=999))
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     daily = next(p for p in result.payloads if p.dataset_id == "keyword_daily")
     assert b'"adv_id": 999' in daily.content or b'"adv_id":999' in daily.content
@@ -369,7 +373,7 @@ async def test_contract_null_spend(fake_deps: FakeKeywordDeps) -> None:
     fake_deps.daily_raw = [make_daily_raw(spend=None)]
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     daily = next(p for p in result.payloads if p.dataset_id == "keyword_daily")
     row = json.loads(daily.content.decode("utf-8").strip().split("\n")[0])
@@ -382,7 +386,7 @@ async def test_contract_null_position(fake_deps: FakeKeywordDeps) -> None:
     fake_deps.daily_raw = [make_daily_raw(avr_pos=None)]
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     daily = next(p for p in result.payloads if p.dataset_id == "keyword_daily")
     row = json.loads(daily.content.decode("utf-8").strip().split("\n")[0])
@@ -395,7 +399,7 @@ async def test_bid_log_unsupported_coverage(fake_deps: FakeKeywordDeps) -> None:
     fake_deps.bid_decision_status = BidDecisionSourceStatus.UNSUPPORTED
     assembler = build_fake_assembler(fake_deps)
     result = await assembler.assemble(
-        shop_id=SHOP_ID, manifest_shop_id=1, period=PERIOD, generated_at=GENERATED_AT
+        shop_id=SHOP_ID, manifest_shop_id="1", period=PERIOD, generated_at=GENERATED_AT
     )
     coverage = next(p for p in result.payloads if p.dataset_id == "keyword_coverage")
     doc = json.loads(coverage.content.decode("utf-8"))
@@ -440,7 +444,7 @@ async def test_contract_cutoff_excludes_future_date_payload() -> None:
     )
     result = await build_fake_assembler(deps).assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=CUTOFF_PERIOD,
         generated_at=CUTOFF_GENERATED_AT,
     )
@@ -487,7 +491,7 @@ async def test_contract_cutoff_excludes_same_day_post_instant_daily_payload() ->
     )
     result = await build_fake_assembler(deps).assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=CUTOFF_PERIOD,
         generated_at=CUTOFF_GENERATED_AT,
     )
@@ -523,7 +527,7 @@ async def test_contract_cutoff_excludes_future_position_version_payload() -> Non
     )
     result = await build_fake_assembler(deps).assemble(
         shop_id=SHOP_ID,
-        manifest_shop_id=1,
+        manifest_shop_id="1",
         period=CUTOFF_PERIOD,
         generated_at=CUTOFF_GENERATED_AT,
     )
@@ -576,6 +580,7 @@ async def test_default_export_service_keyword_enabled() -> None:
         campaign_reader=_NoOpReader(),  # type: ignore[arg-type]
         funnel_reader=_NoOpReader(),  # type: ignore[arg-type]
         freshness_reader=_NoOpReader(),  # type: ignore[arg-type]
+        analysis_campaign_reader=EmptyAnalysisCampaignReader(),
         settings_assembler=settings,
         keyword_assembler=KeywordPerformanceAssembler(
             scope_reader=scope_reader,

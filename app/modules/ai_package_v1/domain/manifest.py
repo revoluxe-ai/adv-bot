@@ -11,8 +11,13 @@ from pydantic import BaseModel, Field
 from app.modules.ai_package_v1.domain.dataset_card import DatasetCard
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
 from app.modules.ai_package_v1.domain.serialization import canonical_json_bytes
+from app.modules.ai_package_v1.domain.shop_id import AuthoritativeShopId
 
 PACKAGE_SCHEMA_VERSION = "1.0.0"
+PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS = "1.1.0"
+SUPPORTED_PACKAGE_SCHEMA_VERSIONS = frozenset(
+    {PACKAGE_SCHEMA_VERSION, PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS}
+)
 MANIFEST_LOGICAL_NAME = "manifest.json"
 
 
@@ -57,7 +62,7 @@ class ExportManifest(BaseModel):
     """Версионированный manifest пакета."""
 
     package_schema_version: str = Field(default=PACKAGE_SCHEMA_VERSION)
-    shop_id: int
+    shop_id: AuthoritativeShopId
     period: ExportPeriod
     generated_at: str
     datasets: list[DatasetCard]

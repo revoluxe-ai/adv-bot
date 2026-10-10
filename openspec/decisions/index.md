@@ -89,6 +89,17 @@ architecture decisions belong here.
   - Scope: canonical campaign settings field registry ownership; fail-closed
     classification for history and Excel projections; PostgreSQL remains
     current-settings authority.
+- [campaign-settings-changeset-ownership](campaign-settings-changeset-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `ChangeSetV1`, dry-run validation, `sd1`/`st1`, and `wb_sky_control_plane`
+    ownership; no production writes from dry-run; registry reuse only from
+    `campaign_settings_contract`.
+- [changeset-apply-authority-ownership](changeset-apply-authority-ownership/decision.md)
+  - Status: Accepted
+  - Scope: WB Sky Apply Authority for in-scope `ChangeSetV1` PG policy apply;
+    `wb_sky_control_plane/apply/` orchestration and evidence ledger; V1 PG-only
+    bounded policy mutations; external WB and REST/MCP transports are separate
+    future changes; legacy bypass acknowledged until migration.
 - [shop-runner-shop-wide-collection](shop-runner-shop-wide-collection/decision.md)
   - Status: Accepted
   - Scope: shop-wide campaign ad data collection executor is shop-runner only;
@@ -109,7 +120,31 @@ architecture decisions belong here.
   - Scope: ownership/layering for AI Package v1 read-only export under
     `app/modules/ai_package_v1/`; `READ_ONLY_NO_MUTATION`; forbidden WB API,
     shop-runner orchestrator, and collector triggers on export path; CLI/Job
-    entry only (no TG/GUI).
+    entry plus a transport-only Telegram adapter that calls
+    `PackageZipAssembler` (no second exporter).
+- [decision-experiment-memory-ownership](decision-experiment-memory-ownership/decision.md)
+  - Status: Accepted
+  - Scope: semantic ownership of decision/experiment memory (plans, lifecycle,
+    validity, factual results, interpretation linkage); refs-only for settings,
+    Apply, metrics, attribution; not production write authority.
+- [product-control-aggregate-ownership](product-control-aggregate-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `(shop_id, nmid)` control anchor; WBCard catalog-only; future
+    `ShopControlSettings` / `ProductControlSettings` (persistence in separate change).
+- [campaign-product-binding-ownership](campaign-product-binding-ownership/decision.md)
+  - Status: Accepted
+  - Scope: `CampaignProductBinding` projector semantics; Auto/Search legs;
+    no `main_nmid` PRIMARY; multi-nm fail-closed.
+- [product-pricing-and-cpo-ownership](product-pricing-and-cpo-ownership/decision.md)
+  - Status: Accepted (`CATALOG_PRICE_SEMANTICS_ACCEPTED = NO` on price-based path)
+  - Scope: Path A — `ProductPricingReader` + `ProductCpoResolver` (catalog/unit
+    price × DRR); Path B — see `drr-cpo-price-semantics` (order-value campaign
+    `TARGET_CPO_RUB`; not `ProductCpoResolver`).
+- [drr-cpo-price-semantics](drr-cpo-price-semantics/decision.md)
+  - Status: Accepted (`PRICE_SEMANTICS_QUALIFIER = V1_ORDER_VALUE_BASIS`)
+  - Scope: V1 shop/campaign DRR denominators, order-value `TARGET_CPO_RUB`,
+    shop headroom rub, fail-closed blockers; catalog price not required for V1
+    campaign control; `ProductCpoResolver` path unchanged.
 
 ## Change Requirements
 

@@ -39,7 +39,14 @@ def test_datamap_grain_keys() -> None:
     )
     daily = dm["datasets"]["keyword_daily"]
     assert "adv_id" in daily["primary_key"]
+    assert "leg_role" in daily["primary_key"]
     assert "norm_query" in daily["primary_key"]
+    leg_pk = [
+        row
+        for row in dm["export_field_matrix"]
+        if row["dataset"] == "keyword_daily" and row["field"] == "leg_role"
+    ]
+    assert leg_pk and leg_pk[0].get("primary_key") is True
 
 
 def test_datamap_comparable_formulas() -> None:

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from app.modules.ai_package_v1.domain.campaign_stat import (
     assert_no_synthetic_merge,
+    assert_observed_ids_are_physical,
     rows_for_shop,
 )
 from app.modules.ai_package_v1.domain.cards import (
@@ -18,7 +19,24 @@ from app.modules.ai_package_v1.domain.funnel_orders_boundary import (
     FunnelOrdersMetric,
     assert_funnel_orders_do_not_populate_shop_product_orders,
 )
+from app.modules.ai_package_v1.analysis.attribution_reader import (
+    AnalysisAttributionReaderProtocol,
+    ChAnalysisAttributionReader,
+    collect_attribution_evidence,
+)
+from app.modules.ai_package_v1.analysis.aggregate import legs_from_scope
+from app.modules.ai_package_v1.analysis.campaign_reader import (
+    AnalysisCampaignReaderProtocol,
+    ChAnalysisCampaignReader,
+)
+from app.modules.ai_package_v1.analysis.catalog import build_analysis_windows
+from app.modules.ai_package_v1.analysis.models import AnalysisBuildRequest, CampaignDailyFact
+from app.modules.ai_package_v1.analysis.service import (
+    AnalysisAggregationService,
+    annotate_data_map,
+)
 from app.modules.ai_package_v1.domain.manifest import (
+    PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS,
     DomainPayload,
     ExportManifest,
     build_file_descriptors,
@@ -40,14 +58,20 @@ from app.modules.ai_package_v1.export.payload_encode import (
     encode_campaign_stat_csv,
     encode_funnel_stat_csv,
 )
-from app.utils.db.session_maker import get_async_session_maker
 from app.modules.ai_package_v1.export.scope_collect import (
     collect_main_nmids,
     collect_scoped_adv_ids,
 )
+from app.modules.ai_package_v1.keyword_performance.domain.cutoff import PackageCutoff
+from app.modules.ai_package_v1.keyword_performance.export.dataset_cards import (
+    DATA_MAP_LOGICAL,
+)
 from app.modules.ai_package_v1.keyword_performance.export.keyword_assembler import (
     KeywordAssemblerProtocol,
     KeywordPerformanceAssembler,
+)
+from app.modules.ai_package_v1.keyword_performance.readers.pg_session_adapter import (
+    default_pg_session_factory,
 )
 from app.modules.ai_package_v1.readers.ch_campaign_stat_reader import ChCampaignStatReader
 from app.modules.ai_package_v1.readers.ch_funnel_reader import ChFunnelReader
@@ -63,7 +87,7 @@ from app.modules.ai_package_v1.scope.pg_export_shop_scope_reader import (
 class ExportResult:
     """Результат export без ZIP-транспорта (domain manifest + payloads).
 
-    ``manifest.shop_id`` — int (manifest v1); входной PG ``shop_id`` — str.
+    ``manifest.shop_id`` совпадает с входным PG ``WBCabinet.shop_id`` (str).
     """
 
     manifest: ExportManifest
@@ -87,7 +111,15 @@ class ExportService:
         pg_snapshot_reader: PgSnapshotReader | None = None,
         settings_assembler: CampaignSettingsAssembler | None = None,
         keyword_assembler: KeywordAssemblerProtocol | None = None,
+        analysis_campaign_reader: AnalysisCampaignReaderProtocol | None = None,
+        analysis_attribution_reader: AnalysisAttributionReaderProtocol | None = None,
     ) -> None:
+        """Собирает read-only зависимости export.
+
+        Settings inventory по умолчанию получает ``default_pg_session_factory``.
+        Reader открывает сессию как ``session_maker(read_only=True)()``, поэтому
+        фабрика возвращает ``async_sessionmaker``.
+        """
         self._scope_reader = scope_reader or PgExportShopScopeReader()
         self._campaign_reader = campaign_reader or ChCampaignStatReader()
         self._funnel_reader = funnel_reader or ChFunnelReader()
@@ -99,12 +131,17 @@ class ExportService:
             self._settings_assembler = settings_assembler
         else:
             self._settings_assembler = CampaignSettingsAssembler(
-                session_maker=get_async_session_maker,
+                session_maker=default_pg_session_factory,
             )
         if keyword_assembler is not None:
             self._keyword_assembler = keyword_assembler
         else:
             self._keyword_assembler = KeywordPerformanceAssembler()
+        self._analysis_reader = analysis_campaign_reader or ChAnalysisCampaignReader()
+        self._analysis_attribution_reader = (
+            analysis_attribution_reader or ChAnalysisAttributionReader()
+        )
+        self._analysis_service = AnalysisAggregationService()
 
     async def export(
         self,
@@ -125,7 +162,7 @@ class ExportService:
             ``ExportResult`` с карточками датасетов и CSV payloads.
 
         Raises:
-            ValueError: при нарушении grain Auto/Search, невалидном shop_id или period.
+            ValueError: при synthetic campaign_id, невалидном shop_id или period.
         """
         manifest_id = validate_export_inputs(shop_id, period)
         scope = await self._scope_reader.load_scope(shop_id)
@@ -170,7 +207,7 @@ class ExportService:
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         scope: list[ExportScopeAdv],
         generated_at: str | None,
@@ -182,15 +219,19 @@ class ExportService:
             manifest_shop_id, adv_ids, period
         )
         campaign_rows = rows_for_shop(campaign_rows, manifest_shop_id)
+        assert_observed_ids_are_physical(
+            {row.campaign_id for row in campaign_rows},
+            set(adv_ids),
+        )
         for item in scope:
             if item.search_adv_id is not None and item.search_adv_id != item.auto_adv_id:
-                scoped_rows = [
-                    r
-                    for r in campaign_rows
-                    if r.campaign_id in (item.auto_adv_id, item.search_adv_id)
+                leg_rows = [
+                    row
+                    for row in campaign_rows
+                    if row.campaign_id in (item.auto_adv_id, item.search_adv_id)
                 ]
                 assert_no_synthetic_merge(
-                    scoped_rows, item.auto_adv_id, item.search_adv_id
+                    leg_rows, item.auto_adv_id, item.search_adv_id
                 )
 
         funnel_rows = await self._funnel_reader.fetch_rows(
@@ -212,9 +253,11 @@ class ExportService:
         settings_payload_content = serialize_campaign_settings_payload(
             settings_snapshot
         )
+        observed_adv_ids = sorted({row.campaign_id for row in campaign_rows})
         campaign_card = build_campaign_full_stat_card(
             period,
             scoped_adv_ids=adv_ids,
+            observed_adv_ids=observed_adv_ids,
             row_count=len(campaign_rows),
             freshness=campaign_freshness,
         )
@@ -242,6 +285,39 @@ class ExportService:
             generated_at=timestamp,
         )
 
+        cutoff = PackageCutoff.from_generated_at(timestamp)
+        analysis_facts = await self._analysis_reader.fetch_daily_facts(
+            shop_id=manifest_shop_id,
+            adv_ids=adv_ids,
+            end_date=cutoff.package_cutoff_date,
+        )
+        source_first, source_last = _campaign_fact_bounds(tuple(analysis_facts))
+        windows = build_analysis_windows(
+            cutoff,
+            campaign_first=source_first,
+            campaign_last=source_last,
+            requested_period=period,
+        )
+        legs = legs_from_scope(tuple(scope))
+        attribution_evidence = await collect_attribution_evidence(
+            self._analysis_attribution_reader,
+            shop_id=manifest_shop_id,
+            windows=windows,
+            legs=legs,
+        )
+        analysis = self._analysis_service.build(
+            AnalysisBuildRequest(
+                shop_id=manifest_shop_id,
+                generated_at=timestamp,
+                period=period,
+                scope=tuple(scope),
+                campaign_facts=tuple(analysis_facts),
+                keyword_windows=tuple(keyword_result.windows),
+                keyword_history_first=keyword_result.keyword_history_first,
+                keyword_history_last=keyword_result.keyword_history_last,
+                attribution_by_leg_window=attribution_evidence,
+            )
+        )
         payloads = [
             DomainPayload(
                 logical_name="datasets/campaign_full_stat.csv",
@@ -258,9 +334,11 @@ class ExportService:
                 dataset_id="campaign_settings_snapshot",
                 content=settings_payload_content,
             ),
-            *keyword_result.payloads,
+            *_with_analysis_data_map(keyword_result.payloads),
+            *analysis.payloads,
         ]
         manifest = ExportManifest(
+            package_schema_version=PACKAGE_SCHEMA_VERSION_WITH_ANALYSIS,
             shop_id=manifest_shop_id,
             period=period,
             generated_at=timestamp,
@@ -270,7 +348,34 @@ class ExportService:
                 settings_card,
                 shop_orders_card,
                 *keyword_result.cards,
+                *analysis.cards,
             ],
             files=build_file_descriptors(payloads),
         )
         return ExportResult(manifest=manifest, payloads=payloads)
+
+
+def _campaign_fact_bounds(
+    facts: tuple[CampaignDailyFact, ...],
+) -> tuple[date | None, date | None]:
+    if not facts:
+        return None, None
+    dates = [fact.stat_date for fact in facts]
+    return min(dates), max(dates)
+
+
+def _with_analysis_data_map(payloads: tuple[DomainPayload, ...]) -> list[DomainPayload]:
+    """Вписывает зерно анализа в уже собранную карту данных."""
+    annotated: list[DomainPayload] = []
+    for payload in payloads:
+        if payload.logical_name == DATA_MAP_LOGICAL:
+            annotated.append(
+                DomainPayload(
+                    logical_name=payload.logical_name,
+                    dataset_id=payload.dataset_id,
+                    content=annotate_data_map(payload.content),
+                )
+            )
+        else:
+            annotated.append(payload)
+    return annotated

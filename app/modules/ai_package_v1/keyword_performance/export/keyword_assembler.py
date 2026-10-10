@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Protocol
 
 from app.modules.ai_package_v1.domain.export_period import ExportPeriod
@@ -10,6 +11,7 @@ from app.modules.ai_package_v1.domain.manifest import DomainPayload
 from app.modules.ai_package_v1.keyword_performance.domain.coverage_assembler import (
     build_coverage_json,
 )
+from app.modules.ai_package_v1.keyword_performance.domain.models import KeywordWindowRowV1
 from app.modules.ai_package_v1.keyword_performance.domain.cutoff import PackageCutoff
 from app.modules.ai_package_v1.keyword_performance.domain.cutoff_guard import (
     effective_last_available,
@@ -122,19 +124,26 @@ class KeywordAssemblerProtocol(Protocol):
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         generated_at: str,
-    ) -> "KeywordAssemblyResult":
+    ) -> KeywordAssemblyResult:
         ...
 
 
 @dataclass(frozen=True, slots=True)
 class KeywordAssemblyResult:
-    """Keyword payloads + manifest cards."""
+    """Keyword payloads + manifest cards.
+
+    ``windows`` — уже посчитанная витрина. Аналитический слой переиспользует её
+    и не запускает второй проход по ключевому зерну.
+    """
 
     payloads: tuple[DomainPayload, ...]
     cards: tuple[DatasetCard, ...]
+    windows: tuple[KeywordWindowRowV1, ...] = ()
+    keyword_history_first: date | None = None
+    keyword_history_last: date | None = None
 
 
 def _decisions_by_key(
@@ -181,7 +190,7 @@ class KeywordPerformanceAssembler:
         self,
         *,
         shop_id: str,
-        manifest_shop_id: int,
+        manifest_shop_id: str,
         period: ExportPeriod,
         generated_at: str,
     ) -> KeywordAssemblyResult:
@@ -420,7 +429,13 @@ class KeywordPerformanceAssembler:
             build_data_map_card(period),
             build_coverage_card(period),
         )
-        return KeywordAssemblyResult(payloads=payloads, cards=cards)
+        return KeywordAssemblyResult(
+            payloads=payloads,
+            cards=cards,
+            windows=tuple(windows),
+            keyword_history_first=daily_bounds.first_available,
+            keyword_history_last=daily_bounds.last_available,
+        )
 
     async def _probe_bid_decision_log(
         self, adv_ids: frozenset[int], cutoff: PackageCutoff

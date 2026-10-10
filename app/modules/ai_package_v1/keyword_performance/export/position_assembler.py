@@ -19,7 +19,7 @@ from app.modules.ai_package_v1.keyword_performance.readers.ch_keyword_position_r
 def assemble_position_rows(
     raw_rows: list[RawPositionRow],
     *,
-    manifest_shop_id: int,
+    manifest_shop_id: str,
     daily_norm_queries: frozenset[tuple[int, str, str]],
 ) -> list[KeywordPositionRowV1]:
     """Map raw position rows; norm_query only when proven equal to daily cluster key."""

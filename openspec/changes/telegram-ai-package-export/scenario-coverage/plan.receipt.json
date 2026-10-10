@@ -1,0 +1,53 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "telegram-ai-package-export",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "SCPV1-39e72d4f252d8f6f",
+  "PLAN_CONTENT_HASH": "4f761b2591113f4b9705ff0585ef93400189b77f1debf880f982098964dca9cd",
+  "PLAN_PATH": "openspec/changes/telegram-ai-package-export/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/telegram-ai-package-export/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 11,
+  "LIFECYCLE_COVERAGE": {
+    "covered": [
+      "L1:S01",
+      "L2:S02,S03",
+      "L3:S10",
+      "L4:S04,S05",
+      "L5:S06,S07",
+      "L6:S07,S08,S09,S11"
+    ],
+    "gaps": []
+  },
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/telegram-ai-package-export/design.md",
+      "content_hash": "39af2982f7b90497ddb3482987d4e853320adc236d4259308b751859ebcf846a"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/telegram-ai-package-export/specs/telegram-ai-package-export/spec.md",
+        "content_hash": "49030409270e2aa298a2051f9b2df66bf9b48e8707396ff4512f9436cdfce670"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/telegram-ai-package-export/design.md#lifecycle",
+      "content_hash": "39af2982f7b90497ddb3482987d4e853320adc236d4259308b751859ebcf846a"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/telegram-ai-package-export/owner-contract.md",
+      "content_hash": "f935ae2394143dcf94ea284f7f5aa92bc4f751cbdf0b7a3513d4c1d43681aae6"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": "39af2982f7b90497ddb3482987d4e853320adc236d4259308b751859ebcf846a",
+    "SPEC_REVISION": [
+      "49030409270e2aa298a2051f9b2df66bf9b48e8707396ff4512f9436cdfce670"
+    ],
+    "LIFECYCLE_REVISION": "39af2982f7b90497ddb3482987d4e853320adc236d4259308b751859ebcf846a",
+    "OWNER_CONTRACT_REVISION": "f935ae2394143dcf94ea284f7f5aa92bc4f751cbdf0b7a3513d4c1d43681aae6"
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

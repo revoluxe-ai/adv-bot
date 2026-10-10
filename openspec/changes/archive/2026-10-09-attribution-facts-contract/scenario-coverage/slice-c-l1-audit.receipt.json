@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "change_id": "attribution-facts-contract",
+  "scope": "slice_c_l1_only",
+  "producer": "slice-c-certification-repair",
+  "certified_head": "677a0606f",
+  "destructive_ch": {
+    "status": "PASS",
+    "executed_at_utc": "2026-10-08T11:25:00Z",
+    "command": "ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE=1 ALLOW_DESTRUCTIVE_TEST_SUBPROCESS=1 poetry run pytest -m 'integration and destructive_local' tests/integration/attribution_facts/test_ch_observation_store.py -q",
+    "result": "3 passed"
+  },
+  "certification_guards": {
+    "SPARSE_WINDOW_COMPLETE_GUARD": "PASS",
+    "SOURCE_COMPLETE_THROUGH_EVIDENCE": "PASS",
+    "OBSERVATION_CONTENT_HASH": "PASS",
+    "MISSING_NOT_ZERO": "PASS"
+  },
+  "scenarios": {
+    "S10": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py + domain/versioning"
+    },
+    "S11": {
+      "status": "PASS",
+      "evidence": "EXECUTED destructive_local: test_migration_tables_and_latest_projection (COMPLETE + source_complete_through)"
+    },
+    "S12": {
+      "status": "PASS",
+      "evidence": "EXECUTED destructive_local: test_correction_updates_latest_not_sums"
+    },
+    "S13": {
+      "status": "PASS",
+      "evidence": "EXECUTED destructive_local reader query + test_window_reconciliation_grid.py"
+    },
+    "S14": {
+      "status": "PASS",
+      "evidence": "tests/unit/attribution_facts/test_slice_a_scenario_evidence.py"
+    }
+  },
+  "deferred_scenarios": [
+    "S15",
+    "S16"
+  ],
+  "full_change_cert_deferred": true
+}

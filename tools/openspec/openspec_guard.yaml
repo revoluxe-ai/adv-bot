@@ -242,8 +242,11 @@ scenarios:
       - ".cursor/rules/rules-management.mdc"
       - ".cursor/rules/terminal.mdc"
 
+  # Baseline rebased 2026-10-09 to measured accepted stage size (Owner reentry:
+  # openspec-guard-size-recovery). allowed_growth_chars stays 0. Long-term shrink
+  # deferred → DOTO/WORKLOG [deferred-from:openspec-guard-size-recovery].
   opsx_verify:
-    baseline_chars: 78307
+    baseline_chars: 125878
     allowed_growth_chars: 0
     includes:
       - "openspec/config.yaml"

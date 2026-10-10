@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.ai_package_v1.domain.shop_id import AuthoritativeShopId
 from app.modules.ai_package_v1.keyword_performance.domain.enums import (
     BidEvidenceStatus,
     CampaignSlotRole,
@@ -42,7 +43,7 @@ class KeywordDailyRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_setting_id: int | None = None
     adv_id: int
     leg_role: KeywordLegRole
@@ -77,7 +78,7 @@ class KeywordPositionRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_id: int | None = None
     nmid: int
     norm_query: str | None = None
@@ -102,7 +103,7 @@ class KeywordPositionLatestRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_id: int | None = None
     nmid: int
     norm_query: str | None = None
@@ -125,7 +126,7 @@ class KeywordPositionWindowRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_id: int | None = None
     nmid: int
     norm_query: str | None = None
@@ -157,7 +158,7 @@ class KeywordDecisionRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_id: int
     nmid: int
     norm_query: str
@@ -182,7 +183,7 @@ class KeywordWindowRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_setting_id: int | None = None
     adv_id: int
     leg_role: KeywordLegRole
@@ -227,7 +228,7 @@ class KeywordCurrentStateRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_setting_id: int | None = None
     adv_id: int
     leg_role: KeywordLegRole
@@ -268,7 +269,7 @@ class KeywordChangeRowV1(BaseModel):
     model_config = _FROZEN
 
     schema_version: str = SCHEMA_VERSION_KEYWORD
-    shop_id: int
+    shop_id: AuthoritativeShopId
     adv_setting_id: int | None = None
     adv_id: int
     leg_role: KeywordLegRole

@@ -88,14 +88,14 @@ def encode_funnel_stat_csv(rows: list[FunnelStatRow]) -> bytes:
 def encode_pg_inventory_csv(
     rows: Sequence[ExportScopeAdv],
     *,
-    manifest_shop_id: int,
+    manifest_shop_id: str,
 ) -> bytes:
     """
     CSV campaign_settings_snapshot: allowlisted inventory/relations only.
 
     Args:
         rows: Inventory DTO (без bids/budgets/detailed settings).
-        manifest_shop_id: int shop id для согласованности с другими payloads.
+        manifest_shop_id: Authoritative shop id, та же строка, что в manifest.
 
     Returns:
         UTF-8 bytes с заголовком (возможен только header при пустом scope).

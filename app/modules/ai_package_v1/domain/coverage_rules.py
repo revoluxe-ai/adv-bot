@@ -56,6 +56,36 @@ def validate_independent_dimensions(
         raise ValueError("freshness FRESH must not mask UNKNOWN coverage")
 
 
+def reason_codes_for_campaign_physical_legs(
+    *,
+    scoped_adv_ids: list[int],
+    observed_adv_ids: list[int],
+    row_count: int,
+) -> list[ReasonCode]:
+    """
+    Коды покрытия физических Auto/Search ног campaign stat.
+
+    Пустой срез — ``NO_DATA`` (fail-closed), без нулевых строк. Непустое
+    наблюдение строго меньшего множества ожидаемых id — ``PARTIAL_COLLECTION``.
+    Полное наблюдение ожидаемых id не добавляет код само по себе.
+
+    Args:
+        scoped_adv_ids: Ожидаемые физические adv_id из PG scope.
+        observed_adv_ids: campaign_id, реально присутствующие в срезе.
+        row_count: Число строк payload (ноль ⇒ данных нет).
+
+    Returns:
+        Список reason codes для карточки campaign stat.
+    """
+    if row_count == 0:
+        return [ReasonCode.NO_DATA]
+    expected = set(scoped_adv_ids)
+    observed = set(observed_adv_ids) & expected
+    if not observed or expected - observed:
+        return [ReasonCode.PARTIAL_COLLECTION]
+    return []
+
+
 def coverage_for_empty_campaign_stat(
     *,
     scoped_adv_ids: list[int],

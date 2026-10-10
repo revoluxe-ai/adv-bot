@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "change_id": "product-control-context",
+  "scope": "slice_a_l1_only",
+  "producer": "slice-a-apply-verify",
+  "produced_at": "2026-10-08",
+  "head_note": "Slice A domain/resolvers only; B–D deferred",
+  "scenarios": {
+    "S03": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s03_single_nm_safe_resolve"
+    },
+    "S07": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s07_inherit_shop_uses_shop_drr"
+    },
+    "S09": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s09_enrolled_no_profiles_legacy_tier"
+    },
+    "S10": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_product_ref_and_drr_profile.py::test_drr_profile_requires_max_gte_target"
+    },
+    "S16": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s16_pricing_port_types_separate_from_sales_economics"
+    },
+    "S19": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s19_product_override_cannot_bypass_not_enrolled"
+    },
+    "S20": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_effective_control_resolver.py::test_shop_blocked_master_gate"
+    },
+    "S21": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s21_override_without_profile_invalid"
+    },
+    "S22": {
+      "status": "PASS",
+      "evidence": "tests/unit/product_control/test_slice_a_scenario_evidence.py::test_s22_domain_max_cpo_001_rub"
+    }
+  },
+  "deferred_scenarios": [
+    "S01",
+    "S02",
+    "S04",
+    "S05",
+    "S06",
+    "S08",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S15",
+    "S17",
+    "S18"
+  ],
+  "pytest_command": "pytest -m unit tests/unit/product_control/",
+  "full_change_cert_deferred": true
+}

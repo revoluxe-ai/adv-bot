@@ -22,7 +22,7 @@ from app.modules.ai_package_v1.keyword_performance.domain.cutoff import PackageC
 
 def _position_identity_key(
     row: KeywordPositionRowV1,
-) -> tuple[int, int, str, str]:
+) -> tuple[str, int, str, str]:
     return (
         row.shop_id,
         row.nmid,
@@ -108,7 +108,7 @@ def compute_position_windows(
     last_available: date | None,
 ) -> list[KeywordPositionWindowRowV1]:
     """Compute position windows per API source identity."""
-    grouped: dict[tuple[int, int, str, str], list[KeywordPositionRowV1]] = (
+    grouped: dict[tuple[str, int, str, str], list[KeywordPositionRowV1]] = (
         defaultdict(list)
     )
     for row in position_rows:
@@ -128,7 +128,7 @@ def compute_position_latest(
     position_rows: list[KeywordPositionRowV1],
 ) -> list[KeywordPositionLatestRowV1]:
     """Latest position per identity; never use stale when latest is NULL/conflict."""
-    best: dict[tuple[int, int, str, str], KeywordPositionRowV1] = {}
+    best: dict[tuple[str, int, str, str], KeywordPositionRowV1] = {}
     for row in position_rows:
         key = _position_identity_key(row)
         existing = best.get(key)

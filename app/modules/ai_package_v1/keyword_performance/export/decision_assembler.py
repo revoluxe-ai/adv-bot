@@ -25,7 +25,7 @@ def _iso_dt(value: datetime | None) -> str | None:
 def assemble_decision_rows(
     raw_rows: list[RawBidDecisionRow],
     *,
-    manifest_shop_id: int,
+    manifest_shop_id: str,
 ) -> list[KeywordDecisionRowV1]:
     """Map timeline rows with source-derived DECISION class and provenance."""
     result: list[KeywordDecisionRowV1] = []

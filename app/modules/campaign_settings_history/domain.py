@@ -93,6 +93,13 @@ class HistoryRepositoryPort(Protocol):
         end_at: datetime,
     ) -> tuple[HistoryTimelineItem, ...]: ...
 
+    async def timeline_up_to(
+        self,
+        adv_setting_id: int,
+        *,
+        end_at: datetime,
+    ) -> tuple[HistoryTimelineItem, ...]: ...
+
 
 class CabinetCoordinatorPort(Protocol):
     async def transaction_alive(self) -> bool: ...

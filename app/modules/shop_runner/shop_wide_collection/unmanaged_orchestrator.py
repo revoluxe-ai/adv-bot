@@ -182,6 +182,8 @@ async def collect_unmanaged_campaign_advertising(
     route_resolver: CampaignCollectionRouteResolver | None = None,
     route_reader: ShopCampaignInventoryRouteReader | None = None,
     observed_at: datetime | None = None,
+    attribution_history_port: object | None = None,
+    attribution_inventory_port: object | None = None,
 ) -> UnmanagedCollectTickResult:
     """Один unmanaged tick: discovery → route → inventory → gated full_adv write.
 
@@ -264,11 +266,37 @@ async def collect_unmanaged_campaign_advertising(
         fetch_failed = False
         if gate.allow_fact_write:
             try:
-                adv_stats = await _fetch_stats_for_adv_id(
-                    full_adv_stat_fetcher,
-                    adv_id,
-                    threshold_dates,
+                from app.modules.attribution_facts.ingest.shop_runner_hooks import (
+                    adv_setting_id_for_physical_adv,
+                    attribution_ingest_for_fetch,
                 )
+
+                adv_setting_id = adv_setting_id_for_physical_adv(
+                    loader_complex_advs,
+                    adv_id,
+                )
+                if adv_setting_id is not None and (
+                    attribution_history_port is not None
+                    or attribution_inventory_port is not None
+                ):
+                    async with attribution_ingest_for_fetch(
+                        shop_id=shop_id,
+                        physical_adv_id=adv_id,
+                        adv_setting_id=adv_setting_id,
+                        history_port=attribution_history_port,
+                        inventory_port=attribution_inventory_port,
+                    ):
+                        adv_stats = await _fetch_stats_for_adv_id(
+                            full_adv_stat_fetcher,
+                            adv_id,
+                            threshold_dates,
+                        )
+                else:
+                    adv_stats = await _fetch_stats_for_adv_id(
+                        full_adv_stat_fetcher,
+                        adv_id,
+                        threshold_dates,
+                    )
             except Exception:
                 logger.exception(
                     "unmanaged collect source error shop_id=%s adv_id=%s",

@@ -6,8 +6,8 @@
 """
 
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Mapping
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
@@ -34,6 +34,7 @@ from app.client_bot.user_interface.views.callbacks import (
     ShopMassAdvOpsBack,
     ShopMassAdvOpsMenu,
     ExportShopAdvExcel,
+    ExportShopAiPackage,
     ImportShopAdvExcel,
     ToggleCabinetActive,
 )
@@ -45,6 +46,7 @@ from app.client_bot.user_interface.views.callbacks import (
     TurnBot,
     UiModeToggle,
 )
+from app.modules.ad_control_settings.telegram.callbacks import AdcShop
 from app.modules.billing.pricer.pricer import Pricer, TariffMode, TariffDetails
 from app.modules.billing.redis_manager import RedisManager as BillingRedisManager
 from app.modules.common_slaves.wildberries.models import (
@@ -116,6 +118,13 @@ def build_shop_main_keyboard(
 
     _ = builder.row(
         InlineKeyboardButton(
+            text="Рекламный контроль",
+            callback_data=AdcShop(cab=wb_user_cabinet.id).pack(),
+        )
+    )
+
+    _ = builder.row(
+        InlineKeyboardButton(
             text="➕ Добавить токен/Обновить токены",
             callback_data=AddNewToken(
                 wb_user_cabinet_original_id=wb_user_cabinet.id
@@ -170,6 +179,16 @@ def build_shop_main_keyboard(
                 ).pack(),
             )
         )
+
+    # Read-only AI Package: и FREE, и PAID. Рядом с Excel, но отдельный callback.
+    _ = builder.row(
+        InlineKeyboardButton(
+            text="📦 Выгрузить AI-пакет",
+            callback_data=ExportShopAiPackage(
+                wb_user_cabinet_original_id=wb_user_cabinet.id
+            ).pack(),
+        )
+    )
 
     # Безопасный resolve: user может отсутствовать / быть None
     # (например, loader без joinedload или detached ORM вне сессии).

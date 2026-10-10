@@ -1,0 +1,57 @@
+{
+  "SCHEMA_VERSION": 1,
+  "SCENARIO_COVERAGE_RECEIPT": true,
+  "CHANGE_ID": "changeset-apply-authority",
+  "MODE": "plan",
+  "PLAN_STATUS": "ready",
+  "PLAN_EVIDENCE_ID": "d4aa1ccfab2ddd98d69b00be109590660ccdca7e0e3f7337b206852619304016",
+  "PLAN_CONTENT_HASH": "f68fe9158fafd28a4a0b9e9c90daada9e8b570c402ee79e148531b5909cf245a",
+  "PLAN_PATH": "openspec/changes/changeset-apply-authority/scenario-coverage/plan.md",
+  "RECEIPT_PATH": "openspec/changes/changeset-apply-authority/scenario-coverage/plan.receipt.json",
+  "SCENARIO_COUNT": 35,
+  "LIFECYCLE_STATUS": "DERIVED",
+  "PRODUCT_ACCEPTANCE_REQUIRED": true,
+  "INPUT_FRESHNESS": "current",
+  "UNRESOLVED_GAPS": [],
+  "INPUTS": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/changeset-apply-authority/design.md",
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/changeset-apply-authority/specs/changeset-apply-authority/spec.md",
+        "content_hash": "4a25c92b799037ef04fa77f43a7bb6607ad17fb04f3dec08f3aed8a6b2acd6db"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/changeset-apply-authority/design.md",
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/changeset-apply-authority/owner-contract.md",
+      "content_hash": "15750aedc290410de25d141921fc279cd1b22982c6ef537a441e6d552adba304"
+    }
+  },
+  "GENERATED_FROM": {
+    "DESIGN_REVISION": {
+      "path": "openspec/changes/changeset-apply-authority/design.md",
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
+    },
+    "SPEC_REVISION": [
+      {
+        "path": "openspec/changes/changeset-apply-authority/specs/changeset-apply-authority/spec.md",
+        "content_hash": "4a25c92b799037ef04fa77f43a7bb6607ad17fb04f3dec08f3aed8a6b2acd6db"
+      }
+    ],
+    "LIFECYCLE_REVISION": {
+      "source": "openspec/changes/changeset-apply-authority/design.md",
+      "content_hash": "25d471ba07d1319b4f0a99c40386d01eb884a1d62c8437c35a8e241b547a6cbd"
+    },
+    "OWNER_CONTRACT_REVISION": {
+      "path": "openspec/changes/changeset-apply-authority/owner-contract.md",
+      "content_hash": "15750aedc290410de25d141921fc279cd1b22982c6ef537a441e6d552adba304"
+    }
+  },
+  "MATERIALIZATION_STATUS": "COMMITTED"
+}

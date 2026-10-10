@@ -137,3 +137,45 @@ ORDER BY observed_at, snapshot_id
             )
             for row in rows
         )
+
+    async def timeline_up_to(
+        self,
+        adv_setting_id: int,
+        *,
+        end_at: datetime,
+    ) -> tuple[HistoryTimelineItem, ...]:
+        """
+        Snapshots with observed_at < end_at (as-of upper bound, exclusive).
+
+        Used for membership authority: latest snapshot at or before event-day end.
+        """
+        query = f"""
+SELECT
+    observed_at,
+    snapshot_id,
+    schema_version,
+    state_hash,
+    payload_json
+FROM {_QUALIFIED_TABLE}
+WHERE adv_setting_id = %(adv_setting_id)s
+  AND observed_at < %(end_at)s
+ORDER BY observed_at, snapshot_id
+""".strip()
+        result = await self._client.query(
+            query,
+            parameters={
+                "adv_setting_id": int(adv_setting_id),
+                "end_at": end_at,
+            },
+        )
+        rows = result.result_rows
+        return tuple(
+            HistoryTimelineItem(
+                observed_at=row[0],
+                snapshot_id=str(row[1]),
+                schema_version=int(row[2]),
+                state_hash=str(row[3]),
+                payload_json=str(row[4]),
+            )
+            for row in rows
+        )

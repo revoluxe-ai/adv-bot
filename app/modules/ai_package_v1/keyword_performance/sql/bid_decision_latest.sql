@@ -6,6 +6,8 @@
 -- Параметры: adv_ids, package_cutoff_instant
 -- Вызывается: ChBidDecisionReader.fetch_latest_decisions
 -- Примечание: native event_class column отсутствует (scripts/fill_bid_decision.py INSERT).
+--   Внешний alias — max_version, не version. Alias version
+--   подставляется в uniqExact/any и даёт CH Code 184 ILLEGAL_AGGREGATION.
 -- ============================================================================
 WITH latest_version AS (
     SELECT
@@ -49,7 +51,9 @@ SELECT
     adv_id,
     nmid,
     norm_query,
-    max(version) AS version,
+    -- Alias must not be `version`: ClickHouse rewrites that name inside
+    -- uniqExact/any and raises Code 184 (max nested in another aggregate).
+    max(version) AS max_version,
     uniqExact(
         (cpm_curr, final_bid, decision_time, stats_max_timestamp, decision_source, version)
     ) AS tuple_variants_at_max_version,
