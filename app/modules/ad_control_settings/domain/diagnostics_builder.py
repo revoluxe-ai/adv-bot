@@ -41,6 +41,21 @@ from app.modules.ad_control_settings.domain.resolver_models import (
     ResolverContext,
 )
 
+_ORDER_VALUE_SUPPRESS = frozenset(
+    {
+        AdControlReasonCode.ACTUAL_DRR_STALE,
+        AdControlReasonCode.ACTUAL_DRR_INSUFFICIENT,
+        AdControlReasonCode.ACTUAL_DRR_UNSUPPORTED,
+        AdControlReasonCode.MEASUREMENT_UNKNOWN,
+        AdControlReasonCode.NO_CONTROL_ACTION_STALE_OR_UNKNOWN,
+        AdControlReasonCode.NOT_ENROLLED_FAIL_CLOSED,
+        AdControlReasonCode.FEATURE_DISABLED_AT_CAMPAIGN,
+        AdControlReasonCode.FEATURE_DISABLED_AT_SHOP,
+        AdControlReasonCode.FEATURE_DISABLED_AT_PRODUCT,
+        AdControlReasonCode.LEGACY_PASSTHROUGH_ACTIVE,
+    }
+)
+
 
 class AdControlDiagnosticsBuilder:
     """Строит diagnostic report; не выполняет production writes."""
@@ -54,7 +69,20 @@ class AdControlDiagnosticsBuilder:
         allowed_spend_rub: Decimal | None = None,
         spend_rub: Decimal | None = None,
         dry_run_diff_available: bool = False,
+        v1_order_value: bool = False,
+        order_value_target_cpo_rub: Decimal | None = None,
+        order_value_reason_codes: tuple[AdControlReasonCode, ...] = (),
+        campaign_observed_drr: ActualDrrObservation | None = None,
+        shop_headroom_target_percent: Decimal | None = None,
     ) -> AdControlDiagnosticsReportV1:
+        """
+        Собрать read-only отчёт.
+
+        ``v1_order_value=False`` сохраняет catalog-price блок
+        ``PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED``.
+        ``v1_order_value=True`` принимает order-value target и не подменяет его
+        catalog-ценой. Allocator не вызывается.
+        """
         reason_codes: list[AdControlReasonCode] = []
         blockers: list[str] = []
         provenance_entries: list[ProvenanceEntry] = []
@@ -72,6 +100,9 @@ class AdControlDiagnosticsBuilder:
         else:
             effective_features.append(drr_resolved)
             provenance_entries.append(drr_resolved.provenance)
+            for code in drr_resolved.reason_codes:
+                if code != AdControlReasonCode.OK:
+                    reason_codes.append(code)
             if (
                 drr_resolved.active
                 and isinstance(drr_resolved.payload, DrrPolicyParamsV1)
@@ -118,8 +149,13 @@ class AdControlDiagnosticsBuilder:
                 dynamic_enabled,
                 actual_drr,
             )
+            headroom_percent = (
+                shop_headroom_target_percent
+                if shop_headroom_target_percent is not None
+                else configured_target.target_drr_percent
+            )
             shop_headroom = evaluate_shop_headroom_state(
-                configured_target.target_drr_percent,
+                headroom_percent,
                 actual_drr,
                 allowed_spend_rub,
                 spend_rub,
@@ -159,15 +195,16 @@ class AdControlDiagnosticsBuilder:
                         schema_version=1,
                     ),
                 )
-            proposed = BoundedCpoProposal(
-                campaign=context.campaign,
+            proposed = _cpo_proposal(
+                context=context,
                 current_max_cpo_rub=current_max_cpo_rub,
-                proposed_max_cpo_rub=None,
-                decision="NO_PROPOSAL_PRICE_SEMANTICS_NOT_ACCEPTED",
-                reason_codes=(
-                    AdControlReasonCode.PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED,
-                ),
+                reason_codes=reason_codes,
+                v1_order_value=v1_order_value,
+                order_value_target_cpo_rub=order_value_target_cpo_rub,
+                order_value_reason_codes=order_value_reason_codes,
             )
+            if proposed is not None:
+                reason_codes.extend(proposed.reason_codes)
 
         decision = "DIAGNOSTIC_READ_ONLY"
         if blockers:
@@ -189,9 +226,54 @@ class AdControlDiagnosticsBuilder:
             shop_headroom=shop_headroom,
             current_max_cpo_rub=current_max_cpo_rub,
             proposed_cpo=proposed,
+            campaign_observed_drr=campaign_observed_drr,
             decision=decision,
             reason_codes=tuple(dict.fromkeys(reason_codes)),
             blockers=tuple(blockers),
             dry_run_diff_available=dry_run_diff_available,
             provenance_index=tuple(provenance_entries),
         )
+
+
+def _cpo_proposal(
+    *,
+    context: ResolverContext,
+    current_max_cpo_rub: Decimal | None,
+    reason_codes: list[AdControlReasonCode],
+    v1_order_value: bool,
+    order_value_target_cpo_rub: Decimal | None,
+    order_value_reason_codes: tuple[AdControlReasonCode, ...],
+) -> BoundedCpoProposal:
+    """Catalog-price блок или V1 order-value target без allocator."""
+    if not v1_order_value:
+        return BoundedCpoProposal(
+            campaign=context.campaign,
+            current_max_cpo_rub=current_max_cpo_rub,
+            proposed_max_cpo_rub=None,
+            decision="NO_PROPOSAL_PRICE_SEMANTICS_NOT_ACCEPTED",
+            reason_codes=(
+                AdControlReasonCode.PRICE_SEMANTICS_NOT_ACCEPTED_CPO_ACTUATION_BLOCKED,
+            ),
+        )
+    blocked = [
+        code for code in reason_codes if code in _ORDER_VALUE_SUPPRESS
+    ]
+    blocked.extend(order_value_reason_codes)
+    if order_value_target_cpo_rub is None or blocked:
+        codes = tuple(dict.fromkeys(blocked)) or (
+            AdControlReasonCode.CPO_INPUTS_INCOMPLETE,
+        )
+        return BoundedCpoProposal(
+            campaign=context.campaign,
+            current_max_cpo_rub=current_max_cpo_rub,
+            proposed_max_cpo_rub=None,
+            decision="NO_PROPOSAL_ORDER_VALUE_BLOCKED",
+            reason_codes=codes,
+        )
+    return BoundedCpoProposal(
+        campaign=context.campaign,
+        current_max_cpo_rub=current_max_cpo_rub,
+        proposed_max_cpo_rub=order_value_target_cpo_rub,
+        decision="DIAGNOSTIC_ORDER_VALUE_TARGET_CPO",
+        reason_codes=(AdControlReasonCode.HEADROOM_ALLOCATOR_NOT_ACCEPTED,),
+    )

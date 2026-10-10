@@ -47,6 +47,7 @@ class AdControlDiagnosticsReportV1:
     shop_headroom: ShopHeadroomState | None
     current_max_cpo_rub: Decimal | None
     proposed_cpo: BoundedCpoProposal | None
+    campaign_observed_drr: ActualDrrObservation | None = None
     decision: str
     reason_codes: tuple[AdControlReasonCode, ...]
     blockers: tuple[str, ...]

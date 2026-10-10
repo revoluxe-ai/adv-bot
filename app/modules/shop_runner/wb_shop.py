@@ -145,6 +145,12 @@ class WBShop:
                 )
                 tg.create_task(
                     _taskgroup_coro(
+                        "hierarchical_ad_control_diagnostics",
+                        lambda: cm.hierarchical_ad_control_diagnostics(),
+                    )
+                )
+                tg.create_task(
+                    _taskgroup_coro(
                         "update_minus_phrases_in_advs",
                         lambda: cm.update_minus_phrases_in_advs(only_bot_active=False),
                     )

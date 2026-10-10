@@ -26,6 +26,7 @@ def _build_coroutines_manager_mock() -> MagicMock:
         "update_clusters_adv_stats_history",
         "refresh_stats_freshness_cache",
         "adv_settings_auto_update",
+        "hierarchical_ad_control_diagnostics",
         "update_minus_phrases_in_advs",
         "update_cluster_bids",
         "cache_current_cluster_bids",
@@ -107,6 +108,7 @@ async def test_wb_shop_run_calls_all_coroutines(fake_redis) -> None:
         "update_common_sale_stat",
         "update_full_adv_stat",
         "adv_settings_auto_update",
+        "hierarchical_ad_control_diagnostics",
         "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",
@@ -163,14 +165,15 @@ async def test_wb_shop_run_gathers_correct_number_of_coroutines(fake_redis) -> N
     ), patch("app.modules.shop_runner.wb_shop.WBShop._alive_worker_run", AsyncMock(return_value=None)), patch("asyncio.TaskGroup", new=lambda *args, **kwargs: recorded_group):
         await wb_shop.run()
 
-    # 1 _alive_worker_run + 25 coroutines from WBShop.run() TaskGroup
-    assert len(recorded_group.created) == 26
+    # 1 _alive_worker_run + 26 coroutines from WBShop.run() TaskGroup
+    assert len(recorded_group.created) == 27
     for method in (
         "update_advs_data_from_wb_to_pg",
         "update_cards_data_from_wb_to_pg",
         "update_common_sale_stat",
         "update_full_adv_stat",
         "adv_settings_auto_update",
+        "hierarchical_ad_control_diagnostics",
         "update_minus_phrases_in_advs",
         "update_clusters_adv_stats_today",
         "update_clusters_adv_stats_history",

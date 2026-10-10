@@ -560,6 +560,21 @@ class CoroutinesManager:
         await self._update_cards_data_from_wb_to_pg(shop_data_updater)
         logger.debug("РћР±РЅРѕРІР»РµРЅРёРµ РєР°СЂС‚РѕС‡РµРє Р·Р°РІРµСЂС€РµРЅРѕ")
 
+    @while_coroutine_decorator(60 * 60, 60)
+    async def hierarchical_ad_control_diagnostics(self) -> None:
+        """Read-only V1 diagnostics. Не пишет WB и не вызывает Apply."""
+        if not settings.HIERARCHICAL_AD_CONTROL_DIAGNOSTICS_ENABLED:
+            return None
+        from app.modules.shop_runner.hierarchical_ad_control_diagnostics import (
+            run_enabled_shop_diagnostics,
+        )
+
+        await run_enabled_shop_diagnostics(
+            shop_id=str(self.shop_id),
+            reports_manager=self._wb_manager_hub.wb_data_manager.reports_manager,
+        )
+        return None
+
     @while_coroutine_decorator(5 * 60)
     async def adv_settings_auto_update(self, only_bot_active: bool = False) -> None:
         if not settings.AUTO_SETTING_ACTIVE:

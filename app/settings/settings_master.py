@@ -795,6 +795,14 @@ class Settings:
         return False
 
     @property
+    def HIERARCHICAL_AD_CONTROL_DIAGNOSTICS_ENABLED(self) -> bool:
+        """Read-only shop-runner tick Task 4.1. По умолчанию выключен."""
+        value = os.getenv("HIERARCHICAL_AD_CONTROL_DIAGNOSTICS_ENABLED")
+        if value is None:
+            return False
+        return value.strip().lower() == "true"
+
+    @property
     def STATS_FRESHNESS_GUARD_ENABLED(self) -> bool:
         """Guard Redis-фильтрации свежести статы в корутинах shop_runner.
 
