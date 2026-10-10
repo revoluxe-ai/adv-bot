@@ -255,6 +255,8 @@ def classify_lifecycle_error(exc: BaseException) -> RetryClass:
             "refuse Docker",
             "DEV_TUNNELS_",
             "ALLOW_DESTRUCTIVE_TEST_",
+            "TEST_INFRA_REUSE",
+            "refuse Docker-free reuse",
             "not allowlisted",
             "forbidden",
             "opt-in",
@@ -332,6 +334,8 @@ class TestInfraLifecycle:
     init_pg_schema: Callable[[], None]
     init_ch_schema: Callable[[], None]
     raise_docker_stage: Callable[..., None]
+    probe_pg: Callable[[], None] | None = None
+    probe_ch: Callable[[], None] | None = None
     sleep_fn: Callable[[float], None] = time.sleep
     startup_max_retries: int = 120
     startup_sleep_sec: float = 2.0
@@ -345,8 +349,7 @@ class TestInfraLifecycle:
         if not needs.needs_compose:
             return
 
-        # 1) Static validation BEFORE any docker/subprocess.
-        self._assert_subprocess_opt_in()
+        # 1) Static validation BEFORE any docker/subprocess or endpoint probes.
         if needs.needs_pg:
             self.validate_pg()
         if needs.needs_clickhouse:
@@ -355,6 +358,12 @@ class TestInfraLifecycle:
         for service in needs.compose_services:
             self.state.requested_services.add(service)
 
+        if self.state.reuse_mode:
+            self._ensure_reuse_resources(needs)
+            return
+
+        # Default path: Docker Compose lifecycle (requires subprocess opt-in).
+        self._assert_subprocess_opt_in()
         missing = [
             svc for svc in needs.compose_services if svc not in self.state.started_services
         ]
@@ -364,6 +373,46 @@ class TestInfraLifecycle:
                 self._wait_healthy(svc)
                 self.state.started_services.add(svc)
 
+        self._ensure_schema_bootstrap(needs)
+
+    def _ensure_reuse_resources(self, needs: TestResourceNeeds) -> None:
+        """Reuse externally-managed stack: loopback probes only, no Docker API.
+
+        ``validate_pg`` / ``validate_ch`` MUST уже пройти в ``ensure_resources``.
+        """
+        if needs.needs_pg and COMPOSE_SERVICE_PG not in self.state.started_services:
+            if self.probe_pg is None:
+                raise RuntimeError(
+                    "TEST_INFRA_REUSE requires probe_pg runner — "
+                    "refuse Docker-free reuse without loopback PG probe"
+                )
+            self.probe_pg()
+            self.state.started_services.add(COMPOSE_SERVICE_PG)
+            self.state.health_check_counts[COMPOSE_SERVICE_PG] = (
+                self.state.health_check_counts.get(COMPOSE_SERVICE_PG, 0) + 1
+            )
+            print(f"[OK] Service {COMPOSE_SERVICE_PG} is healthy (reuse probe).")
+
+        if (
+            needs.needs_clickhouse
+            and COMPOSE_SERVICE_CH not in self.state.started_services
+        ):
+            if self.probe_ch is None:
+                raise RuntimeError(
+                    "TEST_INFRA_REUSE requires probe_ch runner — "
+                    "refuse Docker-free reuse without loopback CH probe"
+                )
+            self.probe_ch()
+            self.state.started_services.add(COMPOSE_SERVICE_CH)
+            self.state.health_check_counts[COMPOSE_SERVICE_CH] = (
+                self.state.health_check_counts.get(COMPOSE_SERVICE_CH, 0) + 1
+            )
+            print(f"[OK] Service {COMPOSE_SERVICE_CH} is healthy (reuse probe).")
+
+        self._ensure_schema_bootstrap(needs)
+
+    def _ensure_schema_bootstrap(self, needs: TestResourceNeeds) -> None:
+        """Session-once PG/CH schema bootstrap после infra ready."""
         if needs.needs_pg and not self.state.pg_schema_initialized:
             self._init_pg_with_retry()
             self.state.pg_schema_initialized = True

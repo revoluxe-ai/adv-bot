@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -209,3 +211,69 @@ def test_get_new_bid_returns_int_when_fact_equals_target() -> None:
 
     assert isinstance(new_bid, int)
     assert new_bid == 90
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_update_common_bid_uses_search_cpo_not_aggregate() -> None:
+    """Spec leg-cpo-economics: bad aggregate/Auto не должен reset хороший Search."""
+    wb_modifier = MagicMock()
+    wb_modifier.update_search_adv_common_cpm = AsyncMock()
+    redis_manager = MagicMock()
+    redis_manager.set_bids = AsyncMock()
+    manager = UpdateCommotBidInSearchAdvsManager(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        redis_common_bid_value_manager=redis_manager,
+    )
+    manager._count_candidate_to_keywords = AsyncMock(return_value=0)  # type: ignore[method-assign]
+
+    complex_adv = SimpleNamespace(search_adv_id=202)
+    adv = SimpleNamespace(
+        fact_pay_for_order=999.0,
+        search_fact_cpo=50.0,
+        result_target_pay_for_order=100.0,
+        nmids=[100],
+        current_common_bids_in_search_adv={100: 120},
+        search_adv_min_bids={100: 50},
+        max_user_cpm_bid=200,
+        complex_adv=complex_adv,
+    )
+
+    await manager.update_common_bid_in_search_adv(adv)  # type: ignore[arg-type]
+
+    command = wb_modifier.update_search_adv_common_cpm.await_args.args[0]
+    assert len(command.items) == 1
+    assert command.items[0].new_bid == 121
+    redis_manager.set_bids.assert_awaited_once_with(202, {100: 121})
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_update_common_bid_missing_search_cpo_does_not_use_aggregate() -> None:
+    """Spec leg-cpo-economics: missing Search CPO идёт в safe reset без common fallback."""
+    wb_modifier = MagicMock()
+    wb_modifier.update_search_adv_common_cpm = AsyncMock()
+    redis_manager = MagicMock()
+    redis_manager.set_bids = AsyncMock()
+    manager = UpdateCommotBidInSearchAdvsManager(
+        wb_modifier=wb_modifier,
+        tasks_manager=MagicMock(),
+        redis_common_bid_value_manager=redis_manager,
+    )
+    manager._count_candidate_to_keywords = AsyncMock(return_value=0)  # type: ignore[method-assign]
+    adv = SimpleNamespace(
+        fact_pay_for_order=1.0,
+        search_fact_cpo=None,
+        result_target_pay_for_order=100.0,
+        nmids=[100],
+        current_common_bids_in_search_adv={100: 120},
+        search_adv_min_bids={100: 50},
+        max_user_cpm_bid=200,
+        complex_adv=SimpleNamespace(search_adv_id=202),
+    )
+
+    await manager.update_common_bid_in_search_adv(adv)  # type: ignore[arg-type]
+
+    command = wb_modifier.update_search_adv_common_cpm.await_args.args[0]
+    assert command.items[0].new_bid == 50

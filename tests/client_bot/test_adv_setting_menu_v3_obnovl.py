@@ -77,6 +77,8 @@ def _minimal_menu_for_text(
     menu._target_cost = None
     menu._avg_cost_additional = None
     menu._is_campaign_active_by_cost = None
+    menu._auto_fact_cpo = None
+    menu._search_fact_cpo = None
     menu._cost_threshold_kind = None
     menu._plan_set = False
     menu._plan_fact_ch_max_ts_str = None
@@ -140,6 +142,23 @@ def test_obnovl_v2_shows_bs_not_v3() -> None:
     assert "добавл в БС" in block
     assert "удал из БС" in block
     assert "посл. V3" not in block
+
+
+@pytest.mark.unit
+def test_campaign_menu_shows_leg_cpo_without_cross_leg_fallback() -> None:
+    menu = _minimal_menu_for_text(bot_active=True, v3_last_action_str="Нет данных")
+    menu._auto_fact_cpo = 300.0
+    menu._search_fact_cpo = 100.0
+
+    text = menu.text
+
+    assert "CPO Auto: 300 р." in text
+    assert "CPO Search: 100 р." in text
+
+    menu._search_fact_cpo = None
+    text_missing = menu.text
+    assert "CPO Auto: 300 р." in text_missing
+    assert "CPO Search: нет данных" in text_missing
 
 
 @pytest.mark.unit

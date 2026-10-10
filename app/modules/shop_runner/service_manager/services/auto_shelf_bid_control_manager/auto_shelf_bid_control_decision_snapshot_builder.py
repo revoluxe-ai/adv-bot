@@ -70,7 +70,7 @@ def _resolve_cycle_metric_for_snapshot(
     }:
         return OptimizationMetric.CPC
     return resolve_optimization_metric(
-        complex_adv.fact_pay_for_order,
+        getattr(complex_adv, "auto_fact_cpo", None),
         complex_adv.resolve_cpo,
     )
 

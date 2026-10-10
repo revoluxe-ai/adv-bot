@@ -266,10 +266,17 @@ async def get_auto_campaign_cost_activity_metrics(
         if plan_fact_summary is not None
         else None
     )
+    # leg-cpo-economics: когда caller передал ComplexAdv, cost-activity
+    # относится к Auto leg и MUST читать только Auto CPO. Aggregate plan/fact
+    # остаётся legacy fallback лишь для старых aggregate-only callers без ComplexAdv.
     fact_pay_for_order = (
-        plan_fact_summary.fact_pay_for_order
-        if plan_fact_summary is not None
-        else None
+        getattr(complex_adv, "auto_fact_cpo", None)
+        if complex_adv is not None
+        else (
+            plan_fact_summary.fact_pay_for_order
+            if plan_fact_summary is not None
+            else None
+        )
     )
     fact_pay_for_order_value = _as_finite_cost_number(fact_pay_for_order)
     is_active = _resolve_cost_activity(

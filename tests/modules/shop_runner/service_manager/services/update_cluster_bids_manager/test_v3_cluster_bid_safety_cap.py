@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -37,6 +39,7 @@ from app.modules.wb_adv_updater.calculated_keywords_manager.dto.inner_dto.keywor
 from app.shared.domains.wb.dto.redis_keyword_bidder_status_manager.bidder_keyword_status import (
     BidderKeywordStatus,
 )
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import LegCpoSnapshot
 from tests.factories import GoodKeywordFactory
 
 ADV_ID = 37326138
@@ -365,3 +368,97 @@ async def test_apply_command_empty_command_skips_remember_bids() -> None:
     await manager._apply_command(UpdateBidsCommand(new_bids=[]))
     wb_manager.set_new_cluster_bids.assert_awaited_once()
     cluster_bids_manager.remember_bids.assert_awaited_once_with([])
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_fact_datas_uses_search_cpo_and_never_aggregate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cluster safety cap получает Search CPO из structural Search leg."""
+    plan_fact_reader = MagicMock()
+    plan_fact_reader.get_latest_plan_facts = AsyncMock(
+        return_value={ADV_ID: SimpleNamespace()}
+    )
+    manager = UpdateClusterBidsManager(
+        wb_manager=MagicMock(),
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=MagicMock(),
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+    )
+    adv = SimpleNamespace(
+        adv_id=ADV_ID,
+        shop_id="shop-1",
+        adv_setting=MagicMock(),
+    )
+    aggregate_fact = _fact(999.0)
+    monkeypatch.setattr(
+        "app.modules.plan_fact.provider.PlanFactProvider.fact_data_from_plan_fact_summary",
+        lambda *_args, **_kwargs: aggregate_fact,
+    )
+    now = datetime(2026, 9, 30)
+    leg_snapshot = LegCpoSnapshot(
+        auto_adv_id=ADV_ID,
+        search_adv_id=SEARCH_ADV_ID,
+        auto_cpo=999.0,
+        search_cpo=80.0,
+        start_date=now,
+        end_date=now,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.update_cluster_bids_manager.load_leg_cpo_snapshots",
+        AsyncMock(return_value={ADV_ID: leg_snapshot}),
+    )
+
+    result = await manager._get_fact_datas([adv])  # type: ignore[list-item]
+
+    assert result[ADV_ID].pay_for_order == 80.0
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_get_fact_datas_missing_search_cpo_has_no_aggregate_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing Search CPO остаётся None, даже если aggregate CPO плохой."""
+    plan_fact_reader = MagicMock()
+    plan_fact_reader.get_latest_plan_facts = AsyncMock(
+        return_value={ADV_ID: SimpleNamespace()}
+    )
+    manager = UpdateClusterBidsManager(
+        wb_manager=MagicMock(),
+        redis_keyword_bidder_status_manager=MagicMock(),
+        redis_cluster_bids_manager=MagicMock(),
+        redis_api_cluster_bids_manager=MagicMock(),
+        redis_cluster_bids_timestamp_manager=MagicMock(),
+        tasks_manager=MagicMock(),
+        plan_fact_reader=plan_fact_reader,
+    )
+    adv = SimpleNamespace(
+        adv_id=ADV_ID,
+        shop_id="shop-1",
+        adv_setting=MagicMock(),
+    )
+    monkeypatch.setattr(
+        "app.modules.plan_fact.provider.PlanFactProvider.fact_data_from_plan_fact_summary",
+        lambda *_args, **_kwargs: _fact(999.0),
+    )
+    now = datetime(2026, 9, 30)
+    leg_snapshot = LegCpoSnapshot(
+        auto_adv_id=ADV_ID,
+        search_adv_id=SEARCH_ADV_ID,
+        auto_cpo=999.0,
+        search_cpo=None,
+        start_date=now,
+        end_date=now,
+    )
+    monkeypatch.setattr(
+        "app.modules.shop_runner.service_manager.services.update_cluster_bids_manager.update_cluster_bids_manager.load_leg_cpo_snapshots",
+        AsyncMock(return_value={ADV_ID: leg_snapshot}),
+    )
+
+    result = await manager._get_fact_datas([adv])  # type: ignore[list-item]
+
+    assert result[ADV_ID].pay_for_order is None

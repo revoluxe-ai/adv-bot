@@ -3,7 +3,7 @@ import time
 from collections.abc import Iterable
 from datetime import datetime, date, timedelta
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 from app.modules.full_stat_adv_updater.types.full_adv_stat import FullAdvStat
 from app.modules.full_stat_adv_updater.types.full_adv_stat import (
@@ -54,7 +54,7 @@ def concatenate_stats(
     data_to_auto = {stat.date: stat for stat in auto_adv_stats}
     data_to_auction = {stat.date: stat for stat in auction_adv_stats}
 
-    concatenate_stats = []
+    concatenate_stats: list[SmallFullAdvStatPerDay] = []
 
     for day in all_dates:
         auto_stat = data_to_auto.get(day)
@@ -192,7 +192,7 @@ async def get_stats_by_last_days(
                         "adv_ids": adv_ids,
                     },
                 )
-                result = res.first_item
+                result = cast(dict[str, Any] | None, getattr(res, "first_item", None))
 
                 # Обрабатываем результат, создавая общий объект FullAdvStat
                 if result:
@@ -228,6 +228,68 @@ async def get_stats_by_last_days(
                 raise
 
 
+async def get_stats_by_adv_ids_last_days(
+    adv_ids: list[int],
+    start_date: datetime,
+    end_date: datetime,
+) -> dict[int, SmallFullAdvStat]:
+    """Вернуть exact-leg статистику по каждому adv_id для spec leg-cpo-economics.
+
+    В отличие от get_stats_by_last_days результат не суммирует разные рекламные
+    ноги между собой: каждый concrete adv_id остаётся отдельной строкой.
+    """
+    if not adv_ids:
+        return {}
+    query = """
+    SELECT
+        adv_id,
+        SUM(latest_views) AS views,
+        SUM(latest_clicks) AS clicks,
+        SUM(latest_spend) AS spend,
+        SUM(latest_added_to_cart) AS added_to_cart,
+        SUM(latest_orders) AS orders,
+        SUM(latest_sum_price_orders) AS sum_price_orders
+    FROM (
+        SELECT
+            adv_id,
+            date,
+            argMax(views, version) AS latest_views,
+            argMax(clicks, version) AS latest_clicks,
+            argMax(spend, version) AS latest_spend,
+            argMax(added_to_cart, version) AS latest_added_to_cart,
+            argMax(orders, version) AS latest_orders,
+            argMax(sum_price_orders, version) AS latest_sum_price_orders
+        FROM default_db.full_adv_wb_stat
+        WHERE date BETWEEN toDate(%(start_date)s) AND toDate(%(end_date)s)
+          AND adv_id IN %(adv_ids)s
+        GROUP BY adv_id, date
+    )
+    GROUP BY adv_id
+    ORDER BY adv_id
+    """
+    async with anti_ch_crash_semaphore:
+        async with get_clickhouse_client() as client:
+            result = await client.query(
+                query,
+                parameters={
+                    "start_date": start_date.strftime("%Y-%m-%d"),
+                    "end_date": end_date.strftime("%Y-%m-%d"),
+                    "adv_ids": adv_ids,
+                },
+            )
+    return {
+        int(row[0]): SmallFullAdvStat(
+            views=int(row[1] or 0),
+            clicks=int(row[2] or 0),
+            spend=float(row[3] or 0.0),
+            added_to_cart=int(row[4] or 0),
+            orders=int(row[5] or 0),
+            sum_price=float(row[6] or 0.0),
+        )
+        for row in result.result_rows
+    }
+
+
 async def get_spend_by_last_days(
     adv_ids: list[int], start_date: datetime, end_date: datetime
 ) -> float:
@@ -249,7 +311,7 @@ async def get_spend_by_last_days(
                         "adv_ids": adv_ids,
                     },
                 )
-                result = res.first_item
+                result = cast(dict[str, Any] | None, getattr(res, "first_item", None))
                 total_spend = result["total_spend"] if result else 0.0
                 return float(total_spend or 0.0)
     except Exception:
@@ -286,7 +348,7 @@ async def get_total_spend_by_advs(adv_ids: list[int]) -> float:
                     query,
                     parameters={"adv_ids": adv_ids},
                 )
-                result = res.first_item
+                result = cast(dict[str, Any] | None, getattr(res, "first_item", None))
                 total_spend = result["total_spend"] if result else 0.0
                 return float(total_spend or 0.0)
     except Exception:
@@ -355,7 +417,7 @@ async def insert(stats: Iterable[FullAdvStat]) -> None:
         async with get_clickhouse_client() as client:
             query = _get_insert_query()
             version = str(time.time())
-            values = []
+            values: list[list[int | float | str]] = []
             for stat in stats:
                 adv_id = stat.advertId
                 for day in stat.days:
@@ -374,7 +436,7 @@ async def insert(stats: Iterable[FullAdvStat]) -> None:
                     )
 
             for row in values:
-                query_result = await client.query(query, parameters=row)
+                query_result = await client.query(query, parameters=cast(Any, row))
                 logger.debug(query_result)
 
     await run_ch_with_timeout(_insert_stats())
@@ -418,7 +480,7 @@ async def get_keywords_spend(
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 res = await client.query(query)
-                result = res.first_item
+                result = cast(dict[str, Any] | None, getattr(res, "first_item", None))
                 return float(result["total_spend"]) if result else 0.0
     except Exception:
         logger.error(
@@ -642,7 +704,7 @@ async def get_keywords_clicks_and_views(
         async with anti_ch_crash_semaphore:
             async with get_clickhouse_client() as client:
                 res = await client.query(query)
-                result = res.first_item
+                result = cast(dict[str, Any] | None, getattr(res, "first_item", None))
                 if result:
                     return int(result["total_clicks"]), int(result["total_views"])
                 return 0, 0

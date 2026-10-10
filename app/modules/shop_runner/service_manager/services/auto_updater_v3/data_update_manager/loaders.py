@@ -76,10 +76,18 @@ async def resolve_v3_fact_data(
     keywords: list[CalculatedKeyword],
     max_last_period: int,
 ) -> tuple[FactData, str]:
-    """Fact для V3 ladder без повторного ``get_stat_data``, если fact уже в ``WBAdvDTO``."""
+    """Fact для V3 ladder с Search-leg CPO по spec leg-cpo-economics.
+
+    Orders/method остаются из существующего fact, но pay_for_order для Search
+    automation берётся только из explicit Search leg snapshot. Aggregate CPO
+    не используется как fallback.
+    """
     if (
         isinstance(dto, WBAdvDTO)
         and max_last_period == _WB_ADV_DTO_FACT_LAST_DAYS
     ):
-        return dto.fact, "dto"
+        search_fact = dto.fact.model_copy(
+            update={"pay_for_order": dto.search_fact_cpo}
+        )
+        return search_fact, "dto_search_leg"
     return await updater.get_fact_data(keywords), "updater"

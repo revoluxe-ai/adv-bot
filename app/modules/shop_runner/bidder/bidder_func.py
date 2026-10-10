@@ -197,7 +197,8 @@ async def build_v3_safety_cap_by_keyword_setting_original_id(
         )
         return {}
 
-    fact_pay_for_order = dto.fact_pay_for_order
+    # leg-cpo-economics: bidder safety-cap mutates Search, значит читает Search CPO.
+    fact_pay_for_order = dto.search_fact_cpo
     max_pay_for_order = dto.plan.max_pay_for_order
     overspend = (
         fact_pay_for_order is not None and fact_pay_for_order > max_pay_for_order

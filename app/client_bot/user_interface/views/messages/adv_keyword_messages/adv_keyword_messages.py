@@ -1,6 +1,7 @@
 import logging
 import typing
 from datetime import datetime
+from io import BytesIO
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
@@ -61,7 +62,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         keywords: list[CalculatedKeyword],
         adv_setting: AdvSetting,
         wb_user_cabinet_original_id: int,
-        adv_choice_last_page,
+        adv_choice_last_page: int,
         image: str,
         page: int,
         image_mode: str = "graphic",
@@ -72,8 +73,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self._adv_setting = adv_setting
         self._page = page
         self._wb_user_cabinet_original_id = wb_user_cabinet_original_id
-        self._adv_choice_last_page = adv_choice_last_page
-        self._image = image
+        self._adv_choice_last_page: int = adv_choice_last_page
+        self._image: str | BytesIO = image
         self._filter: bool = False
         self._on_page = 24
         self.image_mode = image_mode
@@ -101,8 +102,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         if search_adv_id is not None and nmids:
             self._last_saved_bids = await redis_manager.get_bids(search_adv_id, nmids)
 
-        keywords_filter: list[str] = data.get("keywords_filter")
-        clear_keywords = []
+        keywords_filter = typing.cast(list[str] | None, data.get("keywords_filter"))
+        clear_keywords: list[CalculatedKeyword] = []
         if keywords_filter:
             self._filter = True
             for keyword in self._keywords:
@@ -123,8 +124,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
 
             self._keywords = clear_keywords
 
-        hide_keywords_is_not_relevant = data.get("hide_keywords_is_not_relevant")
-        self.hide_keywords_is_not_relevant = hide_keywords_is_not_relevant
+        hide_keywords_is_not_relevant = bool(data.get("hide_keywords_is_not_relevant"))
+        self.hide_keywords_is_not_relevant: bool = hide_keywords_is_not_relevant
 
         if hide_keywords_is_not_relevant:
             clear_keywords = []
@@ -186,6 +187,8 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         self.cost_per_order_from_additional_last_week = (
             stat_data.cost_per_order_from_additional_last_week
         )
+        self.auto_cpo = stat_data.auto_cpo
+        self.search_cpo = stat_data.search_cpo
         if self._all_orders_for_last_days is not None:
             self._sum_spend = self._spend_for_inner_adv_for_3_days
         if self.image_mode == "graphic":
@@ -253,7 +256,13 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
             text += (
                 f"Себес. зак. из доп. пок. (7 д.): {self.cost_per_order_from_additional_last_week:.2f} р.\n"
             )
+        auto_cpo_text = f"{self.auto_cpo:.2f} р." if self.auto_cpo is not None else "нет данных"
+        search_cpo_text = (
+            f"{self.search_cpo:.2f} р." if self.search_cpo is not None else "нет данных"
+        )
         text += (
+            f"CPO Auto: {auto_cpo_text}\n"
+            f"CPO Search: {search_cpo_text}\n"
             f"Заказы: {self._all_orders_for_last_days}\n"
             f"  -Авто: {self.full_adv_stat_for_last_days_for_auto_adv.orders}\n"
             f"  -Аукцион: {self.full_adv_stat_for_last_days_for_auction.orders}\n"
@@ -323,15 +332,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         text += self._format_last_saved_bids()
         return text
 
-    @property
-    def image(self) -> str:
-        return self._image
-
-    @image.setter
-    def image(self, value):
-        self._image = value
-
-    async def _graphic_injection(self):
+    async def _graphic_injection(self) -> BytesIO | None:
         bot = self.bot
         user_telegram_id = self.chat_id
         adv_original_id = self._adv_setting.id
@@ -372,7 +373,7 @@ class AdvKeywordsSetting(TextWithKeyboardAndImage):
         return "\n".join(lines) + "\n"
 
     @staticmethod
-    async def _get_status_auction(search_adv_id: int) -> str:
+    async def _get_status_auction(search_adv_id: int | None) -> str:
         if not search_adv_id:
             return "не подключен"
         stmt = select(AdvSetting.active_status).where(

@@ -12,6 +12,12 @@ from app.modules.common_slaves.wildberries.models.enums.auto_shelf_bid_control_s
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_manager import (
     AutoShelfBidControlManager,
 )
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.auto_shelf_bid_control_decision_snapshot_builder import (
+    _resolve_cycle_metric_for_snapshot,
+)
+from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.optimization_metric import (
+    OptimizationMetric,
+)
 from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_manager.dto.decision_snapshot_dto import (
     BidSyncStatus,
     parse_plan_ranked_top_bid_minor,
@@ -26,6 +32,36 @@ from app.modules.shop_runner.service_manager.services.auto_shelf_bid_control_man
 )
 
 pytestmark = pytest.mark.unit
+
+
+def test_plan_distance_metric_uses_auto_cpo_not_bad_aggregate_or_search() -> None:
+    """Auto Shelf dynamic metric принадлежит Auto leg."""
+    complex_adv = MagicMock(
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=999.0,
+        auto_fact_cpo=80.0,
+        search_fact_cpo=999.0,
+        resolve_cpo=100.0,
+    )
+
+    metric = _resolve_cycle_metric_for_snapshot(complex_adv)
+
+    assert metric == OptimizationMetric.CTR
+
+
+def test_plan_distance_metric_missing_auto_cpo_has_no_aggregate_fallback() -> None:
+    """Missing Auto CPO не превращается в aggregate-CPO decision."""
+    complex_adv = MagicMock(
+        auto_shelf_bid_control_strategy=AutoShelfBidControlStrategy.PLAN_DISTANCE,
+        fact_pay_for_order=999.0,
+        auto_fact_cpo=None,
+        search_fact_cpo=999.0,
+        resolve_cpo=100.0,
+    )
+
+    metric = _resolve_cycle_metric_for_snapshot(complex_adv)
+
+    assert metric == OptimizationMetric.CPC
 
 
 def test_resolve_expected_bid_minor_test_mode_uses_next_test() -> None:

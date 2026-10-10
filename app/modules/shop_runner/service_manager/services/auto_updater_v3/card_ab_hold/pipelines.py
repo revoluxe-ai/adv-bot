@@ -403,7 +403,8 @@ async def process_ab_hold(
             ),
         )
 
-    fact = complex_adv.fact_pay_for_order
+    # leg-cpo-economics: A/B Hold mutates Search keyword state.
+    fact = complex_adv.search_fact_cpo
     if not is_ab_hold_campaign_deep_overspend(
         fact_pay_for_order=fact,
         max_pay_for_order=plan_max,

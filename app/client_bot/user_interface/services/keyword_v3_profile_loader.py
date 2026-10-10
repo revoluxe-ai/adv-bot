@@ -45,6 +45,7 @@ from app.modules.shop_runner.service_manager.services.auto_updater_v3.selector i
     KeywordV3Context,
 )
 from app.modules.shop_runner.service_manager.wb_shop_data_manager import ComplexAdv
+from app.modules.shop_runner.wb_stat_manager.leg_cpo import load_leg_cpo_snapshot
 from app.modules.wb_adv_updater.calculated_keywords_manager.dto.calculated_keyword import (
     CalculatedKeyword,
 )
@@ -105,12 +106,25 @@ async def _build_complex_adv(adv_setting: AdvSetting, shop_id: str) -> ComplexAd
         async with sm(read_only=True) as session:
             result = await session.execute(stmt)
             search_adv = result.scalar_one_or_none()
-    return ComplexAdv(
+    complex_adv = ComplexAdv(
         adv_setting=adv_setting,
         search_adv=search_adv,
         shop_id=shop_id,
         get_keywords_func=_ui_get_keywords_from_redis,
     )
+    try:
+        leg_snapshot = await load_leg_cpo_snapshot(
+            auto_adv_id=int(adv_setting.adv_id),
+            search_adv_id=search_adv_id,
+        )
+        complex_adv.attach_leg_cpo(leg_snapshot)
+    except Exception:
+        logger.warning(
+            "v3 keyword profile: leg CPO unavailable adv_id=%s",
+            adv_setting.adv_id,
+            exc_info=True,
+        )
+    return complex_adv
 
 
 def _positions_size_for_adv(adv_setting: AdvSetting) -> int:
