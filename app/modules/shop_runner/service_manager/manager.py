@@ -569,7 +569,7 @@ class CoroutinesManager:
             run_enabled_shop_diagnostics,
         )
 
-        await run_enabled_shop_diagnostics(
+        _ = await run_enabled_shop_diagnostics(
             shop_id=str(self.shop_id),
             reports_manager=self._wb_manager_hub.wb_data_manager.reports_manager,
         )

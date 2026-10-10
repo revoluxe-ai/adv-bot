@@ -203,8 +203,7 @@ class AdControlDiagnosticsBuilder:
                 order_value_target_cpo_rub=order_value_target_cpo_rub,
                 order_value_reason_codes=order_value_reason_codes,
             )
-            if proposed is not None:
-                reason_codes.extend(proposed.reason_codes)
+            reason_codes.extend(proposed.reason_codes)
 
         decision = "DIAGNOSTIC_READ_ONLY"
         if blockers:

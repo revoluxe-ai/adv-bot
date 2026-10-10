@@ -97,12 +97,8 @@ async def evaluate_shop_window(
     Успешный путь собирает supplier orders ровно один раз на этот вызов.
     """
     if not request.enrolled:
-        reports = tuple(
-            AdControlDiagnosticsBuilder.build(context, None)
-            for context in request.contexts
-        )
         return ShopEvaluationResult(
-            reports=reports,
+            reports=_reports_without_facts(request.contexts),
             gmv=None,
             shop=None,
             supplier_order_collections=0,
@@ -151,7 +147,7 @@ async def evaluate_shop_window(
         spend_window=spend_window,
         shop_target_drr_percent=shop_target,
     )
-    inventory_set = (
+    inventory_set: set[int] = (
         set(request.inventory_adv_ids)
         if request.inventory_adv_ids is not None
         else set()

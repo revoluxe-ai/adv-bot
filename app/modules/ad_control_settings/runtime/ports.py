@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
-from typing import Protocol, Sequence
+from typing import Protocol
 
 from app.modules.attribution_facts.domain.models import (
     AttributionQueryResult,

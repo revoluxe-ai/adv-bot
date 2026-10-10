@@ -55,7 +55,7 @@ _MOSCOW = ZoneInfo("Europe/Moscow")
 
 
 class _ClosedPort:
-    """Фейковый порт: неenrolled путь не должен читать факты."""
+    """Фейковый порт: путь без enrollment не читает факты."""
 
     async def get_supplier_orders(
         self,

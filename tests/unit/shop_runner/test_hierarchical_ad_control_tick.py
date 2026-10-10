@@ -15,11 +15,9 @@ pytestmark = pytest.mark.unit
 async def test_diagnostics_coroutine_is_idle_when_flag_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Флаг читается из env; выключенное значение не вызывает live-read."""
     runner = AsyncMock()
-    monkeypatch.setattr(
-        "app.settings.settings.HIERARCHICAL_AD_CONTROL_DIAGNOSTICS_ENABLED",
-        False,
-    )
+    monkeypatch.setenv("HIERARCHICAL_AD_CONTROL_DIAGNOSTICS_ENABLED", "false")
     monkeypatch.setattr(
         "app.modules.shop_runner.hierarchical_ad_control_diagnostics.run_enabled_shop_diagnostics",
         runner,
@@ -34,11 +32,9 @@ async def test_diagnostics_coroutine_is_idle_when_flag_off(
 async def test_diagnostics_coroutine_runs_once_when_flag_on(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Включённый флаг вызывает ровно один read-only прогон магазина."""
     runner = AsyncMock()
-    monkeypatch.setattr(
-        "app.settings.settings.HIERARCHICAL_AD_CONTROL_DIAGNOSTICS_ENABLED",
-        True,
-    )
+    monkeypatch.setenv("HIERARCHICAL_AD_CONTROL_DIAGNOSTICS_ENABLED", "true")
     monkeypatch.setattr(
         "app.modules.shop_runner.hierarchical_ad_control_diagnostics.run_enabled_shop_diagnostics",
         runner,

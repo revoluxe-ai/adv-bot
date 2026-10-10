@@ -2,12 +2,12 @@
 Провайдеры Task 4.1: history → inventory, spend, supplier orders.
 
 Чтения ClickHouse и ``ReportsManager``. Новых таблиц и миграций нет.
-``wb_common_stat`` не читается.
+Воронка продаж магазина этим провайдером не читается.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from decimal import Decimal, InvalidOperation
 from typing import Protocol
 
@@ -52,14 +52,18 @@ GROUP BY adv_id
 
 
 class SupplierOrdersClient(Protocol):
-    """Узкий ``ReportsManager.get_supplier_orders``."""
+    """Узкий ``ReportsManager.get_supplier_orders``.
 
-    async def get_supplier_orders(
+    Возврат — ``Awaitable``, а не ``async def``: coroutine result инвариантен,
+    и ``list[OrdersItem]`` иначе не подходит под ``list[object]``.
+    """
+
+    def get_supplier_orders(
         self,
         *,
         date_from: str,
         flag: int | None = 0,
-    ) -> list[object]:
+    ) -> Awaitable[Sequence[object]]:
         """Одна страница statistics-api supplier orders."""
         ...
 

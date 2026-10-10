@@ -67,7 +67,7 @@ def _verdict(
 
 
 def test_shop_gmv_uses_price_with_disc_srid_and_excludes_cancel() -> None:
-    """Один srid, отмена и чужая дата не входят в GMV. gNumber не дедупит."""
+    """Последний srid побеждает. Отмена и чужая дата не входят. gNumber не дедупит."""
     lines = (
         _line("a", Decimal(600), g_number="same"),
         _line("a", Decimal(999), g_number="same"),
@@ -77,7 +77,7 @@ def test_shop_gmv_uses_price_with_disc_srid_and_excludes_cancel() -> None:
     )
     aggregate = aggregate_shop_order_gmv(lines, _WINDOW, _verdict())
     assert aggregate.status == ShopOrderGmvStatus.COMPLETE
-    assert aggregate.whole_shop_order_gmv_rub == Decimal(1000)
+    assert aggregate.whole_shop_order_gmv_rub == Decimal(1399)
     assert aggregate.order_item_count == 2
 
 

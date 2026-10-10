@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
+from typing import cast
 
 from app.core.mp.wb.api.generated.reports.v1.reports_client.types import UNSET
 from app.modules.ad_control_settings.runtime.ports import SupplierOrdersPagePort
@@ -133,9 +134,10 @@ def _cursor_text(row: object) -> str | None:
 
 def _field(row: object, *names: str) -> object:
     if isinstance(row, dict):
+        mapping = cast(dict[str, object], row)
         for name in names:
-            if name in row:
-                return row[name]
+            if name in mapping:
+                return mapping[name]
         return UNSET
     for name in names:
         if hasattr(row, name):
