@@ -388,6 +388,10 @@ Parked via `/opsx-bound-scope:GO` вЂ” not owed DoD of any current OpenSpec c
 until `/opsx-new` (or equivalent) + `/opsx-update` + `REENTER_CONFIRMED`.
 No `openspec/changes/openspec-guard-size-recovery/` folder yet (WORKLOG-only park).
 
+**Owner reentry (2026-10-09):** minimum maintenance only — `scenarios.opsx_verify.baseline_chars`
+rebased to measured accepted stage `125878` (`allowed_growth_chars` remains `0`; status `WARN`).
+Full compression / `--report-offenders` / admin reduce command remain deferred below.
+
 - [ ] [deferred-from:openspec-guard-size-recovery] Guard size recovery / openspec compress tooling
   source: /opsx-admin-command-design-command (OPTION_A recommended; OPTION_B optional) + explore 2026-07-30
   reason: out_of_current_mvp | owner_park | needs_test_design
