@@ -66,4 +66,18 @@ on failure.
 
 Non-consuming preflight: `opsx_provider_preflight.py` (imports, docker, collect-only).
 
+`--require-docker-daemon` (used inside the sealed block, before `guard run`) also fails closed on:
+Low-integrity process token, Low-labelled `.venv` launchers, `docker info` denied from the venv
+python, hidden `git ls-files -v` flags, dirty worktree, stray `tests/tests`. `--fix-integrity`
+tries `icacls <exe> /setintegritylevel M` first; a failure there is only a `WARN` (exit 1299 =
+the calling token is Low and cannot raise labels).
+
+### HOME-PC one-time machine fix (when the preflight reports `process_integrity: low`)
+
+File labels cannot fix a Low *process token* (e.g. an agent sandbox shell). The Owner starts the
+cert once from an ordinary Git Bash window (Start menu, not launched from the agent terminal),
+confirms `whoami /groups | grep -i "Mandatory Label"` shows `Medium Mandatory Level`, that the
+user is in `docker-users`, and that `docker info` works. Then run the sealed block there. No
+tracked file is edited and nothing is marked assume-unchanged or deleted locally.
+
 Unit tests: `tests/unit/opsx/test_opsx_provider_run_guard.py`.

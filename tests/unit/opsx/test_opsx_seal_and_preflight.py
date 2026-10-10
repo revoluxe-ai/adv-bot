@@ -87,3 +87,58 @@ def test_hygiene_flags_assume_unchanged_and_stray_tests_dir(repo: Path) -> None:
 def test_hygiene_flags_dirty_tree(repo: Path) -> None:
     (repo / "a.txt").write_text("changed", encoding="utf-8")
     assert "dirty_worktree" in preflight.check_worktree_hygiene(repo)["problems"]
+
+
+class _Proc:
+    def __init__(self, stdout: str = "", returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.stderr = ""
+        self.returncode = returncode
+
+
+def test_process_integrity_low_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(preflight.sys, "platform", "win32")
+    monkeypatch.setattr(
+        preflight.subprocess,
+        "run",
+        lambda *a, **k: _Proc("Mandatory Label\\Low Mandatory Level  Label"),
+    )
+    result = preflight.check_process_integrity()
+    assert result["status"] == "FAIL"
+    assert result["process_integrity"] == "low"
+    assert "README" in result["remedy"]
+
+
+def test_process_integrity_medium_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(preflight.sys, "platform", "win32")
+    monkeypatch.setattr(
+        preflight.subprocess,
+        "run",
+        lambda *a, **k: _Proc("Mandatory Label\\Medium Mandatory Level  Label"),
+    )
+    assert preflight.check_process_integrity()["status"] == "OK"
+
+
+def test_fix_integrity_failure_is_warn_not_fail(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scripts = repo / ".venv" / "Scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "python.exe").write_text("", encoding="utf-8")
+    monkeypatch.setattr(preflight.sys, "platform", "win32")
+    monkeypatch.setattr(
+        preflight.subprocess, "run", lambda *a, **k: _Proc("", returncode=1299)
+    )
+    results = preflight.fix_venv_integrity(repo)
+    assert results
+    assert {r["status"] for r in results} == {"WARN"}
+    assert {r["check"] for r in results} >= {
+        "fix_integrity_launcher",
+        "fix_integrity_venv_tree",
+    }
+
+
+def test_sealed_block_uses_container_pg_isready(repo: Path) -> None:
+    block = str(seal.build_packet(repo, change_id="c", live_token="t")["allowed_run_block_text"])
+    assert "exec -T test_db pg_isready" in block
+    assert "\npg_isready" not in block

@@ -49,14 +49,64 @@ def _venv_launchers(repo_root: Path) -> list[Path]:
 
 
 def fix_venv_integrity(repo_root: Path) -> list[dict[str, Any]]:
-    """Raise worktree ``.venv`` launchers to medium integrity (Windows only, not tracked by git)."""
+    """Best-effort raise of ``.venv`` launchers to medium integrity (Windows, untracked).
+
+    Failures are reported as ``WARN`` only: ``icacls`` exits 1299 when the calling
+    process token is itself Low (it cannot raise labels), and the authoritative
+    verdict is ``check_venv_integrity`` / ``check_process_integrity`` afterwards.
+    """
 
     if sys.platform != "win32":
         return []
-    return [
-        _check_cmd(["icacls", str(path), "/setintegritylevel", "M"])
-        for path in _venv_launchers(repo_root)
-    ]
+    results: list[dict[str, Any]] = []
+    failed = False
+    for path in _venv_launchers(repo_root):
+        attempt = _check_cmd(["icacls", str(path), "/setintegritylevel", "M"])
+        attempt["check"] = "fix_integrity_launcher"
+        if attempt["status"] != "OK":
+            attempt["status"] = "WARN"
+            failed = True
+        results.append(attempt)
+    venv = repo_root / ".venv"
+    if failed and venv.exists():
+        fallback = _check_cmd(["icacls", str(venv), "/setintegritylevel", "M", "/T"])
+        fallback["check"] = "fix_integrity_venv_tree"
+        if fallback["status"] != "OK":
+            fallback["status"] = "WARN"
+        results.append(fallback)
+    return results
+
+
+def check_process_integrity() -> dict[str, Any]:
+    """FAIL when this process token is Low integrity (file labels cannot compensate).
+
+    A Low token (sandboxed agent shell) cannot raise labels and Docker Desktop
+    denies its named pipe; the cert must be launched from a normal Medium Git Bash.
+    """
+
+    if sys.platform != "win32":
+        return {"check": "process_integrity", "status": "OK", "note": "not windows"}
+    result = subprocess.run(
+        ["whoami", "/groups"], capture_output=True, text=True, check=False
+    )
+    text = (result.stdout or "").lower()
+    level = "unknown"
+    for name in ("low", "medium", "high", "system"):
+        if f"mandatory label\\{name} mandatory level" in text:
+            level = name
+            if name != "medium":
+                break
+    return {
+        "check": "process_integrity",
+        "status": "FAIL" if level == "low" else "OK",
+        "process_integrity": level,
+        "remedy": (
+            "start the cert from a normal (non-sandboxed) Medium-integrity Git Bash; "
+            "see .opsx/tools/README.md 'HOME-PC one-time machine fix'"
+            if level == "low"
+            else ""
+        ),
+    }
 
 
 def check_venv_integrity(repo_root: Path) -> dict[str, Any]:
@@ -142,6 +192,7 @@ def run_preflight(
     if fix_integrity:
         checks.extend(fix_venv_integrity(repo_root))
     if require_docker_daemon:
+        checks.append(check_process_integrity())
         checks.append(check_venv_integrity(repo_root))
         checks.append(check_docker_daemon())
         checks.append(check_worktree_hygiene(repo_root))
@@ -166,7 +217,7 @@ def run_preflight(
     )
 
     poetry = shutil.which("poetry")
-    failed = [c for c in checks if c.get("status") != "OK"]
+    failed = [c for c in checks if c.get("status") == "FAIL"]
     return {
         "repo_root": str(repo_root),
         "poetry_on_path": poetry is not None,
