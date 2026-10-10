@@ -21,7 +21,17 @@ from app.modules.ad_control_settings.domain.resolver_models import (
     ResolverContext,
     ShopFeatureSlot,
 )
-from app.modules.ad_control_settings.telegram.callbacks import AdcPrev
+from app.modules.ad_control_settings.telegram.callbacks import (
+    AdcCamp,
+    AdcCampPage,
+    AdcFeat,
+    AdcPrev,
+)
+from app.modules.ad_control_settings.telegram.inventory import CampaignListItem
+from app.modules.ad_control_settings.telegram.keyboards import (
+    campaign_detail_keyboard,
+    campaign_list_keyboard,
+)
 from app.modules.ad_control_settings.telegram.context import build_settings_context
 from app.modules.ad_control_settings.ui.dry_run_preview import (
     preview_clear_to_inherit,
@@ -335,14 +345,49 @@ def test_override_preview_uses_shop_payload_and_empty_shop_fails_closed() -> Non
 @pytest.mark.unit
 def test_unknown_feature_code_fails_closed() -> None:
     assert feature_from_code("nope") is None
-    packed = AdcPrev(cab=1, aid=2, f="zz", op="clr").pack()
+    packed = AdcPrev(cab=1, aid=2, f="zz", op="clr", pg=1).pack()
     assert len(packed.encode("utf-8")) <= 64
 
 
 @pytest.mark.unit
 def test_callback_data_fits_telegram_limit() -> None:
-    packed = AdcPrev(cab=2_147_483_647, aid=2_147_483_647, f="dp", op="ovr").pack()
+    packed = AdcPrev(
+        cab=2_147_483_647,
+        aid=2_147_483_647,
+        f="dp",
+        op="ovr",
+        pg=2_147_483_647,
+    ).pack()
     assert len(packed.encode("utf-8")) <= 64
+
+
+@pytest.mark.unit
+def test_campaign_list_keeps_page_on_detail_back() -> None:
+    """Возврат «К списку» сохраняет страницу, с которой открыли кампанию."""
+    listing = campaign_list_keyboard(
+        cabinet_id=7,
+        page=3,
+        pages=5,
+        items=(CampaignListItem(advert_id=99, name="label"),),
+    )
+    opened = AdcCamp.unpack(listing.inline_keyboard[0][0].callback_data)
+    assert opened.pg == 3
+    assert opened.aid == 99
+    detail = campaign_detail_keyboard(cabinet_id=7, advert_id=99, page=opened.pg)
+    back = next(
+        button
+        for row in detail.inline_keyboard
+        for button in row
+        if button.text == "К списку"
+    )
+    assert AdcCampPage.unpack(back.callback_data).pg == 3
+    feature = next(
+        button
+        for row in detail.inline_keyboard
+        for button in row
+        if button.callback_data and button.callback_data.startswith("adc_f")
+    )
+    assert AdcFeat.unpack(feature.callback_data).pg == 3
 
 
 @pytest.mark.unit

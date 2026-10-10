@@ -60,7 +60,11 @@ def campaign_list_keyboard(
         _ = builder.row(
             InlineKeyboardButton(
                 text=f"adv {item.advert_id}",
-                callback_data=AdcCamp(cab=cabinet_id, aid=item.advert_id).pack(),
+                callback_data=AdcCamp(
+                    cab=cabinet_id,
+                    aid=item.advert_id,
+                    pg=page,
+                ).pack(),
             )
         )
     nav: list[InlineKeyboardButton] = []
@@ -106,6 +110,7 @@ def campaign_detail_keyboard(
                     cab=cabinet_id,
                     aid=advert_id,
                     f=code,
+                    pg=page,
                 ).pack(),
             )
         )
@@ -123,6 +128,7 @@ def feature_keyboard(
     cabinet_id: int,
     advert_id: int,
     feature_id: AdControlFeatureId,
+    page: int,
 ) -> InlineKeyboardMarkup:
     """Три preview и возврат к кампании. Кнопки Apply нет."""
     code = CODE_BY_FEATURE[feature_id]
@@ -135,6 +141,7 @@ def feature_keyboard(
                 aid=advert_id,
                 f=code,
                 op="dis",
+                pg=page,
             ).pack(),
         )
     )
@@ -146,6 +153,7 @@ def feature_keyboard(
                 aid=advert_id,
                 f=code,
                 op="clr",
+                pg=page,
             ).pack(),
         )
     )
@@ -157,13 +165,18 @@ def feature_keyboard(
                 aid=advert_id,
                 f=code,
                 op="ovr",
+                pg=page,
             ).pack(),
         )
     )
     _ = builder.row(
         InlineKeyboardButton(
             text="К кампании",
-            callback_data=AdcCamp(cab=cabinet_id, aid=advert_id).pack(),
+            callback_data=AdcCamp(
+                cab=cabinet_id,
+                aid=advert_id,
+                pg=page,
+            ).pack(),
         )
     )
     return builder.as_markup()
@@ -174,6 +187,7 @@ def preview_keyboard(
     cabinet_id: int,
     advert_id: int,
     feature_code: str,
+    page: int,
 ) -> InlineKeyboardMarkup:
     """После preview — только назад к feature."""
     builder = InlineKeyboardBuilder()
@@ -184,6 +198,7 @@ def preview_keyboard(
                 cab=cabinet_id,
                 aid=advert_id,
                 f=feature_code,
+                pg=page,
             ).pack(),
         )
     )

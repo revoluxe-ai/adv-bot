@@ -17,10 +17,11 @@ class AdcCampPage(CallbackData, prefix="adc_cp"):
 
 
 class AdcCamp(CallbackData, prefix="adc_c"):
-    """Карточка кампании. ``aid`` — advert_id."""
+    """Карточка кампании. ``aid`` — advert_id. ``pg`` — страница списка."""
 
     cab: int
     aid: int
+    pg: int
 
 
 class AdcFeat(CallbackData, prefix="adc_f"):
@@ -29,6 +30,7 @@ class AdcFeat(CallbackData, prefix="adc_f"):
     cab: int
     aid: int
     f: str
+    pg: int
 
 
 class AdcPrev(CallbackData, prefix="adc_p"):
@@ -38,3 +40,4 @@ class AdcPrev(CallbackData, prefix="adc_p"):
     aid: int
     f: str
     op: str
+    pg: int

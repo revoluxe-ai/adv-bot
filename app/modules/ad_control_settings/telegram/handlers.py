@@ -175,7 +175,7 @@ async def open_campaign(callback: CallbackQuery, callback_data: AdcCamp) -> None
         campaign_detail_keyboard(
             cabinet_id=callback_data.cab,
             advert_id=callback_data.aid,
-            page=1,
+            page=callback_data.pg,
         ),
     )
 
@@ -199,6 +199,7 @@ async def open_feature(callback: CallbackQuery, callback_data: AdcFeat) -> None:
             cabinet_id=callback_data.cab,
             advert_id=callback_data.aid,
             feature_id=feature_id,
+            page=callback_data.pg,
         ),
     )
 
@@ -277,6 +278,7 @@ async def open_preview(callback: CallbackQuery, callback_data: AdcPrev) -> None:
             cabinet_id=callback_data.cab,
             advert_id=callback_data.aid,
             feature_code=callback_data.f,
+            page=callback_data.pg,
         ),
     )
 
