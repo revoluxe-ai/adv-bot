@@ -41,6 +41,7 @@ def build_packet(
     change_id: str,
     live_token: str,
     redis_port: int = 6379,
+    packet_id: str = "PROVIDER-PACKET-v8",
 ) -> dict[str, object]:
     """Build packet dict bound to current git HEAD and worktree fingerprints."""
 
@@ -73,8 +74,14 @@ def build_packet(
         f"export REDIS_PORT={redis_port}\n"
         "export AUTHORIZE_ONE_LIVE_RUN=\"${AUTHORIZE_ONE_LIVE_RUN:?required}\"\n"
         "docker compose -f tests/docker-compose.test.yml up -d test_db test_clickhouse test_redis\n"
+        "for _ in $(seq 1 30); do pg_isready -h 127.0.0.1 -p 5433 -U test_user "
+        "-d test_adv_bot_db && break; sleep 2; done\n"
         "pg_isready -h 127.0.0.1 -p 5433 -U test_user -d test_adv_bot_db\n"
+        "for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8124/ping >/dev/null "
+        "&& break; sleep 2; done\n"
         "curl -fsS http://127.0.0.1:8124/ping >/dev/null\n"
+        "poetry run python .opsx/tools/opsx_provider_preflight.py --repo . "
+        "--fix-integrity --require-docker-daemon\n"
         f"# PYTEST_TARGETS: {pytest_targets[0]}\n"
         f"# CANONICAL_PYTEST_ARGV_SHA256: {argv_sha}\n"
         "poetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet "
@@ -85,7 +92,7 @@ def build_packet(
     )
     block_sha = guard.allowed_run_block_sha256(block)
     return {
-        "packet_evidence_id": "PROVIDER-PACKET-v5",
+        "packet_evidence_id": packet_id,
         "audited_head": head,
         "audited_status_sha256": status,
         "audited_tracked_diff_sha256": diff,
@@ -124,6 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Value for AUTHORIZE_ONE_LIVE_RUN (hashed into packet)",
     )
     parser.add_argument("--redis-port", type=int, default=6379)
+    parser.add_argument("--packet-id", default="PROVIDER-PACKET-v8")
     args = parser.parse_args(argv)
 
     repo_root = args.repo.resolve()
@@ -132,6 +140,7 @@ def main(argv: list[str] | None = None) -> int:
         change_id=args.change_id,
         live_token=args.live_token,
         redis_port=args.redis_port,
+        packet_id=args.packet_id,
     )
     out = (
         repo_root
