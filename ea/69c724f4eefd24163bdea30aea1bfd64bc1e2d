@@ -1,0 +1,31 @@
+app/client_bot/global_router.py
+  s_d5f6858b07756f::t_0ca62683db957d 27-28
+app/client_bot/middlewars/channel_subscription.py
+  s_d5f6858b07756f::t_e55a15ba867268 3-12,58,309-312,352-357
+app/client_bot/middlewars/gate.py
+  s_d5f6858b07756f::t_ac66523a6309a8 6
+app/client_bot/user_interface/handlers/user_subscribe_on_channel.py
+  s_d5f6858b07756f::t_46db3aafab602f 3-7,28,41-48,52-64,67-74,76
+app/settings/settings_master.py
+  s_d5f6858b07756f::t_84f76350037bd0 131-133,150-167
+env.sample
+  s_d5f6858b07756f::t_3f1792c6860841 69,71-73,79-80,84,88
+tests/client_bot/test_channel_subscription.py
+  s_d5f6858b07756f::t_2a56212670cf2e 34-39,536-571
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ea69c724f4eefd24163bdea30aea1bfd64bc1e2d",
+  "prompts": {},
+  "sessions": {
+    "s_d5f6858b07756f": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5a0280bf-3574-4cde-826d-4e3a1b6a3823",
+        "model": "unknown"
+      },
+      "human_author": "revoluxe-ai <revoluxe@gmail.com>"
+    }
+  }
+}
