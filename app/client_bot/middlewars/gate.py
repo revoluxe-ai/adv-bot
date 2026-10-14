@@ -3,7 +3,7 @@
 Rollout contract (``add-free-ui-bot-access-guards`` / invite-gate-deferred):
 
 - **Prod path today:** ``settings.invite_gate`` default ``False`` → early return
-  L137–139 (no-op). Channel + phone middleware — реальные entry gates.
+  (no-op). Channel subscription gate тоже off by default; phone — реальный entry gate.
 - **Код ниже L137** (``passed_gate``, gate screen, orphan pass-through) —
   dormant legacy / ``re-enable-invite-gate`` only. Static review MUST NOT treat
   orphan ``chat_id``/``bot`` pass-through as a prod defect while invite gate is off.

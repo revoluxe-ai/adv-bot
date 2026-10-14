@@ -128,8 +128,9 @@ class Settings:
     def invite_gate(self) -> bool:
         """Гейт по инвайту на входе (deferred / off by default).
 
-        **Current rollout:** False — ``GateMiddleware`` no-op; entry = channel +
-        phone. Do **not** set ``INVITE_GATE=true`` on stage/prod without owner GO
+        **Current rollout:** False — ``GateMiddleware`` no-op; entry = phone
+        (channel subscription gate off by default). Do **not** set
+        ``INVITE_GATE=true`` on stage/prod without owner GO
         (see invite-gate-deferred decision).
 
         Rollout vs legacy ``stage``: там default был True при пустом env —
@@ -145,6 +146,24 @@ class Settings:
         elif value == "true":
             return True
         raise Exception("Не верное значение в INVITE_GATE")
+
+    @property
+    def support_channel_subscription_gate(self) -> bool:
+        """Проверка подписки на канал поддержки (off by default).
+
+        **Current rollout:** False — ``ChannelSubscriptionMiddleware`` и
+        ``check_subscribe`` no-op, без ``get_chat_member``. Entry = phone.
+        Повторное включение только явным ``SUPPORT_CHANNEL_SUBSCRIPTION_GATE=true``.
+        """
+        value = os.environ.get("SUPPORT_CHANNEL_SUBSCRIPTION_GATE")
+        if value is None or not str(value).strip():
+            return False
+        value = str(value).strip().lower()
+        if value == "false":
+            return False
+        elif value == "true":
+            return True
+        raise Exception("Не верное значение в SUPPORT_CHANNEL_SUBSCRIPTION_GATE")
 
     @property
     def presentation_only(self) -> bool:

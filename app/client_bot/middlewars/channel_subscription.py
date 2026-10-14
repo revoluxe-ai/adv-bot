@@ -1,9 +1,15 @@
 """Middleware for checking support-channel subscription before bot usage.
 
-This middleware sits after the invite gate and before the phone gate. It works
-for messages and callback queries, blocks explicitly unsubscribed users, and
-fails closed when Telegram membership lookup is temporarily unavailable
-(``TelegramAPIError`` / ``None``).
+**Current rollout:** ``settings.support_channel_subscription_gate`` default
+``False`` → early return in :meth:`ChannelSubscriptionMiddleware.__call__`
+(no Redis, no ``get_chat_member``). ``check_subscribe`` uses the same flag and
+continues without a membership lookup. Re-enable only with explicit
+``SUPPORT_CHANNEL_SUBSCRIPTION_GATE=true``.
+
+When the flag is on, this middleware sits after the invite gate and before the
+phone gate. It works for messages and callback queries, blocks explicitly
+unsubscribed users, and fails closed when Telegram membership lookup is
+temporarily unavailable (``TelegramAPIError`` / ``None``).
 
 Positive Redis cache (TTL 1 hour) is used on the hot path so Telegram
 ``get_chat_member`` is called at most about once per hour per user.
@@ -49,6 +55,7 @@ from app.client_bot.admin_access import is_bot_admin
 from app.client_bot.callback_replay import serialize_callback_query
 from app.client_bot.const import SUPPORT_CHANNEL_ID
 from app.client_bot.start_command import is_start_command_message
+from app.settings import settings
 from app.client_bot.user_interface.views import callbacks
 from app.client_bot.user_interface.views.messages.messages import (
     NeedSubscribe,
@@ -299,6 +306,10 @@ async def send_subscription_check_unavailable_message(
 class ChannelSubscriptionMiddleware(BaseMiddleware):
     """Block access for users unsubscribed from the support channel.
 
+    Off by default (``settings.support_channel_subscription_gate`` is False):
+    the call returns the downstream handler without a membership lookup.
+    The block below applies only when the flag is explicitly enabled.
+
     Admission of ``data["bot"]`` is structural (``get_chat_member`` /
     ``send_message``), then narrowed with ``cast(Bot, …)`` for typing — not
     ``isinstance(Bot)`` alone. Telegram lookup failure (``None``) fails closed:
@@ -338,6 +349,12 @@ class ChannelSubscriptionMiddleware(BaseMiddleware):
             getattr(event, "data", None),
             getattr(event, "text", None),
         )
+        if not settings.support_channel_subscription_gate:
+            logger.debug(
+                "ChannelSubscriptionMiddleware: subscription gate off, pass through user=%s",
+                telegram_id,
+            )
+            return await handler(event, data)
         if telegram_id is None:
             logger.debug("ChannelSubscriptionMiddleware: no telegram_id, pass through")
             return await handler(event, data)

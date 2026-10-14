@@ -32,6 +32,12 @@ from tests.helpers.telegram_message_asserts import (
 
 
 @pytest.fixture(autouse=True)
+def enable_support_channel_subscription_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Existing cases cover the explicit-on gate; default in prod is off."""
+    monkeypatch.setenv("SUPPORT_CHANNEL_SUBSCRIPTION_GATE", "true")
+
+
+@pytest.fixture(autouse=True)
 def reset_subscription_cache_client():
     """Reset memoized Redis client; stub DI so unit tests skip real Redis."""
     from app.client_bot.middlewars import channel_subscription
@@ -525,6 +531,42 @@ def test_need_subscribe_message_text_is_user_facing() -> None:
         ],
     )
     assert_no_raw_technical_text(text)
+
+
+@pytest.mark.asyncio
+async def test_subscription_gate_off_passes_without_telegram_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default-off gate: middleware and CheckSubscribe do not call Telegram."""
+    monkeypatch.delenv("SUPPORT_CHANNEL_SUBSCRIPTION_GATE", raising=False)
+
+    middleware = ChannelSubscriptionMiddleware()
+    event = _make_message_event(111)
+    handler = AsyncMock()
+    bot = MagicMock()
+    bot.get_chat_member = AsyncMock()
+    bot.send_message = AsyncMock()
+
+    await middleware(handler, event, {"bot": bot})
+
+    handler.assert_awaited_once_with(event, {"bot": bot})
+    bot.get_chat_member.assert_not_awaited()
+    bot.send_message.assert_not_awaited()
+
+    callback = _make_callback_event(112, callbacks.CheckSubscribe().pack())
+    state = MagicMock()
+    state.get_data = AsyncMock(return_value={})
+    state.update_data = AsyncMock()
+    with patch(
+        "app.client_bot.user_interface.handlers.user_subscribe_on_channel.callback_start_registration",
+        new=AsyncMock(),
+    ) as start_mock:
+        await check_subscribe(callback, bot, state)
+
+    start_mock.assert_awaited_once()
+    bot.get_chat_member.assert_not_awaited()
+    bot.send_message.assert_not_awaited()
+    callback.answer.assert_not_awaited()
 
 
 def test_global_router_middleware_registration_for_gate_channel_phone_onion() -> None:

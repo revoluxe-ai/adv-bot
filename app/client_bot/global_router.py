@@ -24,6 +24,8 @@ global_router = Router()
 # Aiogram wraps with reversed(list): last registered runs first (outermost).
 # Desired runtime: Gate → Channel → Phone → handler.
 # Invite deferred: Gate no-ops when settings.invite_gate is False (default).
+# Channel subscription deferred: Channel no-ops when
+# settings.support_channel_subscription_gate is False (default). Entry = phone.
 _ = global_router.message.middleware(ReturnToStart())
 _ = global_router.message.middleware(PhoneRequiredMiddleware())
 _ = global_router.message.middleware(ChannelSubscriptionMiddleware())
