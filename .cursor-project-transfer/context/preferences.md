@@ -1,0 +1,20 @@
+- Дефолтная модель для adv-bot: **Composer 2.5** со **Standard** (не Fast); API slug `composer-2.5`, не `composer-2.5-fast`. Feature Lead (cloud): `claude-sonnet-5-5-xhigh` или `claude-opus-5-5-xhigh`; review/challenger — `grok-4.7-medium`; механика/OPSX/Runner — `composer-2.5`; self-hosted execution — `composer-2.5`. Не дублировать writers. Уточнено 2026-10-10 (handoff correction).
+- Сертифицированные PR (CI green, strict OpenSpec, opsx_verify, ревью без CRITICAL/HIGH/MEDIUM) штаб вливает в `stage` сам, merge-коммитом; prod/deploy/WB writes/GHCR — только с GO Owner. Уточнено 2026-10-10.
+- Субагентов запускай на composer-2.5 (standard). Уточнено 2026-09-30.
+- На локали (vkita-pc, self-hosted worker) — только composer-2.5 (standard). Уточнено 2026-09-30.
+- Промокоды: не спешить с archive; после verification — Tempo bugbot и Tempo review, стоп на моделях, project-проверки, потом verify/archive. Уточнено 2026-09-30.
+- Google Drive для выгрузок не использовать. Уточнено 2026-09-30.
+- adv-bot программировать на vkita-pc в концепции OPSX; саму технологию OPSX допиливать на tiriel-game. Уточнено 2026-09-30.
+- Разработку вести только через команды. Если команда не доводит шаг, правку выносить в отдельный процесс и тоже закрывать командами. Прямых правок нет. Уточнено 2026-09-30.
+- Если в Tiriel для участка уже есть `/tempo-*`, брать её. Одной команды на весь цикл пока нет: верификацию закрывает `/tempo-verification`, остальное — `/opsx-*`. Цель — одна tempo-команда на весь цикл. Уточнено 2026-09-30.
+- Единая рамка координатора — OPSX (продукт, развитие процесса, перенос spine); WB Sky и прочие приоритеты — constraints внутри OPSX. На hop: команда + change + worktree + GO/read-only. Уточнено 2026-09-30.
+- Центр Project: command-only OPSX; implementation только когда активная команда разрешает; опора на gate команд, не обход. В одном hop — один режим (product apply vs meta OPSX), не смешивать без явного порядка. Уточнено 2026-09-30.
+- Координатор ведёт документацию в Project store: инциденты → `docs/`; повторяющиеся паттерны → `internal/recurring-patterns.md`; статус → `notes.md`. После значимого hop — дописать паттерн или инцидент, не полагаться на память чата. Уточнено 2026-09-30.
+- adv-bot product changes: канонический порядок worktree/ветка/OPSX — [adv-bot-canonical-development-workflow.md](/cursor/stores/self/docs/adv-bot-canonical-development-workflow.md). Уточнено 2026-09-30.
+- **Prod rollback reserve (Owner 2026-09-30):** при сбое раскатки нового образа (`safe_prod_release` / CAS, в т.ч. `adv-bot-asq-worker` после PR #443) резерв отката — **ветка master / last known good на master** («резерв на мастер перекидываем»). Планировать только `/opsx-devops PLAN_WRITE` → `GO`; целевой образ — `OPS_STATE` LKG или **Prepared fallback** (см. [deploy-rollback-policy.md](/cursor/stores/self/internal/deploy-rollback-policy.md)); без `kubectl set image` и без отката на stage-tip. Уточнено 2026-09-30.
+- adv-bot prod rollout: при плохой раскатке нового образа — rollback на резерв **master** (OPS_STATE LKG), не patch на месте. Уточнено 2026-09-30.
+- adv-bot `scripts/`: ops-lane вне OPSX product gates; не блокировать product merge проверками скриптов; не смешивать merge `scripts` с hotfix PR. Уточнено 2026-09-30.
+- `/opsx-ff` и `/opsx-propose` не рекомендовать: legacy. Планирование: `/opsx-new` → `/opsx-continue`; правка артефактов — `/opsx-update`. Уточнено 2026-10-06.
+- Рутинные отчёты feature-чатов не пересказывать в этот чат. Писать сюда только решение Owner или итог задачи, которую он поставил здесь. Остальное — строка в notes.md. Уточнено 2026-10-06.
+- Штаб adv-bot не исполняет product work по prose `MODE`/`TASK` от Web-архитектора: только перевод в одну `/opsx-*` PRIMARY_COMMAND + change; иначе STOP или `MISSING_OPSX_COMMAND`. См. [opsx-command-only-enforcement](/cursor/stores/self/docs/opsx-command-only-enforcement.md). Уточнено 2026-10-06.
+- Feature-chat: первая исполняемая строка — slash-команда из `.cursor/commands/`; прямой pytest/commit/правка app без активной команды = обход, не делать. Уточнено 2026-10-06.

@@ -1,0 +1,11 @@
+{
+  "packet_id": "PROVIDER-PACKET-v8r2",
+  "audited_head": "ade6117976f31c2e0b976c7ff1c81d3516dda16b",
+  "auth_id": "7689ab306d8ea404efe54fd1005a066363a153aeec4af8c0e8a106a5391f68ec",
+  "argv_sha": "329442e445bde7c13685db79b8ab1a21fe78132ff38ae2161bf1277f1e7edf30",
+  "block_sha": "085a6103a53f8bf54d1c4cab3dae602abe32546a497a64990bd8926853b03e54",
+  "run_spec": "210d68155db78c2b1b4fb6988fb7be633d95d42a68882f6f392c9facaf2eecc3",
+  "verify_status": "PERMIT",
+  "spawn_count": 0,
+  "token_file": "wb-sky-mcp-cert-v8-secret.txt (same token as v8, unused)"
+}

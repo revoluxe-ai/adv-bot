@@ -1,0 +1,10 @@
+{
+  "packet_id": "PROVIDER-PACKET-v8",
+  "audited_head": "2876e8c7dc2f63ed26565c566849981107aebb23",
+  "auth_id": "7689ab306d8ea404efe54fd1005a066363a153aeec4af8c0e8a106a5391f68ec",
+  "argv_sha": "329442e445bde7c13685db79b8ab1a21fe78132ff38ae2161bf1277f1e7edf30",
+  "block_sha": "952aa6e809b6159a894886841a3d676cb1bbd7304488e4e4fe1ed4048709dd3c",
+  "run_spec": "0a8a69b3cc8ebb8a25caa3e3814b1c4bc1eed7cc1019608b0ae3d2093493c80e",
+  "verify_status": "PERMIT",
+  "spawn_count": 0
+}

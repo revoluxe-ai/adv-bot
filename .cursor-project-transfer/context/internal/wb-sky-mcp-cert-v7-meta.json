@@ -1,0 +1,10 @@
+{
+  "verify_status": "PERMIT",
+  "guard_permission": "PERMITTED",
+  "authorization_state": "AUTHORIZED_UNUSED",
+  "spawn_count": 0,
+  "audited_head": "6761824ee938c2a4712b6f4872ebabf3d33a2557",
+  "auth_id": "cdd533556b8504421cf7053b016cb1a62fcddad5b9fc2b69d8126af784ff72af",
+  "argv_sha": "329442e445bde7c13685db79b8ab1a21fe78132ff38ae2161bf1277f1e7edf30",
+  "block_sha": "e46a8a0bd94c61913782a3d09ebd87d618118431cd8ee3966efc00a3ef0a700d"
+}

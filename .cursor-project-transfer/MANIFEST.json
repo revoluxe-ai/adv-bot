@@ -1,0 +1,939 @@
+{
+  "package": "wb-sky-cursor-project-transfer",
+  "exported_at": "2026-10-15T15:24:31Z",
+  "source_store": "bc-18f0b34a-df7b-4a06-b47a-7bfd4a10a089 (WB Sky Project)",
+  "repo_stage_at_export": "85fcfb85457bf589801be198cda7381206a29c06",
+  "excluded_patterns": [
+    "*.docx",
+    "*secret*.txt",
+    "*.conflict.md"
+  ],
+  "excluded_secrets_note": "MCP one-shot secrets (wb-sky-mcp-cert-v*-secret.txt) not in git; Owner keeps locally for HOME-PC cert",
+  "file_count": 231,
+  "files": [
+    {
+      "path": "archived.md",
+      "sha256": "a064bef9e0a245bba7e58624fe027b1fb8cc0210a223237dd22f1cbc16f6bb96"
+    },
+    {
+      "path": "artifacts/wb-sky-mcp-provider-cert-v5-handoff.md",
+      "sha256": "9f71a180f7e56144dfc56e2d553c5c59b76ab3acec009b3f4abf566e3fed14c4"
+    },
+    {
+      "path": "artifacts/wb-sky-mcp-provider-cert-v6-handoff.md",
+      "sha256": "361abb8013c1e3f28c96aa86f77bbe5a2ac935aead8a8e2882e6097544b9966d"
+    },
+    {
+      "path": "docs/adv-bot-active-work.md",
+      "sha256": "0e396d6b9aaf3451f07068b99ebf314787543f6719693a55c27351fd85c755d3"
+    },
+    {
+      "path": "docs/adv-bot-canonical-development-workflow.md",
+      "sha256": "5d70fa0e0db99704d0b7128b6be14e51822d5e47996cbc5084c327de0008a218"
+    },
+    {
+      "path": "docs/adv-bot-incident-138252141-campaigns.md",
+      "sha256": "88a5fe73ac2c5e563fb9fd7d5b839644c3a16309bc503fd93de2d8bf3a99fa89"
+    },
+    {
+      "path": "docs/adv-bot-local-worktrees.md",
+      "sha256": "692ec8b3c3080f0fb0cdf106f269051ec0a00ad172b3871132e6bb661825d9b9"
+    },
+    {
+      "path": "docs/adv-bot-strategic-coordinator-role.md",
+      "sha256": "1cb857732bcffdf7d1a50b81ad93977aaa7cf0bcf227d25efcad5beee818c398"
+    },
+    {
+      "path": "docs/adv-bot-transfer-holds.md",
+      "sha256": "61c91c1a1fd67839d7dd11b8f42ef4807203990aefc7a3667299a57482cd0b7e"
+    },
+    {
+      "path": "docs/adv-bot-worktrees.md",
+      "sha256": "e1593713f637c903b171cee73149ac37dea17545b50bf5c621daf9384a84ac27"
+    },
+    {
+      "path": "docs/ai-control-loop-gap-report.md",
+      "sha256": "83f7bb4acf834f4c221ee6c8d0388a2c7134699c1797e902b65f2fe255365acb"
+    },
+    {
+      "path": "docs/architect-handoff-adv-bot-20261006.md",
+      "sha256": "8758a60f9e58beff62bf5fe4872136334a982944b9af4c00b517bfa9b952d088"
+    },
+    {
+      "path": "docs/architect-portfolio-reconciliation-20261006.md",
+      "sha256": "69826fcabbb9f2df68c1940fbedf9991fa45a41f5495312bcd5f69e0e6eb73e8"
+    },
+    {
+      "path": "docs/attribution-facts-contract.md",
+      "sha256": "cb648577fdc3b0f33de0d05030eb6b308a79150dad28fb4eac41908f3cf14785"
+    },
+    {
+      "path": "docs/campaign-attribution-facts-planning.md",
+      "sha256": "7982809eb143a1aee2dd51ebebd6f497cdc7aa98bd7b21ee092636dd778db4e7"
+    },
+    {
+      "path": "docs/changeset-apply-authority-planning.md",
+      "sha256": "716e9a0c6cc4054857d85bb4bcfe694712b85bdf3775a8eb81f8b21ee9f40f99"
+    },
+    {
+      "path": "docs/changeset-local-wip-reconciliation.md",
+      "sha256": "4a92b8912987127138e6a747a6711e844817768cf4792998af0814dcc981459e"
+    },
+    {
+      "path": "docs/chatgpt-strategy-6abcdb39.md",
+      "sha256": "70898de52ca564e59d7194a2bb51c50548091072b8f73fa1f094d48a7254ed6b"
+    },
+    {
+      "path": "docs/chatgpt-strategy-adv-bot-6abd1faa.md",
+      "sha256": "f5154206fb2c71173179ee4beb36833c446fcda2529572eeec320c1cb3325183"
+    },
+    {
+      "path": "docs/decision-experiment-memory-planning.md",
+      "sha256": "e8d50fb3023b2bdf9007c2183a484eb23bab5524d8853ee4a3595423373a470e"
+    },
+    {
+      "path": "docs/full-ai-package-acceptance-report.md",
+      "sha256": "36da043fa72bc658eb3a936bd7694a260505c146f3ef6e54bf7d05bb97d879ab"
+    },
+    {
+      "path": "docs/opsx-command-only-enforcement.md",
+      "sha256": "07332b52e8226361542fd0b1b817cf02b86b40e8986552ab6eac0598b0c47630"
+    },
+    {
+      "path": "docs/opsx-coordinator-role.md",
+      "sha256": "78f40a18554d480efbf9d2170cabb87f59068c5a788653fdbda3c2b59e9900ca"
+    },
+    {
+      "path": "docs/opsx-working-instruction.md",
+      "sha256": "31f0555712ded5663df25edd017d62898470df497e5f05cf1c24f67bb3db8dea"
+    },
+    {
+      "path": "docs/project-context.md",
+      "sha256": "c16297501ad1d715816527512953ea672cc00db6a83128c7d8a9ac42ba3d84df"
+    },
+    {
+      "path": "docs/promocodes-closeout-process.md",
+      "sha256": "5d85b2e567ebdd4c5224dc2b1cb91b934de80134a13a5bf535fffe546eb75060"
+    },
+    {
+      "path": "docs/safe-continue-plan.md",
+      "sha256": "374ae30dec7611aae16e94749d4a764e10bed11630c6f65cd9804cb3040b3be6"
+    },
+    {
+      "path": "docs/tiriel-opsx-gaps.md",
+      "sha256": "1f6a1b713e889d562d2b4820d4fcbd5fe4fd46c33581da8e1096da6c0a91e4aa"
+    },
+    {
+      "path": "docs/wb-sky-handoff-cursor-project-20261003.md",
+      "sha256": "19ecf205c184940839b2d7de0355d497985bacf778ccd827fe4e44861343b6d6"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_2e440c9f-f3f1-4984-8b72-9c1230293033/2026-10-05T21-06-06-687Z_d0a286a0c4984d0c.jsonl",
+      "sha256": "b6b3fff793ed71b7ab6296dc8bc52ca366bfd6eb9193a95029e2010584963962"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_2e440c9f-f3f1-4984-8b72-9c1230293033/2026-10-05T21-06-24-855Z_0c4b54fab0179b43.jsonl",
+      "sha256": "bcf6de1ab2bd80affae5fa97afc681d369394aad83de86bdd75fca242f563c04"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_7b65dbaf-d8ba-40a9-8220-80834e9c3ba2/2026-10-06T22-49-12-300Z_8b774ab0aa5ce5db.jsonl",
+      "sha256": "b45dabb2c4c2931a3ef47d1ea7d11ade2e6ae75d84b61bd8f8ad185e9a8100c9"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_7b65dbaf-d8ba-40a9-8220-80834e9c3ba2/2026-10-06T23-18-22-153Z_ba043a4b08dcd4a6.jsonl",
+      "sha256": "5ef5faa96e5753fdbe08717602a5b41b72f544e2951fd8cf552a329881d83fa3"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_7b65dbaf-d8ba-40a9-8220-80834e9c3ba2/2026-10-06T23-20-36-325Z_5a90edf9a1ce00ce.jsonl",
+      "sha256": "70c42544eaaaa6a9d265baeb4197950ab33f3050ec823c6315eed1ca40a1ce9b"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-05T17-50-17-499Z_d023bfb8fcfa6dc3.jsonl",
+      "sha256": "cbb81d909056b8638bba36a7d8967648ae82cb63336df6492b70fbc0ed138dff"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-05T17-56-21-991Z_d8de35e8f3075f87.jsonl",
+      "sha256": "0215bb5ccf1ac702e43498203564728b82a7c4502c70928be404cfa54ca9412d"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-05T23-12-02-622Z_027a7ed7508aef3a.jsonl",
+      "sha256": "7753adaabe3a71a846f60808d502db175456743ee9a3b8fa7361d38e9c6a5f31"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T00-09-11-358Z_ca811ef70f82bf08.jsonl",
+      "sha256": "4aa52738f1cfb086d3bd1edd5f272d9d334f982b5963b20707512a6dead37d4f"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T00-23-26-002Z_92bdf3a4b683565d.jsonl",
+      "sha256": "03209a12ea4e9640b2dfd6e1691416c0cb911c15f3d4cb333af85b9cca1c7309"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T00-36-10-450Z_0f3138024e100078.jsonl",
+      "sha256": "129542d2483135e3cbb5a19c09e3880f54950f5c84e6a12440136eb84dcb8d1b"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T00-50-22-069Z_9f1e137d35e5662e.jsonl",
+      "sha256": "2b22ff277209e32fa4e7e3ebb0b79d83845c2f59ad8144ba2c88b0668e16f44a"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T01-01-53-352Z_acdb4e6b23bd2642.jsonl",
+      "sha256": "7cf9d326f2ed91cdb48b449f63029af71ab150e80cfa37790165eefd32c51fd5"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T23-00-02-476Z_254b5cc9b5d1447f.jsonl",
+      "sha256": "653c76f276bf4a191761e8a1d9b480db904faac6199637ab99b61101f53c644e"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T23-04-45-606Z_6fbf11b92eb1416d.jsonl",
+      "sha256": "f868bb5a564356ee101ee4f07d4362b346f39bab40b723b90180ee10322f4237"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_abfe5cd2-7257-4bd7-96f3-b2c91131879a/2026-10-06T23-04-50-368Z_fd68478eb9472227.jsonl",
+      "sha256": "c59fdcc75b3507cd49d092e0feac911ecdc59c9fba149ebf54415d0be92423cc"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_cf8bbe16-6648-4cc8-a09a-0ee851b84c14/2026-10-06T00-56-32-694Z_b15b3496804dcf8d.jsonl",
+      "sha256": "7377ce0894bdbe51963ef39035f4332ecb07a7cd25b9e88bb3c973aea5b8aaba"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_cf8bbe16-6648-4cc8-a09a-0ee851b84c14/2026-10-06T02-00-05-909Z_feee5bfe5c76aa28.jsonl",
+      "sha256": "e783703118e7b757f368754bd2922757728fb3277beee61dc0933fb37cbf1cc9"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_cf8bbe16-6648-4cc8-a09a-0ee851b84c14/2026-10-06T08-37-47-276Z_d0454804b7864452.jsonl",
+      "sha256": "56cfe9902bbba7217c0042e49337afeb2df21ce7f5b682843594b7a909b8559b"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_cf8bbe16-6648-4cc8-a09a-0ee851b84c14/2026-10-06T12-27-59-755Z_59466bf00b715489.jsonl",
+      "sha256": "354bb5544431d04dd53a76bf0f15ada1cc2e0120998811705ce12d335e4a3889"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_cf8bbe16-6648-4cc8-a09a-0ee851b84c14/2026-10-07T00-00-15-728Z_749248d991957f79.jsonl",
+      "sha256": "109bdda067c292a82203941b85abba2cca95686e0a6dcda1c014cdba5aa0a3a2"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_cf8bbe16-6648-4cc8-a09a-0ee851b84c14/2026-10-07T01-14-07-675Z_0c96f20dc7221c0d.jsonl",
+      "sha256": "7af23c54f97ec644c288c5f0344b282b53e07ba53c0584bf0c60f6b9f4bc590c"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_cf8bbe16-6648-4cc8-a09a-0ee851b84c14/2026-10-07T01-45-40-451Z_0f1a3b2c6577a980.jsonl",
+      "sha256": "80e00f94f7c6d69ebb86242bec4c9dbacfca579d555308d1c5fca2943d54a790"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-05T17-44-33-905Z_1f8a728fa5d72a40.jsonl",
+      "sha256": "bce4e512385923ed63b63352cfa67000afe1872bc360b64b2dac4f6d4a9cefac"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-05T18-32-32-297Z_f81c464d84a786d9.jsonl",
+      "sha256": "d5f0449806b64eb1ffaf009cae9e3a2ae25a4310babb92d50d6b2b5a9f5d1abb"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-05T21-02-57-283Z_a3b781d19f8f68f9.jsonl",
+      "sha256": "3c2abbf863405a1cfdaaa08be0c2d6474a1a807e82d98d3b7abd36c8aae11649"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-05T23-33-13-285Z_2d2f04b230551cd6.jsonl",
+      "sha256": "89664ea8095934834afa83552b9920ddfb128eb358c1b46e84823d3190061d40"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-06T02-38-03-772Z_c3ae4d9e943c401a.jsonl",
+      "sha256": "196832c78d26d7d90a3d1a69115b67825eaca2f64236b692f1a2fe837ba2a942"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-06T02-56-52-565Z_98991e8bd9271b05.jsonl",
+      "sha256": "9b41055eff59e3f4ba6103499f3bc7c4b79604031e584f271b38d7738fcb7a5c"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-06T14-50-20-224Z_fd1ae27401bf789a.jsonl",
+      "sha256": "65c07e0e0cbc48252df0ccc385e67576f3a7366e4c6a288aa2ca4791b657ff09"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-07T01-15-32-634Z_6e05fa6d6309e696.jsonl",
+      "sha256": "c1cdd7b4ecf78efaea9e03423b7fe6e1b6abbc06a11bdfe2bdd558ab80e64fdb"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_de2062e4-fa4d-4dcc-9b36-d68f3e237fbf/2026-10-07T01-15-35-837Z_34a3f38f66b45361.jsonl",
+      "sha256": "2a6fcd98d18e765f748222e5ebc7b0e035dafe6f2068e38b0011bc3003b7734d"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_dfdb4205-a28c-491b-a996-a6cbcf30bc61/2026-10-06T14-21-02-956Z_65c8d51ee2091cba.jsonl",
+      "sha256": "dcbd8d7277db1ba17cdf17cec3108cc3280f4976829c9f3d554702a0c38f505c"
+    },
+    {
+      "path": "inbox/github_pull_request_pr/sub_dfdb4205-a28c-491b-a996-a6cbcf30bc61/2026-10-07T01-09-39-545Z_f092a565813e3f48.jsonl",
+      "sha256": "ceb295c938c5d67dc632c36d741c5e1783b87ad8d9085fd2b51c792074944164"
+    },
+    {
+      "path": "internal/_extract_6abd1faa.py",
+      "sha256": "404446d9e9d94ef5ddfca774cd8f03951597cd310737c7d88768384df1f30709"
+    },
+    {
+      "path": "internal/adv-bot-447-post-merge-deploy-plan-20261001.md",
+      "sha256": "e27b106b31ef89ba283e88183a26301c7a2eff205e9d2a0805e2bf4d13ffd10f"
+    },
+    {
+      "path": "internal/adv-bot-cursor-project-bootstrap-blocked-reread.md",
+      "sha256": "308c3643a10bb6842b940d24ac330abed8ec50049c196df493256796d121692a"
+    },
+    {
+      "path": "internal/adv-bot-cursor-project-bootstrap-reconciliation.md",
+      "sha256": "03657f499f3dc5ed6504d4015cc08f6383bc5e0e60b92a363096ed3f97a504bf"
+    },
+    {
+      "path": "internal/adv-bot-cursor-project-cloud-ready-report.md",
+      "sha256": "23a1c91c12f6318e83c1e660e042b2fc69cf63f2cce6df3515919f3f2068b574"
+    },
+    {
+      "path": "internal/adv-bot-local-stage-inventory-20261005.md",
+      "sha256": "9149c31ce2600678fe603bf378a0db67edda1f665346e654fa49abb7fef8f224"
+    },
+    {
+      "path": "internal/adv-bot-next-hop-menu-20260930.md",
+      "sha256": "bff6c53fb78e1fa2a675205360c336cb1009d1702da8a44f477002a76bdc28d6"
+    },
+    {
+      "path": "internal/adv-bot-scripts-ops-lane.md",
+      "sha256": "37d0163b85555011aaaf1c524be4d63a44d8c6ef85be7119c7e8f41982b198d7"
+    },
+    {
+      "path": "internal/adv-bot-tech-debt-post-138252141.md",
+      "sha256": "f43184e05c2f978fc585551e1b1e4ddba73d4c695e664425f460d9276d1d4bfd"
+    },
+    {
+      "path": "internal/adv-bot-wb-sky-bot-vs-asq-worker.md",
+      "sha256": "db9066de0f04ebd89d2223b59d104239363036e0d42b27529d10f8e75aa23852"
+    },
+    {
+      "path": "internal/ai-package-campaign-settings-snapshot-lifecycle.md",
+      "sha256": "3a702bc9b5fbcd4d0154090edab341c087c21bb9926dc4a9a6010301c82add64"
+    },
+    {
+      "path": "internal/ai-package-full-export-acceptance-evidence.md",
+      "sha256": "9814485b1f153374acdefe75bd2476eec3b937921b2287b5adb35bab014a9e31"
+    },
+    {
+      "path": "internal/ai-package-full-export-contract-repair-report.md",
+      "sha256": "9f73eab139d085bf24fb3ec1e3046e0c84820da20952054d931b0a47e19c42e4"
+    },
+    {
+      "path": "internal/ai-package-full-export-contract-review-1b636542.md",
+      "sha256": "74a1390754fabba2316a945f0ebf5a2fab709a975f1a493ad67fe44e76d30218"
+    },
+    {
+      "path": "internal/ai-package-full-export-contract-review-a776b2b.md",
+      "sha256": "531aeb0a273efb35342a21643ee300555a18108aebae18fed1ea02c6e6fe18bf"
+    },
+    {
+      "path": "internal/ai-package-full-export-contract-review.md",
+      "sha256": "04152990bc747517a073f90aed6e9e015766c4531cf57340c56c3089f903976a"
+    },
+    {
+      "path": "internal/ai-package-full-export-reconciliation-20261005.md",
+      "sha256": "18cf48251f56046100743d9405ee7ab7a3b05568161684f1b8755370b8d0b881"
+    },
+    {
+      "path": "internal/ai-package-full-export/lifecycle-report.md",
+      "sha256": "8f7b8a59f2be5cdb77fd172c10c1c50131d208a408b500685ec545b33d6b705b"
+    },
+    {
+      "path": "internal/ai-package-full-export/reconciliation-report.md",
+      "sha256": "d61a01c4b951d5eeaa5da38609da829a451d78c4fb8a18e52693becbaba5c096"
+    },
+    {
+      "path": "internal/ai-package-multi-window-analysis-planning-report.md",
+      "sha256": "ef156d8dccc6cd1c9db42753aef4efe454eda88d4807df2ac040be55385eef48"
+    },
+    {
+      "path": "internal/ai-package-shop-identity-repair-report.md",
+      "sha256": "a802781c55abbb2c34990b397c7bca84cf7fa57076a2bbf3e60939541bde1e9d"
+    },
+    {
+      "path": "internal/architecture/control-loop-middle-inventory.md",
+      "sha256": "e7d56357967487e1fde8931711cdfe355931068a2236cf1608120f0aca1bf253"
+    },
+    {
+      "path": "internal/architecture/drr-cpo-price-semantics-evidence-scan.md",
+      "sha256": "88eafe0f135be5e20868f4b05c9864cf6e06201103826abdee0eff329fbe3196"
+    },
+    {
+      "path": "internal/architecture/durable-shop-order-facts-future-store.md",
+      "sha256": "b8653a4c511fea350c1ded4e3f01a56af4e8c0ff530988063f1dc0dea7d19476"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-planning-bc-787c8d26.md",
+      "sha256": "dac64b9318b11c6520e9c7092685c7d43f3572df78561c9040e510480c286d43"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-slice-b-ci-cert-bc-787c8d26.md",
+      "sha256": "b58da4806b5c6f7cc016528056e7ff83d59aed341dacc406cc341b3fc49537db"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-slice-b-final-cas-bc-787c8d26.md",
+      "sha256": "64064478e4ba5fee87bab29f25634192c117b6ed5b1f55429cc26c4dd3c817d6"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-slice-b-final-cert-bc-787c8d26.md",
+      "sha256": "5472f673854d4351dc7248fac4324a82b295a9f0685b2a3c43fdef2544d08a6d"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-slice-b-fresh-stage-bc-787c8d26.md",
+      "sha256": "49540236dce206e92f435c8545ea5e695cab48d1a0922021d0c8f44fbdde70c9"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-slice-b-repair-bc-787c8d26.md",
+      "sha256": "5cdfb01db37b5e3f57122091c514488a8bc4c0654ac6a88c41e6115847890aef"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-slice-b-review-repair-bc-787c8d26.md",
+      "sha256": "3fba1fc160e6e90210f80707b9e39e09d2df94f0dc77e4d62741295c882eae74"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings-slice-c-ui-design.md",
+      "sha256": "40742589e0a27c7822f5609e2e877b3918265e9dd4a1b85c9ac8995707ce3e5c"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-settings.md",
+      "sha256": "f7e04e8075282bc6824a4112ac346599d5530e6e384331e529c966282fcb6181"
+    },
+    {
+      "path": "internal/architecture/hierarchical-ad-control-slice-ab-type-map-bc-ab9bf4d3.md",
+      "sha256": "c27467b90d905d80be55e071b4a12d207c98520e34159baae3867045c8b069f7"
+    },
+    {
+      "path": "internal/architecture/task-4-2-ui-advertising-control-architecture-packet.md",
+      "sha256": "473dc872898e29bc953f5c74f0a3c5cec93b37207246d3927243137349080782"
+    },
+    {
+      "path": "internal/architecture/task-42-ui-advertising-control.md",
+      "sha256": "007568bcd315b1b5a45df4bb51246a28a8de3c04f85cad6b6e34b22339bf0f25"
+    },
+    {
+      "path": "internal/architecture/task-42b-readiness-report.md",
+      "sha256": "b504c6af528d7f148bf0d267b3467cabd9c7e012dc6646c7ff242b7f9e11f56a"
+    },
+    {
+      "path": "internal/architecture/wave-1b-hierarchical-contract-inventory-task-4-2-bc-46bc43af.md",
+      "sha256": "fa12334fedb9540a44dda3dfed89cb5ab063a7181ed233a52b49a5faaad549bd"
+    },
+    {
+      "path": "internal/attribution-facts-contract-planning.md",
+      "sha256": "d3857c73051c5bc9b79a34a40b31f6f09ec325f0624377caa97d799a79dd874a"
+    },
+    {
+      "path": "internal/attribution-facts-contract/slice-a-independent-review-20261007.md",
+      "sha256": "c8e77a614556817c08d3ab0649c352469cfed7dcbaaa7849d441f3d649d66c41"
+    },
+    {
+      "path": "internal/attribution-facts-contract/slice-a-owner-merge-20261007.md",
+      "sha256": "3860d2f57066a93da4625d4cc63803aa6f05ffa3435bc7ffa143f55e0c4eb899"
+    },
+    {
+      "path": "internal/attribution-facts-contract/slice-a-reverify-post-repair-20261007.md",
+      "sha256": "4ebc3e4f098d9e3bd6bfb75a2110993e13a8b3d9dea4a9d8c8c476ac4b7df394"
+    },
+    {
+      "path": "internal/attribution-facts-contract/slice-a-stage-moved-reverify-20261007.md",
+      "sha256": "b8c3fa411d3766420ac5070bc7496757ae12241f856f69fbbb8b15ae81e5f18e"
+    },
+    {
+      "path": "internal/attribution-facts-slice-b-independent-review.md",
+      "sha256": "f861fda7f126cb21d7e7d01ce2af9f718a6c7c6a4928c308f74921bdf43d455d"
+    },
+    {
+      "path": "internal/attribution-facts-slice-d-independent-review.md",
+      "sha256": "f24dc27ff77c635a87f33c2a60bf85185f3fb5bf895bfe38c107bcfb82b6f9d8"
+    },
+    {
+      "path": "internal/attribution-slice-d-security-review-3c36.md",
+      "sha256": "703744ceae8e1d2317e67e21af97c0c45f9b2428a5e563ad89d64c9f88501390"
+    },
+    {
+      "path": "internal/campaign-attribution-facts-planning.md",
+      "sha256": "0836113dd551afa27682d5083cf0998e27a03e8d0d58a7176e520ec19c570505"
+    },
+    {
+      "path": "internal/campaign-settings-architecture-inventory.md",
+      "sha256": "2a70456927cf75b894f13d331cda72487b44b746def31b436a4c82d13fb6f2a3"
+    },
+    {
+      "path": "internal/campaign-settings-changeset-contract-planning.md",
+      "sha256": "e8c9153a980ff176db0d9cff5cdbfcce7645e3c4f93a57f14e768f9d3cf7e549"
+    },
+    {
+      "path": "internal/campaign-settings-changeset-implementation-report.md",
+      "sha256": "39534fd79a7704da5902afe7ded88d61934aa942cde38d19444c0dacd047965c"
+    },
+    {
+      "path": "internal/campaign-settings-history-lifecycle.md",
+      "sha256": "9bd20bb99af3f60f125699bfedf2137bdf6b962892280599dd297fd548b1cd56"
+    },
+    {
+      "path": "internal/campaign-settings-history-reconciliation.md",
+      "sha256": "7f03cccfb18add839a2586a314cc9af1c5e5477635c1a6753ca7cfcb48015516"
+    },
+    {
+      "path": "internal/campaign-settings-mutation-inventory.md",
+      "sha256": "99503fb17a8f100fad9ca838f10219b30c82b5a3559c3ea4fb2ece4377097d62"
+    },
+    {
+      "path": "internal/changeset-apply-authority-owner-contract-review-bc-b1403ae8.md",
+      "sha256": "a3992928ef6bde3b881e3154cd30dcab850e3119165ac5e190fa453804948ac6"
+    },
+    {
+      "path": "internal/changeset-apply-authority-planning-bc-b1403ae8.md",
+      "sha256": "4a89200d9c0e60eeda7cebcc5382845d0b0d3350282c73cc8c31028845ab9d7e"
+    },
+    {
+      "path": "internal/changeset-apply-authority-planning-report.md",
+      "sha256": "310bb1dfebd1b620c439f02c38206e8a967dffe2dad244e461f2884dadb8c800"
+    },
+    {
+      "path": "internal/chatgpt-6abcdb39-extraction.md",
+      "sha256": "c2ad758d8278cee84f80322a2db36f2ecdaa49a2f2b6f9bf09fea02a1e81f8b7"
+    },
+    {
+      "path": "internal/chatgpt-6abd1faa-extract-raw.txt",
+      "sha256": "ef9cadb8663ed054f331dba73f7da1c2548e45a596b1439d07b620b4aaac554e"
+    },
+    {
+      "path": "internal/chatgpt-6abd1faa-messages.txt",
+      "sha256": "4a9f52508f2588144b2c3e3f86601f4d4a17fcf08bb4f9643635a6a796940a36"
+    },
+    {
+      "path": "internal/chatgpt-6abd1faa-parse-meta.json",
+      "sha256": "774589ae285de9da9d92171f88639036950416bfb1a798f2493886b378fde630"
+    },
+    {
+      "path": "internal/cursor-project-bootstrap-final-report.md",
+      "sha256": "32f4fa95970fd531cc94615d99611927888d8a5d877c118a95c9e1857b71871d"
+    },
+    {
+      "path": "internal/decision-experiment-memory-planning-bc-05eab406.md",
+      "sha256": "be2d80ed05881612a3a74cc178133100011bad640fcaeec601bcccb7d04b7ff1"
+    },
+    {
+      "path": "internal/decision-experiment-memory-pr460-slice-a-rereview-e8fb5ba.md",
+      "sha256": "cbe3391f0be4b5c764518768d9513e386a8266344e954f42e0360bc43cd179ae"
+    },
+    {
+      "path": "internal/decision-experiment-memory/final-architecture-locks.md",
+      "sha256": "5bb656a1c922a4f4f3fa2a1977992eab967a0c4f2fff32e5ee44f325d5eeaf59"
+    },
+    {
+      "path": "internal/decision-experiment-memory/owner-contract-review-20261007.md",
+      "sha256": "4ce10ccc188d8a2a5a7b4427af243383c4dd626817eef97e67be6172ab4c62b7"
+    },
+    {
+      "path": "internal/decision-experiment-memory/planning-repair-methodology-addendum.md",
+      "sha256": "dc9cad14935a42465270ff8554052bfd17af7545767e180cae629eedfb96c293"
+    },
+    {
+      "path": "internal/decision-experiment-memory/planning-repair-pipeline-gates.md",
+      "sha256": "eb7973986f6b67ecf68ee622735178750a9d2d176a7dd39301041a41870a308a"
+    },
+    {
+      "path": "internal/decision-experiment-memory/planning-report-bc-0395eb9d.md",
+      "sha256": "055fbcb0e0feabe1a2cfaf6e898c7fa13d5b22cf85f8a4fbc039c793a7cadc27"
+    },
+    {
+      "path": "internal/decision-experiment-memory/planning-report-bc-2bbf6418.md",
+      "sha256": "2756b3043cdd4af9142439ca5fcf307c07c55bed1cf562b3cd33444f2179be70"
+    },
+    {
+      "path": "internal/decision-experiment-memory/planning-report.md",
+      "sha256": "b592baeeb91f2582940a61c21b29a060ca8864b5dd4170ffd13e4eb4d2b60621"
+    },
+    {
+      "path": "internal/decision-experiment-memory/slice-a-merge-and-scope-reconciliation-2026-10-09.md",
+      "sha256": "97e381c3601dd5fa6c5cbd00699dc7202f6947b6f44a4ad4a7e04f096bab6af1"
+    },
+    {
+      "path": "internal/decision-experiment-memory/slice-a-review-53a334905.md",
+      "sha256": "6aa390fa2eeafcadf122bd22c1eb5172955e2166563389e26cf2d1343d5b1c86"
+    },
+    {
+      "path": "internal/deploy-rollback-policy.md",
+      "sha256": "b93f08bc8eb71821f883ee26817f221084d55663abf227484a3eb3ecbff5c201"
+    },
+    {
+      "path": "internal/drr-cpo-price-semantics-owner-return.md",
+      "sha256": "fa2ba5d5ed2f8889d5cac594b0dc2aa6b8a1500bdfab6561d5168f2d60c75050"
+    },
+    {
+      "path": "internal/drr-cpo-price-semantics/adr-certification-5695d21b.md",
+      "sha256": "d537dd9cce05d683a2cc7cc87f63d7a547d93f4e3e2ee9ebd4e1e21e6ac082ca"
+    },
+    {
+      "path": "internal/drr-cpo-price-semantics/evidence-report.md",
+      "sha256": "2948a8535f26f4defb7ec66bbabdb201ec1a971e8aaf55b88c605e565bfea740"
+    },
+    {
+      "path": "internal/drr-settings-hierarchy-inventory-bc-59832951.md",
+      "sha256": "fb48f15293bbff16d2d6588ee57e31dd8b85d0c4f6b3129477b86e1cccf1e695"
+    },
+    {
+      "path": "internal/full-ai-package-acceptance-report.md",
+      "sha256": "ca7e4719dd56ca88c6119e114e7fa413110f6ee8d90de146e0daff5993083942"
+    },
+    {
+      "path": "internal/full-ai-package-real-acceptance-export-report.md",
+      "sha256": "cc5cce7ada45951b37d6075145fd376fbfb973d11fc46fdef464a84d8ec7ca3a"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings-slice-b-merge-receipt.md",
+      "sha256": "a803f1d5abdd0d9766fe68978376eabe4ab038c5b4c04d0cdb3ece504a2b6647"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings-slice-b-review-ebbee1bc.md",
+      "sha256": "b176a6e527e4cae4be350e7f0fadb0f3189eb3ad8d6238b99f47d24b46e4ef7d"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings/task-41-implementation-report.md",
+      "sha256": "7d1cc7d53521042eb4b0ab08cff36b94a416d907b49520407495a886394ac114"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings/task-41-slice-ab-domain-archaeology-bc-ab5b6195.md",
+      "sha256": "739cea50149de837a6706aae7d883557d2f16395ff5ab243ef4e10a495c958b1"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings/task-41-test-matrix.md",
+      "sha256": "00ca4c0978253cf9739b32959a1477ecf4ca2819a6e79a5c929fd3b668f3e677"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings/task-43-allocator-design.md",
+      "sha256": "3367b225b389f0c0e513b37bc6b9d70e394a2acc7069e703ecaf99cfdfe5b66c"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings/task-43-allocator-parameter-lock.md",
+      "sha256": "02c1757eefde86d13c9064e0b6902cf87f127f60019f8166d10db85235364c35"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings/task-43-owner-parameter-decision.md",
+      "sha256": "9471795f67c1843bee74434c3b2bf08f272742cebbd3c11b8603d8e2513b3553"
+    },
+    {
+      "path": "internal/hierarchical-ad-control-settings/wave-1c-ui-diagnostics-read-model.md",
+      "sha256": "07316e8d181e10b81ece5774c64ce43c8e37a86b0d98aae8657f0a925a405c4d"
+    },
+    {
+      "path": "internal/hierarchical-ad-control/campaign-list-scale-ux-archaeology-d.md",
+      "sha256": "66a21176079b5730fef2f956e3f59baeafe1634469abef9b0261fc2710db61e0"
+    },
+    {
+      "path": "internal/hierarchical-ad-control/runtime-economic-facts-archaeology-c.md",
+      "sha256": "d1a9e53c92696fc40c90d61d3cda15d7a0525722e7a30604499dc2813a10aebe"
+    },
+    {
+      "path": "internal/hierarchical-ad-control/task-4-1-shop-runner-archaeology.md",
+      "sha256": "4c3c14230f460c47508fe36e99a438799cd5bbd562b2b44a70c4f5c9680d79d3"
+    },
+    {
+      "path": "internal/hierarchical-ad-control/telegram-ui-slice-ab-readonly-symbol-map-e1e5.md",
+      "sha256": "f1c49546148aa8d11a6f95423a260c666990cc0517f627a38187d89a68fdd0ba"
+    },
+    {
+      "path": "internal/local-connect-evidence.md",
+      "sha256": "3255d61e32b96fac96d8a0a770ba4fb54dc9d8ab4d163512e3e123b4a89dd9dc"
+    },
+    {
+      "path": "internal/openspec-guard-opsx-verify-rebaseline-2026-10-09.md",
+      "sha256": "011cc7b8f2a9cc8830fd87da573e1eca5279ebfd9839fd050894f41d54ffe8c5"
+    },
+    {
+      "path": "internal/opsx-command-only-rules-pr.md",
+      "sha256": "62d7b2399e349a6de471faa88c0cc4d4c9752cb731f2e2cc84063c9aec592ecc"
+    },
+    {
+      "path": "internal/opsx-compliance-audit-active-chats-20261006.md",
+      "sha256": "17140a69cf7b934092797a4f26dc950cf82058cdc9880909017597c94db33649"
+    },
+    {
+      "path": "internal/opsx-tiriel-advbot.md",
+      "sha256": "4422221b2a86aa3a4f66b3530629a51a08a9c1e3f8c11c5fbf250e18d0befcd7"
+    },
+    {
+      "path": "internal/opsx-transfer.md",
+      "sha256": "f3f3738bfb1cfb7cb4470a4e30e822e31d278aad336ef4447b6b3d663990b043"
+    },
+    {
+      "path": "internal/opsx/decision-experiment-memory-archive-readonly-review.md",
+      "sha256": "c579440639a4a9dbd991a098c8499fcc06f9449fd4a41780a3a5c18bc303565d"
+    },
+    {
+      "path": "internal/pcc-planning-certification-2026-10-07.md",
+      "sha256": "149f4ba16504560db78fee6ce1edc84aa3f19e64fe02ffb42ba59d24d6384ceb"
+    },
+    {
+      "path": "internal/pr443-diff-categorization-6147.md",
+      "sha256": "44ddde4249510947caf196f2d116c8c46d0882442e936ec9ec3b92da65c61dc4"
+    },
+    {
+      "path": "internal/product-control-context-owner-contract-review.md",
+      "sha256": "702993799d76988325bd3530960677c763dd2e48909c41dacc6dfb8b5479ebf1"
+    },
+    {
+      "path": "internal/product-control-context-planning.md",
+      "sha256": "2293b73232b6e71e1bdb6ae957653f90effa3dd24739d19b35276ee9e64d1906"
+    },
+    {
+      "path": "internal/product-control-context/subagent3-planning-merge-readiness-27086af.md",
+      "sha256": "55bbb4f8892452f2fcab193d62ffb6dcaa942cbbdf2ef573a78c8bd00a584ff6"
+    },
+    {
+      "path": "internal/promocodes-worker-20260930-navigate-apply.md",
+      "sha256": "d66317b69eaef0345b62bcfab5e1e86ff97410c9e5ab476c86113525e2446e48"
+    },
+    {
+      "path": "internal/provenance-inventory-separate-auto-search-cpo-host-mismatch.md",
+      "sha256": "364f615cedf415bfccda320ae41d925e8bdef567b0dabfa8bcd1113263fe8198"
+    },
+    {
+      "path": "internal/recurring-patterns.md",
+      "sha256": "80b4d1b01ef7353227aeab89f7937119b5868f19f7145ab2cc3e103236b810be"
+    },
+    {
+      "path": "internal/reviews/hierarchical-ad-control-settings-slice-a-89e6b48.md",
+      "sha256": "14f7f82739cfc49520de1c4a846ef8ef3bb19e4bbf2fa7ecd550da6eeb44ea28"
+    },
+    {
+      "path": "internal/reviews/separate-auto-search-cpo-890799160.md",
+      "sha256": "7db613c8ffd5e218fc08966ccd3a86f6e505e50f1c069a6f2bb1a595171d012d"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-blocker-followup.md",
+      "sha256": "cb795c1899a5c77ed900c37035069ccb02b688a86697facb03464c9f9c0040d9"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-ch-seam-fix.md",
+      "sha256": "2bc4e36517e7ed6afb31c31fa09679a563f1065f90cd062f09bcfaa9b1fb3618"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-clean-branch.md",
+      "sha256": "6059219cbd7082cc6f4c1272373a25b7bfd7d906cc0e6edbb37e78fe23037ed7"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-clean-certification.md",
+      "sha256": "333cc8fef9df97f5bfee55eebe00308a4b2f2445deaa1743e97f54c5074bc7c8"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-home-pc-live-cert-handoff.md",
+      "sha256": "4dfb58c8643c8d95917736ad280c18846470dd8713a944ca2c7a19e7fcec6612"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-home-pc-live-cert-result.md",
+      "sha256": "79855d487de09e3b0b69861f6aea065137931734055b878c8c458768c7cc5722"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-lifecycle-report.md",
+      "sha256": "938074857bf180138e94725cc274d71f662dac4b7feeb577715ad719aa10055d"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-live-certification.md",
+      "sha256": "412155916f5c077ec874f70e6481f12111a1f8e15a396dc5babf71aff6cf0961"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-pyright-final.md",
+      "sha256": "bd98c520b23bce59de039b57d82716400ba65b9dcd7b7f03a87dfe311e306718"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-reconcile-merge.md",
+      "sha256": "20ae9207644b2821c69ac7b1563936d2226ec02ab283b6049200e106c03e760b"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-reconciliation-inventory.md",
+      "sha256": "a3c92f46aaf7eeea7cf3d69ba8492ae80779d9cd303ed9672d49d041be4dc01d"
+    },
+    {
+      "path": "internal/separate-auto-search-cpo-verification.md",
+      "sha256": "7cd1da03cbce38aa2ee69fbc100766723af6c429c48c1047ee98382043de9edd"
+    },
+    {
+      "path": "internal/stage-revert-451-final-review.md",
+      "sha256": "b0aa03db9d370e91ef7e3f1683b5f04c42a72376080be3f2e57603ecc77da420"
+    },
+    {
+      "path": "internal/stage-revert-451-post-merge.md",
+      "sha256": "de1dacc6368ef0a50b17d3b10f9b75bb4b6ff49ad46d3cedbc02ef5bb0c2fd61"
+    },
+    {
+      "path": "internal/verification/promocodes-auth-server-redeem-20260930-verification-hop.md",
+      "sha256": "5594fc9beeb0c8d3667ea7798fec56c2ae7aa71b0ea2c1cc1ba797e221a67554"
+    },
+    {
+      "path": "internal/wave-1a-ui-pattern-inventory-hierarchical-ad-control.md",
+      "sha256": "aea016807b258f3a37385174318cf1bdf3319dbadbf131db354a3b188eeacad1"
+    },
+    {
+      "path": "internal/wave-1d-scale-ux-analyst-task-4-2-ui-advertising-control.md",
+      "sha256": "a78f129f9544e7fa9bdb6e715b482a76cfd881303a609aace3d27a2fe743a1ca"
+    },
+    {
+      "path": "internal/wb-sky-architecture-inventory-ai-mutation-surfaces-20261005.md",
+      "sha256": "af60a83970bea04a58b8311cc78461a29d39cba2767c2aae8387954a808413f0"
+    },
+    {
+      "path": "internal/wb-sky-changeset-inventory-readonly.md",
+      "sha256": "c6f595e6d31ccfc1f22ed793c53e586ed6542fdd33facd5f7307cd6daca76766"
+    },
+    {
+      "path": "internal/wb-sky-coordinator-snapshot-20260930.md",
+      "sha256": "d667c51a814a15f2b12176e50bf70a91f46d6664c7dc871cf961692e06f5be46"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-harness-repair-v6-conflict.md",
+      "sha256": "7dff282efdf6fdc0d363cb84496ba723578e31346ae2f7082aa1dd197cd46178"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v7-meta.json",
+      "sha256": "8e4412bf9161edde0ed060fe3f63d02526b35aa4ff3e95eb0f89d82a154bc8b9"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v7-packet.md",
+      "sha256": "dc10accf2345b93278a3568aec03962828ace82aa898fa41e49e08197564fda5"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v8-meta.json",
+      "sha256": "e28f8d65620ccbb0b1a8b04232e3dc28006fc54f90a16dc429270ab2d4a82996"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v8-packet.json",
+      "sha256": "819446639c2bcad03f688d30d0bd73bb42a0c9648e21bbd6df5a284ea0a50a24"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v8-packet.md",
+      "sha256": "87d773ccb58d94a6c41a31b8cd08436a3f0cc4cd5173d7e59c867d1e69fd2606"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v8r2-meta.json",
+      "sha256": "fa51902ecce15a1ea28a60e3127cde7b93b87e92b1cfce62137ed9ff60c942a3"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v8r2-packet.json",
+      "sha256": "e14690a871ae070ecaf53b8f81cb164fdc07bfeedb350557e17468730bb6fd9c"
+    },
+    {
+      "path": "internal/wb-sky-mcp-cert-v8r2-packet.md",
+      "sha256": "9326da14a652fc90ef62b3567d0ff1c7b9140972152f7612be0e58915024b0f4"
+    },
+    {
+      "path": "internal/wb-sky-mcp-certification-chain-blocked-environment.md",
+      "sha256": "3789e585e6d6599427c49443f335e4cf4cae52cd1ca012f79302702fe6fd1c2a"
+    },
+    {
+      "path": "internal/wb-sky-mcp-formal-scenario-certification-stale-plan.md",
+      "sha256": "a4ea74bcef533716572fa53e78bf416b9721d0543da695be2a7915348a46e358"
+    },
+    {
+      "path": "internal/wb-sky-mcp-formal-scenario-certification.md",
+      "sha256": "4520084216bd36ebc71ede7a56d7b30432231025a7104d8ad112e3128e7a56d2"
+    },
+    {
+      "path": "internal/wb-sky-mcp-home-pc-execution-blocked-cloud-vm.md",
+      "sha256": "c9044657de86f66e7f1afe73a0a913537e862ee0f315de6eacb9a83434ad446d"
+    },
+    {
+      "path": "internal/wb-sky-mcp-home-pc-redis6379-guard-env-handoff.md",
+      "sha256": "ca883cf8d7ecd710329f8832a9ba277938a7fde6940a75b549ed4d017dd49e65"
+    },
+    {
+      "path": "internal/wb-sky-mcp-pg-authorized-provider-run.md",
+      "sha256": "bca39f9aced222228fa3850310a846d565318f8220e046a6b7089331503a282f"
+    },
+    {
+      "path": "internal/wb-sky-mcp-pg-fresh-reaudit-after-guard-repair.md",
+      "sha256": "c83dada73653ce03e163d8a8facea3976560ea43833eef3490d96ced75800c5b"
+    },
+    {
+      "path": "internal/wb-sky-mcp-pg-independent-reaudit.md",
+      "sha256": "f2abd1108febca69474e1e1ec9d6d58cc729039e0f4eeac9599cb352bab00590"
+    },
+    {
+      "path": "internal/wb-sky-mcp-pg-provider-gap-authorship.md",
+      "sha256": "bfea9139c4a33e363f3565596e388836c10bff446a684df6a0f5df3ec30084d2"
+    },
+    {
+      "path": "internal/wb-sky-mcp-pg-test-only-authorship-result.md",
+      "sha256": "61cbde4813712fe8dce35763521ecae856cff1f8eb84c12954d764753e6e6089"
+    },
+    {
+      "path": "internal/wb-sky-mcp-pg-test-only-authorship.md",
+      "sha256": "9d7d05a256d9c34eedff40f5e4c3d82fff42f6f2ad226571e8c6884f81265427"
+    },
+    {
+      "path": "internal/wb-sky-mcp-predeploy-hardening-head-changed.md",
+      "sha256": "f7722478a7e34b99c389767c1d953af17895a6de238f971fe0bc1e13896765de"
+    },
+    {
+      "path": "internal/wb-sky-mcp-predeploy-hardening-report.md",
+      "sha256": "d0c2031910e573c8154f7d6e7c503960d7c836a19b88687f888b60e9f2d0c86f"
+    },
+    {
+      "path": "internal/wb-sky-mcp-predeploy-hardening-reverify.md",
+      "sha256": "ae063e996d110531a101809ba7f954176f34bb335afa1abd027f3012d3118731"
+    },
+    {
+      "path": "internal/wb-sky-mcp-protocol-repair.md",
+      "sha256": "f99459902944e2c2cdbbc55d96e2f0bd929055636d515085082d0dd1f11135c5"
+    },
+    {
+      "path": "internal/wb-sky-mcp-protocol-rereview.md",
+      "sha256": "85745f0ff66cddc87a4fad7187bfb88efdce1b265452e2f8ec240d6136b91192"
+    },
+    {
+      "path": "internal/wb-sky-mcp-provider-cert-v4-handoff.md",
+      "sha256": "474788f0a236ecef7c66f16f722bf217e4ee81b7eceb711b21dfb70cff446237"
+    },
+    {
+      "path": "internal/wb-sky-mcp-provider-cert-v5-handoff.md",
+      "sha256": "9f71a180f7e56144dfc56e2d553c5c59b76ab3acec009b3f4abf566e3fed14c4"
+    },
+    {
+      "path": "internal/wb-sky-mcp-provider-cert-v6-handoff.md",
+      "sha256": "361abb8013c1e3f28c96aa86f77bbe5a2ac935aead8a8e2882e6097544b9966d"
+    },
+    {
+      "path": "internal/wb-sky-mcp-provider-run-fail-closed-repair.md",
+      "sha256": "3600a7838ca5603abd13bd4da1cc88fdcdff375a72848d196f71923d215b001e"
+    },
+    {
+      "path": "internal/wb-sky-mcp-read-interface-independent-review.md",
+      "sha256": "e76d1cf48335bbe559634f7b13d4998837092fe77819b77a7e11290ab080a774"
+    },
+    {
+      "path": "internal/wb-sky-mcp-read-interface-planning-report.md",
+      "sha256": "6ce43c5896d5c907929c4930508269e97ed392fc6c4c77de4e080010ef872ee8"
+    },
+    {
+      "path": "internal/wb-sky-mcp-read-interface-provider-packet-v7.md",
+      "sha256": "7317a656cc608daef23cbdedd1d94689fa8f68e4bd7042a99bd9634eac44a5c2"
+    },
+    {
+      "path": "internal/wb-sky-mcp-scenario-plan-refresh.md",
+      "sha256": "34a03702498a0ba2b0d001fae38c32429f3d3b0fd410b955545280446c101213"
+    },
+    {
+      "path": "internal/wb-sky-mcp-v3-provider-cert-handoff.md",
+      "sha256": "ec746e9d92769c884536af91ed3849172bfdfc98d340fc166f029bca92457f8d"
+    },
+    {
+      "path": "internal/wb-sky-mcp-windows-guard-repair-home-pc-v2-handoff.md",
+      "sha256": "188e89a2b8b33ff2f76860c153e8a8d4bee9d07a527f7f64d4fb3b8508192acf"
+    },
+    {
+      "path": "internal/wb-sky-settings-layers-inventory-origin-stage-20261005.md",
+      "sha256": "961cd055fa751c781561232e27714775bb1d51a1f18f6f13b38a054d6eb286d6"
+    },
+    {
+      "path": "internal/wb-sky-task-4-2-ui-archaeology-a.md",
+      "sha256": "a7543e8cdea39668426fa468db0b94983433fb60de1bfaf70610f7fc2a6d488c"
+    },
+    {
+      "path": "notes.md",
+      "sha256": "c331a1d12519fd46be742a6c6ef90a2520d5d9a3dde772ec10f2ce402b23e27e"
+    },
+    {
+      "path": "preferences.md",
+      "sha256": "93ec7bcbcf16af14f05a39b9b8621d96e5255e1dd663c1144c0632d8b2c34f36"
+    }
+  ]
+}

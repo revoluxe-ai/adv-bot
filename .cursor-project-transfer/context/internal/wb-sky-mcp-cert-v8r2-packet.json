@@ -1,0 +1,39 @@
+{
+  "allowed_run_block_sha256": "085a6103a53f8bf54d1c4cab3dae602abe32546a497a64990bd8926853b03e54",
+  "allowed_run_block_text": "set -euo pipefail\ncd \"$(git rev-parse --show-toplevel)\"\ntest \"$(git rev-parse HEAD)\" = \"ade6117976f31c2e0b976c7ff1c81d3516dda16b\"\nexport POSTGRES_MASTER_HOST=127.0.0.1\nexport POSTGRES_PORT=5433\nexport POSTGRES_DBNAME=test_adv_bot_db\nexport ALLOW_DESTRUCTIVE_TEST_DB=1\nexport ALLOW_DESTRUCTIVE_TEST_CLICKHOUSE=1\nexport REDIS_HOST=127.0.0.1\nexport REDIS_PORT=6379\nexport AUTHORIZE_ONE_LIVE_RUN=\"${AUTHORIZE_ONE_LIVE_RUN:?required}\"\ndocker compose -f tests/docker-compose.test.yml up -d test_db test_clickhouse test_redis\nfor _ in $(seq 1 30); do docker compose -f tests/docker-compose.test.yml exec -T test_db pg_isready -U test_user -d test_adv_bot_db && break; sleep 2; done\ndocker compose -f tests/docker-compose.test.yml exec -T test_db pg_isready -U test_user -d test_adv_bot_db\nfor _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8124/ping >/dev/null && break; sleep 2; done\ncurl -fsS http://127.0.0.1:8124/ping >/dev/null\npoetry run python .opsx/tools/opsx_provider_preflight.py --repo . --fix-integrity --require-docker-daemon\n# PYTEST_TARGETS: tests/integration/wb_sky_mcp/\n# CANONICAL_PYTEST_ARGV_SHA256: 329442e445bde7c13685db79b8ab1a21fe78132ff38ae2161bf1277f1e7edf30\npoetry run python .opsx/tools/opsx_provider_run_guard.py verify --packet .opsx/runs/scenario-coverage/wb-sky-mcp-read-interface/provider-run-packet.json --repo .\npoetry run python .opsx/tools/opsx_provider_run_guard.py run --packet .opsx/runs/scenario-coverage/wb-sky-mcp-read-interface/provider-run-packet.json --repo .\ndocker compose -f tests/docker-compose.test.yml down\n",
+  "audited_head": "ade6117976f31c2e0b976c7ff1c81d3516dda16b",
+  "audited_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "audited_tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "audited_untracked_manifest_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "canonical_pytest_argv_sha256": "329442e445bde7c13685db79b8ab1a21fe78132ff38ae2161bf1277f1e7edf30",
+  "change_id": "wb-sky-mcp-read-interface",
+  "one_shot_authorization_id": "7689ab306d8ea404efe54fd1005a066363a153aeec4af8c0e8a106a5391f68ec",
+  "packet_evidence_id": "PROVIDER-PACKET-v8r2",
+  "postgres_dbname": "test_adv_bot_db",
+  "postgres_host": "127.0.0.1",
+  "postgres_port": 5433,
+  "provider_test_ids": [
+    "tests/integration/wb_sky_mcp/test_mcp_pg_connection_repository.py::test_sql_connection_repository_persist_and_raw_select",
+    "tests/integration/wb_sky_mcp/test_mcp_pg_connection_repository.py::test_sql_connection_repository_refresh_rotation_rejects_reuse",
+    "tests/integration/wb_sky_mcp/test_mcp_pg_connection_repository.py::test_sql_connection_repository_contract_cases[persist_add_get_disconnect_version]",
+    "tests/integration/wb_sky_mcp/test_mcp_pg_connection_repository.py::test_sql_connection_repository_contract_cases[refresh_rotation_rejects_reuse]",
+    "tests/integration/wb_sky_mcp/test_mcp_pg_shop_grant_reader.py::test_sql_shop_grant_reader_lists_only_principal_cabinets",
+    "tests/integration/wb_sky_mcp/test_mcp_pg_shop_grant_reader.py::test_sql_shop_grant_reader_empty_grant_is_success"
+  ],
+  "pytest_argv": [
+    "poetry",
+    "run",
+    "pytest",
+    "tests/integration/wb_sky_mcp/",
+    "-m",
+    "destructive_local",
+    "-vv",
+    "--tb=short"
+  ],
+  "pytest_targets": [
+    "tests/integration/wb_sky_mcp/"
+  ],
+  "redis_host": "127.0.0.1",
+  "redis_port": 6379,
+  "run_spec_sha256": "210d68155db78c2b1b4fb6988fb7be633d95d42a68882f6f392c9facaf2eecc3"
+}
