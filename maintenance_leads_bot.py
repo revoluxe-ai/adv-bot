@@ -2,6 +2,7 @@
 
 One replica, polling, no DB, no Wildberries API, no ad writes.
 """
+
 from __future__ import annotations
 
 import ast
@@ -16,7 +17,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from types import FrameType
+from typing import Any, cast
 
 LOG = logging.getLogger("wb_sky_maintenance")
 TEXT = (
@@ -53,7 +55,8 @@ def owner_admin_chat_id(constants_path: Path | None = None) -> int:
                 continue
             for target in node.targets:
                 if isinstance(target, ast.Name) and target.id in {
-                    "_BASE_ADMINS", "MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID"
+                    "_BASE_ADMINS",
+                    "MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID",
                 }:
                     values[target.id] = ast.literal_eval(node.value)
     except (OSError, SyntaxError, ValueError, TypeError) as exc:
@@ -73,6 +76,31 @@ def owner_admin_chat_id(constants_path: Path | None = None) -> int:
     return recipient
 
 
+def apply_legacy_proxy() -> str | None:
+    """Подключить urllib к уже заданному WB Sky ``PROXY``.
+
+    Клиентский бот кладёт адрес xray в ``PROXY`` для aiohttp. Стандартный
+    urllib читает только ``HTTP(S)_PROXY``. Явный ``HTTPS_PROXY`` не
+    перезаписывается. Возвращает используемый URL или None.
+    """
+    explicit = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+    if explicit:
+        return explicit
+    legacy = os.environ.get("PROXY", "").strip()
+    if not legacy:
+        return None
+    os.environ["HTTPS_PROXY"] = legacy
+    os.environ["HTTP_PROXY"] = legacy
+    return legacy
+
+
+def _as_str(value: object) -> str:
+    """Строка для полей Telegram update без протаскивания Any в str()."""
+    if value is None:
+        return ""
+    return str(value)
+
+
 def normalize_phone(raw: str) -> str | None:
     """Accept 10-digit Russian mobiles, 8/7 Russian prefixes, or E.164-like numbers."""
     raw = raw.strip()
@@ -89,10 +117,13 @@ def normalize_phone(raw: str) -> str | None:
 
 
 class TelegramAPI:
+    """Минимальный клиент Bot API без зависимостей приложения."""
+
     def __init__(self, token: str):
         self._base = "https://api.telegram.org/bot" + token + "/"
 
     def call(self, method: str, **fields: Any) -> Any:
+        """POST method Bot API. Raises RuntimeError on transport or ok=false."""
         values = {
             key: json.dumps(value, ensure_ascii=False)
             if isinstance(value, (list, dict))
@@ -116,18 +147,24 @@ class TelegramAPI:
 
 
 class MaintenanceBot:
+    """Один long-poll consumer: экран обслуживания и заявка с телефоном."""
+
     def __init__(self, api: TelegramAPI, admin_chat_id: int):
         self.api = api
         self.admin_chat_id = admin_chat_id
         self.stopping = False
 
-    def send(self, chat_id: int, text: str, *, keyboard: dict[str, Any] | None = None) -> None:
+    def send(
+        self, chat_id: int, text: str, *, keyboard: dict[str, Any] | None = None
+    ) -> None:
+        """Отправить сообщение. Ошибка доставки пробрасывается вызывающему."""
         fields: dict[str, Any] = {"chat_id": chat_id, "text": text}
         if keyboard is not None:
             fields["reply_markup"] = keyboard
         self.api.call("sendMessage", **fields)
 
     def handle(self, update: dict[str, Any]) -> None:
+        """Обработать одно обновление. Заявку подтверждает только доставка Owner."""
         callback = update.get("callback_query")
         if callback:
             self.api.call(
@@ -141,7 +178,10 @@ class MaintenanceBot:
         message = update.get("message")
         if not message or message.get("chat", {}).get("type") != "private":
             return
-        user = message.get("from") or {}
+        user_raw = cast(object, message.get("from"))
+        user: dict[str, Any] = (
+            cast(dict[str, Any], user_raw) if isinstance(user_raw, dict) else {}
+        )
         chat_id = int(message["chat"]["id"])
         if not user.get("id"):
             return
@@ -171,7 +211,12 @@ class MaintenanceBot:
             phone = normalize_phone(content)
 
         if not phone:
-            if content not in {"/start", "/help"} and (contact or content):
+            # Любая slash-команда, включая deep-link «/start payload», — экран
+            # обслуживания, а не попытка ввести телефон.
+            attempted_phone = bool(contact) or (
+                bool(content) and not content.startswith("/")
+            )
+            if attempted_phone:
                 self.send(
                     chat_id,
                     "Номер не распознан. Нажмите «Поделиться номером» "
@@ -182,10 +227,15 @@ class MaintenanceBot:
                 self.send(chat_id, TEXT, keyboard=MAIN_KEYBOARD)
             return
 
-        display_name = " ".join(
-            str(user.get(k) or "") for k in ("first_name", "last_name")
-        ).strip() or "не указано"
-        username = "@" + str(user["username"]) if user.get("username") else "не указан"
+        display_name = (
+            " ".join(
+                _as_str(cast(object, user.get(key)))
+                for key in ("first_name", "last_name")
+            ).strip()
+            or "не указано"
+        )
+        raw_username = cast(object, user.get("username"))
+        username = "@" + _as_str(raw_username) if raw_username else "не указан"
         created = datetime.now(MSK).strftime("%d.%m.%Y %H:%M МСК")
         notice = (
             f"📩 Новая заявка WB Sky\nИмя: {display_name}\n"
@@ -205,6 +255,7 @@ class MaintenanceBot:
             LOG.warning("Lead delivered to admin; user acknowledgement failed")
 
     def run(self) -> None:
+        """Снять webhook и держать единственный long poll до SIGTERM."""
         self.api.call("deleteWebhook", drop_pending_updates=False)
         offset: int | None = None
         while not self.stopping:
@@ -219,16 +270,19 @@ class MaintenanceBot:
                 for update in updates:
                     self.handle(update)
                     offset = int(update["update_id"]) + 1
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 — poll must survive one bad update
                 LOG.warning("Poll/update failed: %s", type(exc).__name__)
                 if not self.stopping:
                     time.sleep(5)
 
 
 def main() -> None:
+    """Точка входа: токен, Owner id из const.py, один polling-цикл."""
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
+    if apply_legacy_proxy():
+        LOG.info("Using existing PROXY for Telegram transport")
     token = os.getenv("CLIENT_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         raise SystemExit("Missing CLIENT_BOT_TOKEN/TELEGRAM_BOT_TOKEN")
@@ -237,8 +291,12 @@ def main() -> None:
     except RuntimeError as exc:
         raise SystemExit(str(exc)) from exc
     bot = MaintenanceBot(TelegramAPI(token), admin_chat_id)
-    signal.signal(signal.SIGTERM, lambda *_: setattr(bot, "stopping", True))
-    signal.signal(signal.SIGINT, lambda *_: setattr(bot, "stopping", True))
+
+    def _request_stop(_signum: int, _frame: FrameType | None) -> None:
+        bot.stopping = True
+
+    _ = signal.signal(signal.SIGTERM, _request_stop)
+    _ = signal.signal(signal.SIGINT, _request_stop)
     bot.run()
 
 

@@ -1,10 +1,13 @@
 """Offline regression tests. No network access or production API writes."""
+
+import os
 import tempfile
 import unittest
 from pathlib import Path
 
 from maintenance_leads_bot import (
     MaintenanceBot,
+    apply_legacy_proxy,
     normalize_phone,
     owner_admin_chat_id,
 )
@@ -104,6 +107,56 @@ class MaintenanceTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             MaintenanceBot(api, 9911).handle(message_update("+79991234567"))
         self.assertEqual(api.calls, [])
+
+    def test_start_payload_and_legacy_commands_show_maintenance(self):
+        api = FakeAPI()
+        bot = MaintenanceBot(api, 9911)
+        bot.handle(message_update("/start ref-42"))
+        bot.handle(message_update("/menu"))
+        self.assertEqual(len(api.calls), 2)
+        self.assertTrue(all(kwargs["chat_id"] == 123 for _, kwargs in api.calls))
+        self.assertIn("WB Sky обновляется", api.calls[0][1]["text"])
+
+    def test_bad_phone_is_rejected(self):
+        api = FakeAPI()
+        MaintenanceBot(api, 9911).handle(message_update("не телефон"))
+        self.assertEqual(api.calls[0][1]["chat_id"], 123)
+        self.assertIn("Номер не распознан", api.calls[0][1]["text"])
+
+    def test_legacy_callback_shows_maintenance(self):
+        api = FakeAPI()
+        MaintenanceBot(api, 9911).handle(
+            {
+                "update_id": 9,
+                "callback_query": {
+                    "id": "cb-1",
+                    "from": {"id": 123},
+                    "data": "old:bid",
+                },
+            }
+        )
+        self.assertEqual(api.calls[0][0], "answerCallbackQuery")
+        self.assertEqual(api.calls[1][1]["chat_id"], 123)
+        self.assertIn("WB Sky обновляется", api.calls[1][1]["text"])
+        self.assertNotIn(9911, [kwargs.get("chat_id") for _, kwargs in api.calls])
+
+    def test_legacy_proxy_maps_only_when_https_proxy_unset(self):
+        saved = {k: os.environ.get(k) for k in ("PROXY", "HTTPS_PROXY", "HTTP_PROXY")}
+        try:
+            os.environ.pop("HTTPS_PROXY", None)
+            os.environ.pop("HTTP_PROXY", None)
+            os.environ["PROXY"] = "http://xray-client:8080"
+            self.assertEqual(apply_legacy_proxy(), "http://xray-client:8080")
+            self.assertEqual(os.environ["HTTPS_PROXY"], "http://xray-client:8080")
+            os.environ["HTTPS_PROXY"] = "http://explicit:9"
+            os.environ["PROXY"] = "http://xray-client:8080"
+            self.assertEqual(apply_legacy_proxy(), "http://explicit:9")
+        finally:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def test_ignore_group_messages(self):
         api = FakeAPI()

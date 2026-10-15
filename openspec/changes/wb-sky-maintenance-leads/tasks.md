@@ -5,7 +5,8 @@
 - [x] Isolated GitHub branch and minimal Python entrypoint.
 - [x] Unit tests for required contact, manual phone, third-party rejection, no false success.
 - [x] Reversible resource cutover plan with database retention and other-project protection.
-- [ ] OPSX schema/spec validate, independent verify, Ruff and Pyright on isolated feature worktree.
+- [x] Unit tests (14), Ruff, and Pyright on `maintenance_leads_bot.py` in the feature worktree. No live Telegram smoke.
+- [ ] OpenSpec schema/spec validate and independent `/opsx-verify`.
 - [x] Determine Owner ID from `const.py`: `MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID` equals first `_BASE_ADMINS` (`# я`).
 - [ ] Prove live notification delivery to Owner after cutover.
 - [ ] Merge via normal PR/CI, build immutable release image.
