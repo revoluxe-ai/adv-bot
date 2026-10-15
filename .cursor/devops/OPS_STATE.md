@@ -58,8 +58,23 @@ Skip non-app: `postgres-db*`, `xray*`, `bebra-shared-proxy`, pooler.
 | Last complete_release | `app-db-ctrlplane-4d5fae43-r1-complete` → OK lease released |
 | Prepared fallback (prior LKG) | tag `01e29e36fa539e8bdf4307516af922e176c8a0d6` / digest `sha256:f33349f2c163727b356ae3039ef5f2c73dfa08cde67758260cd5f77b1335b207` |
 
+## Rollback reserve (Owner policy)
+
+If a **forward** image rollout fails (failed rollout / CrashLoop on a target Deployment, e.g.
+`adv-bot-asq-worker` after PR #443):
+
+* **Reserve target:** CAS revert to **prod LKG** or **Prepared fallback** (table above) — master-line
+  tags recorded in this file. **Do not** revert to stage-tip or bare `kubectl set image`.
+* **Procedure:** `INVESTIGATE` → `PLAN_WRITE intent=image_cas` (JSON Patch `test`+`replace`,
+  namespace `prod-adv-bot`) → Owner `GO`. Partial CAS (one Deployment) is OK (see action log).
+* **Schema:** at current posture `d7e3c9f1a204` — image-only rollback unless forward-fix (`LAST.json`).
+* **After successful GO:** refresh this file + `LAST.json` (`/opsx-meta-commit`).
+
 ## Open risks / follow-ups
 
+* **2026-09-30 cluster vs OPS_STATE drift (read-only kubectl):** live adv-bot entrypoints on image tag
+  `c5d3ecd88a6f58d4216d6e45cf268f890267372b`; this file still records LKG `4d5fae43…`. Reconcile via
+  `/opsx-devops INVESTIGATE` + Owner-confirmed `/opsx-meta-commit` — do not overwrite LKG from chat alone.
 * **Authz repair DONE (2026-08-14):** `release_controller` LOGIN exists; `app-db-control` → `release_controller` with EXECUTE on all 8 release-control functions; `app_migrator` has **no** release-control EXECUTE.
 * **Authz baseline SELECT DONE (2026-08-16):** Job `app-db-authz-grant-baseline-select-0816` → `release_controller` has `USAGE` on schema `migration_control` + `SELECT` on `migration_control.baseline_registry` (needed for CONTROL_DRY_RUN=1).
 * Zalando status `UpdateFailed` after adding `release_controller` (operator sync unhappy). Role/grants/secret work; CR pins `patroni.pg_hba` `host all all all md5` because `ssl=off` + default `hostnossl reject` broke remote Jobs. Investigate UpdateFailed separately.
