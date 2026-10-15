@@ -19,7 +19,7 @@ Status: OWNER_GO_RECEIVED (2026-10-15); IMPLEMENTATION_DRAFT, NO_PRODUCTION_CUTO
 - LLM never controls production advertising writes.
 - Maintenance bot has no WB API, database, queue or advertisement write adapter.
 - Admin notification succeeds before user is told their lead is received; failure remains retryable.
-- Unknown administrator/chat routing must fail closed.
+- Resolve the single Owner notification recipient via `app/client_bot/const.py::MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID`, and verify it matches `_BASE_ADMINS[0]` (annotated `# я`); any discrepancy fails closed. Do not introduce a separate recipient ID environment variable.
 - Operations: separate scoped OPSX DevOps plan with exact resources, backup evidence, dry-run, rollback and matched Owner GO before Kubernetes mutations.
 - Do not delete PVCs or a worker node until service dependencies, backup restore and migration are verified.
 
@@ -27,7 +27,7 @@ Status: OWNER_GO_RECEIVED (2026-10-15); IMPLEMENTATION_DRAFT, NO_PRODUCTION_CUTO
 1. /start and legacy callbacks only show maintenance screen.
 2. Contact sharing must match Telegram user_id; third-party contacts rejected.
 3. 10-digit RU mobile, 8/7 mobile and valid international number accepted; malformed phone rejected.
-4. First admin receives readable phone, username, sender id, time and update ID.
+4. Owner notification recipient from const.py receives readable phone, username, sender id, time and update ID.
 5. No false success when admin delivery fails.
 6. Only one long poller for this Telegram token.
 7. After runtime smoke, verified ad-only processes scaled to 0.
