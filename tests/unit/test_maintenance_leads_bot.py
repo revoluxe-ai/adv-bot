@@ -1,7 +1,13 @@
 """Offline regression tests. No network access or production API writes."""
+import tempfile
 import unittest
+from pathlib import Path
 
-from maintenance_leads_bot import MaintenanceBot, normalize_phone
+from maintenance_leads_bot import (
+    MaintenanceBot,
+    normalize_phone,
+    owner_admin_chat_id,
+)
 
 
 class FakeAPI:
@@ -29,6 +35,27 @@ def message_update(text=None, contact=None, chat_type="private"):
 
 
 class MaintenanceTests(unittest.TestCase):
+    def test_owner_admin_from_repo_consts(self):
+        self.assertEqual(owner_admin_chat_id(), 373435337)
+
+    def test_owner_admin_requires_const_membership(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "const.py"
+            path.write_text(
+                "_BASE_ADMINS = [12345, 99999]\\n"
+                "MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID = 99999\\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "inconsistent"):
+                owner_admin_chat_id(path)
+
+    def test_owner_admin_missing_constant_fails_closed(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "const.py"
+            path.write_text("_BASE_ADMINS = [12345]\\n", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "inconsistent"):
+                owner_admin_chat_id(path)
+
     def test_phone_validation(self):
         self.assertEqual(normalize_phone("8 (999) 123-45-67"), "+79991234567")
         self.assertEqual(normalize_phone("9991234567"), "+79991234567")
