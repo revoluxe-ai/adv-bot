@@ -4,6 +4,7 @@ One replica, polling, no DB, no Wildberries API, no ad writes.
 """
 from __future__ import annotations
 
+import ast
 import json
 import logging
 import os
@@ -14,6 +15,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 LOG = logging.getLogger("wb_sky_maintenance")
@@ -32,6 +34,43 @@ PHONE_KEYBOARD = {
     "one_time_keyboard": True,
 }
 MSK = timezone(timedelta(hours=3))
+
+
+def owner_admin_chat_id(constants_path: Path | None = None) -> int:
+    """Read the existing const.py authority without importing the full app.
+
+    The main presentation notification recipient is the owner's configured
+    recipient and must also be among the built-in WB Sky administrators.
+    """
+    path = constants_path or (
+        Path(__file__).resolve().parent / "app" / "client_bot" / "const.py"
+    )
+    values: dict[str, Any] = {}
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in {
+                    "_BASE_ADMINS", "MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID"
+                }:
+                    values[target.id] = ast.literal_eval(node.value)
+    except (OSError, SyntaxError, ValueError, TypeError) as exc:
+        raise RuntimeError("Cannot resolve WB Sky owner administrator") from exc
+    admins = values.get("_BASE_ADMINS")
+    recipient = values.get("MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID")
+    if (
+        not isinstance(admins, list)
+        or not isinstance(recipient, int)
+        or isinstance(recipient, bool)
+        or recipient <= 0
+        or recipient not in admins
+        or not admins
+        or recipient != admins[0]
+    ):
+        raise RuntimeError("WB Sky owner administrator identity is inconsistent")
+    return recipient
 
 
 def normalize_phone(raw: str) -> str | None:
@@ -191,13 +230,13 @@ def main() -> None:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
     )
     token = os.getenv("CLIENT_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
-    admin = os.getenv("MAINTENANCE_ADMIN_CHAT_ID", "")
-    if not token or not re.fullmatch(r"\d{5,16}", admin):
-        raise SystemExit(
-            "Missing CLIENT_BOT_TOKEN/TELEGRAM_BOT_TOKEN "
-            "or MAINTENANCE_ADMIN_CHAT_ID"
-        )
-    bot = MaintenanceBot(TelegramAPI(token), int(admin))
+    if not token:
+        raise SystemExit("Missing CLIENT_BOT_TOKEN/TELEGRAM_BOT_TOKEN")
+    try:
+        admin_chat_id = owner_admin_chat_id()
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+    bot = MaintenanceBot(TelegramAPI(token), admin_chat_id)
     signal.signal(signal.SIGTERM, lambda *_: setattr(bot, "stopping", True))
     signal.signal(signal.SIGINT, lambda *_: setattr(bot, "stopping", True))
     bot.run()
