@@ -5,7 +5,7 @@ WB Sky no longer has paying users. The advertising engine, campaign updates, met
 
 ## Proposed change
 - A separate standard-library Telegram polling entrypoint, reusing the existing bot identity, displays an exclusive maintenance notice and collects a validated phone number.
-- The configured admin chat receives the phone and sender details before the user sees success.
+- The Owner ID from `app/client_bot/const.py` (`MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID`, checked against `_BASE_ADMINS[0]`) receives the phone and sender details before the user sees success.
 - Legacy buttons do not invoke old feature handlers.
 - After confirmed on-production smoke, the old ad-specific Deployments can be scaled down through OPSX DevOps.
 - Redis, ClickHouse and PostgreSQL are retained until dependency and recoverable backup proof; PVC removal and node resizing require separately scoped reversible operations.
