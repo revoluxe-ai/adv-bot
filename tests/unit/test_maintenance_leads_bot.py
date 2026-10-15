@@ -42,8 +42,8 @@ class MaintenanceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "const.py"
             path.write_text(
-                "_BASE_ADMINS = [12345, 99999]\\n"
-                "MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID = 99999\\n",
+                "_BASE_ADMINS = [12345, 99999]\n"
+                "MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID = 99999\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(RuntimeError, "inconsistent"):
@@ -52,7 +52,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_owner_admin_missing_constant_fails_closed(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "const.py"
-            path.write_text("_BASE_ADMINS = [12345]\\n", encoding="utf-8")
+            path.write_text("_BASE_ADMINS = [12345]\n", encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "inconsistent"):
                 owner_admin_chat_id(path)
 
