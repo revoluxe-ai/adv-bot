@@ -6,7 +6,8 @@
 - [x] Unit tests for required contact, manual phone, third-party rejection, no false success.
 - [x] Reversible resource cutover plan with database retention and other-project protection.
 - [ ] OPSX schema/spec validate, independent verify, Ruff and Pyright on isolated feature worktree.
-- [ ] Identify exact owner-only Telegram admin chat recipient; prove notification is deliverable.
+- [x] Determine Owner ID from `const.py`: `MAIN_PRESENTATION_NOTIFY_TELEGRAM_ID` equals first `_BASE_ADMINS` (`# я`).
+- [ ] Prove live notification delivery to Owner after cutover.
 - [ ] Merge via normal PR/CI, build immutable release image.
 - [ ] OPSX scoped PLAN_WRITE / GO for safe production image/command cutover.
 - [ ] Real Telegram acceptance using self-contact and manual phone (Owner confirms receipt).
