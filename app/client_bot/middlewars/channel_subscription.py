@@ -120,7 +120,10 @@ def _is_whitelisted_event(event: Message | CallbackQuery) -> bool:
     """
     if isinstance(event, Message):
         return is_start_command_message(event)
-    return bool(event.data and event.data == callbacks.CheckSubscribe().pack())
+    data = event.data or ""
+    if data.startswith("mcpok:") or data.startswith("mcpno:"):
+        return True
+    return bool(data and data == callbacks.CheckSubscribe().pack())
 
 
 async def _is_gate_invite_flow_event(

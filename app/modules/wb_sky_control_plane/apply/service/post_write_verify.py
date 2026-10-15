@@ -15,9 +15,8 @@ from app.modules.wb_sky_control_plane.models.plan import PlanV1
 
 
 def _scalar_db_value(raw: object) -> object:
-    if hasattr(raw, "value"):
-        return raw.value
-    return raw
+    value = getattr(raw, "value", raw)
+    return value
 
 
 def _field_name_from_path(field_path: str) -> str:

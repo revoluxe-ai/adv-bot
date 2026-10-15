@@ -172,6 +172,8 @@
     "tests/unit/test_clickhouse_migration_final_acceptance.py",
     "app/modules/ai_package_v1",
     "tests/unit/ai_package_v1",
+    "app/modules/wb_sky_mcp",
+    "tests/unit/wb_sky_mcp",
     "tests/unit/attribution_facts"
   ],
   "exclude": [

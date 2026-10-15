@@ -16,6 +16,7 @@ from app.modules.token_monitoring import (
     initialize_token_monitoring,
     shutdown_token_monitoring,
 )
+from app.modules.wb_sky_mcp.config import load_mcp_config
 from app.settings import settings
 from app.utils.redis_cache import setup_redis_cache
 from python_modules.logger import setup_logging
@@ -78,6 +79,10 @@ async def lifespan(app_fast_api: FastAPI):  # noqa: ARG001
 
 
 app = FastAPI(lifespan=lifespan)
+if load_mcp_config().enabled:
+    from app.modules.wb_sky_mcp.http import mount_wb_sky_mcp
+
+    mount_wb_sky_mcp(app)
 
 
 @app.get("/health")

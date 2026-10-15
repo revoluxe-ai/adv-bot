@@ -3,7 +3,7 @@ Stub schema + Expand path for CI ephemeral PostgreSQL migration gates.
 
 Historical upgrade-from-empty is not CI-safe; gates stamp baseline ``8c541a39b7e2``
 then upgrade to repository head. Stubs must satisfy ALTER TABLE dependencies on
-the supported ancestor path.
+the supported ancestor path, including ``user`` for MCP connection FK.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ def apply_ephemeral_baseline_stubs(engine: Engine) -> None:
     """Minimum tables required for stamp baseline → head Expand upgrades."""
     statements: Sequence[str] = (
         "CREATE TABLE IF NOT EXISTS advsetting (id SERIAL PRIMARY KEY)",
+        'CREATE TABLE IF NOT EXISTS "user" (id SERIAL PRIMARY KEY)',
         (
             "CREATE TABLE IF NOT EXISTS auto_shelf_bid_control_settings "
             "(id BIGSERIAL PRIMARY KEY)"

@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_password
     volumes:
-      - .\tests\postgres-init:/docker-entrypoint-initdb.d # добавляем init-скрипты для pg_hba.conf
+      - ./postgres-init:/docker-entrypoint-initdb.d
     ports:
       - "5433:5432" # Используем другой порт, чтобы избежать конфликтов с основной БД
     healthcheck:
@@ -20,7 +20,8 @@ services:
 
 
   test_clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    # Pinned: `latest` (26.x) rejects tests/clickhouse-config/users.xml and broke v7 cert.
+    image: ${TEST_CLICKHOUSE_IMAGE:-clickhouse/clickhouse-server:24.8}
     environment:
       CLICKHOUSE_DB: test_adv_bot_clickhouse
       CLICKHOUSE_USER: CLICK_HOUSE_USER
@@ -38,7 +39,7 @@ services:
     # volumes:
     #   - ./ch_data_test:/var/lib/clickhouse
     volumes:
-      - .\tests\clickhouse-config:/etc/clickhouse-server/users.d/
+      - ./clickhouse-config:/etc/clickhouse-server/users.d/
 
 
   # test_redis: host :6379 for /opsx-test-env v0.1 probe + env.sample REDIS_PORT

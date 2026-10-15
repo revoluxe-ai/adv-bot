@@ -65,6 +65,11 @@ class PhoneRequiredMiddleware(BaseMiddleware):
             logger.debug("PhoneRequiredMiddleware: no telegram_id, pass through")
             return await handler(event, data)
 
+        if isinstance(event, CallbackQuery):
+            callback_data = event.data or ""
+            if callback_data.startswith("mcpok:") or callback_data.startswith("mcpno:"):
+                return await handler(event, data)
+
         async with _sm(read_only=True) as session:
             user = await load_user_phone_gate_fields_in_session(session, telegram_id)
 

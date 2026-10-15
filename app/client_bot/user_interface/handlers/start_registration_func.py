@@ -31,6 +31,16 @@ async def start_registration(message: Message, bot: Bot, state: FSMContext) -> N
     """
     if message.from_user is None:
         raise ValueError("start_registration requires message.from_user")
+    from app.modules.wb_sky_mcp.bot_handlers import (
+        mcp_txn_id_from_start,
+        present_mcp_start,
+    )
+
+    mcp_txn_id = mcp_txn_id_from_start(message.text)
+    if mcp_txn_id is not None:
+        await state.clear()
+        await present_mcp_start(message, mcp_txn_id)
+        return
     from_user = message.from_user
     logger.debug(
         "start_registration: enter user=%s text=%r chat=%s",

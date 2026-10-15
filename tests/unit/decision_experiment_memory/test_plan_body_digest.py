@@ -39,7 +39,7 @@ pytestmark = pytest.mark.unit
 BodyMutator = Callable[[ExperimentPlanBody], ExperimentPlanBody]
 
 
-def _base_body() -> ExperimentPlanBody:
+def sample_experiment_plan_body() -> ExperimentPlanBody:
     treatment = TreatmentDefinition(
         setting_keys=("bid",),
         old_values={"bid": 10},
@@ -252,8 +252,8 @@ _DIGEST_MUTATORS: list[tuple[str, BodyMutator]] = [
 
 
 def test_hypothesis_key_order_invariant() -> None:
-    body_a = replace(_base_body(), hypothesis={"z": 1, "a": 2})
-    body_b = replace(_base_body(), hypothesis={"a": 2, "z": 1})
+    body_a = replace(sample_experiment_plan_body(), hypothesis={"z": 1, "a": 2})
+    body_b = replace(sample_experiment_plan_body(), hypothesis={"a": 2, "z": 1})
     assert plan_body_digest(body_a) == plan_body_digest(body_b)
 
 
@@ -262,13 +262,13 @@ def test_plan_digest_changes_on_field(
     mutator_name: str,
     mutator: BodyMutator,
 ) -> None:
-    base = _base_body()
+    base = sample_experiment_plan_body()
     mutated = mutator(base)
     assert plan_body_digest(base) != plan_body_digest(mutated), mutator_name
 
 
 def test_canonical_projection_includes_all_body_fields() -> None:
-    body = _base_body()
+    body = sample_experiment_plan_body()
     projection = plan_body_canonical_projection(body)
     for key in (
         "secondary_metrics",

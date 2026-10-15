@@ -65,7 +65,6 @@ from app.modules.wb_sky_control_plane.apply.writer.pg_campaign_settings_policy_v
 from app.modules.wb_sky_control_plane.kernel.semantic_digest import compute_semantic_digest
 from app.modules.wb_sky_control_plane.kernel.state_token import compute_state_token
 from app.modules.wb_sky_control_plane.models.enums import DryRunStatus
-from app.modules.wb_sky_control_plane.models.errors import ControlPlaneError
 from app.modules.wb_sky_control_plane.models.plan import PlanV1
 from app.modules.wb_sky_control_plane.ports.wb_read_port import WbPromotionV2ReadPort
 from app.modules.wb_sky_control_plane.read.local_policy import (
@@ -77,15 +76,6 @@ ApplySessionFactory: TypeAlias = async_sessionmaker[AsyncSession]
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _reason_from_validation_errors(errors: list[ControlPlaneError]) -> ApplyReasonCode:
-    codes = {err.code for err in errors}
-    if "STATE_TOKEN_STALE" in codes or "STATE_TOKEN_MISSING" in codes:
-        return ApplyReasonCode.STALE_STATE
-    if "CAPABILITY_NOT_ELIGIBLE" in codes:
-        return ApplyReasonCode.CAPABILITY_DRIFT
-    return ApplyReasonCode.VALIDATION_REJECTED
 
 
 def _rejected(
