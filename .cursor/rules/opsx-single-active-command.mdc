@@ -1,0 +1,51 @@
+---
+description: Exclusive PRIMARY_COMMAND — ignore sibling /opsx-* in the same turn
+globs:
+alwaysApply: true
+---
+# Exclusive Active Command (OPSX)
+
+## Контекст применения
+
+Правило действует на **каждый** user turn с OPSX/Cursor slash-командами.
+Назначение: одна активная команда на ход; остальные `/opsx-*` в том же
+сообщении не загружаются и не исполняются.
+
+## Основные принципы
+
+1. **PRIMARY_COMMAND** — ровно одна команда на ход: slash-команда, которой
+   принадлежит текущий turn (контракт, который исполняется).
+2. Любые другие токены `/opsx-*` в том же сообщении (заметки, примеры,
+   случайный второй/третий slash pick) — **plain text only**:
+   - не считать вызовами;
+   - не `Read` их `.cursor/commands/**` тела;
+   - не следовать их Steps / Modes / Output;
+   - не открывать «для контекста».
+3. Если host inject-ит несколько command bodies в context — исполнять только
+   **PRIMARY_COMMAND**; остальные injected bodies игнорировать и не использовать
+   для workflow-решений.
+4. Разрешены только **named dependencies** самого PRIMARY_COMMAND (exact path,
+   который активный контракт уже цитирует, например
+   `.cursor/commands/opsx-execution-preflight.md`). Это не «загрузка другой
+   user-команды».
+5. PRIMARY пишет только в границах своего контракта. Create vs Fix / write
+   owners — SoT `.opsx/shared/meta-orientation.md` (не изобретать вторую
+   политику в теле соседней команды).
+6. Сопутствующий контракт:
+   `.cursor/commands/opsx-execution-preflight.md` → секции
+   **Exclusive active command** и
+   **Ephemeral execution file policy**
+   (`EPHEMERAL_EXECUTION_FILE_POLICY = FORBIDDEN`; quoting ≠ temp script).
+
+## Примеры
+
+- Сообщение: `/opsx-meta-fix-command-defects … /opsx-meta-design-command …`
+  → PRIMARY = `opsx-meta-fix-command-defects`; design-command не читать.
+- В аргументе упомянут `/opsx-verify` как handoff-hint → не открывать
+  `opsx-verify.md` в этом turn, пока PRIMARY этого не требует exact cite.
+
+## Ограничения
+
+- Не отменяет Read/I/O budgets preflight; усиливает их для multi-slash.
+- Не запрещает позже отдельным сообщением вызвать другую команду.
+- Не расширяет права на product/code edits.

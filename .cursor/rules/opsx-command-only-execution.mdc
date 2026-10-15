@@ -1,0 +1,82 @@
+---
+description: Product work only via PRIMARY /opsx-* slash command — no prose bypass
+globs: [".cursor/commands/opsx-*.md", "app/**", "tests/**"]
+alwaysApply: true
+---
+# OPSX Command-Only Execution
+
+## Контекст применения
+
+Правило действует на **каждый product turn** в adv-bot: реализация, тесты,
+verify, правки `app/**` / `tests/**`, git commit/push product-изменений.
+Мета-процесс (правила, OPSX spine, docs без product code) — вне scope, если
+turn явно не product.
+
+Связанные правила: `opsx-single-active-command.mdc` (одна PRIMARY на ход),
+`opsx-cloud-local-routing.mdc` (authority routing).
+
+## Основные принципы
+
+1. **Первая исполняемая строка** product-turn — ровно одна **PRIMARY_COMMAND**:
+   токен `/opsx-<name>` из `.cursor/commands/opsx-*.md`, чей контракт
+   авторизует действия этого хода (apply, test, verify, continue, …).
+2. **Prose без slash — не исполнение.** Блоки `MODE:`, `TASK:`, `RUN CANONICAL …`,
+   `OWNER GO bounded repair`, architect handoff или coordinator relay **без**
+   matching PRIMARY `/opsx-*` в первой исполняемой строке:
+   - **STOP** с токеном `MISSING_OPSX_COMMAND` (или planning-only: описать
+     маппинг, **не** править product code / не гонять gates);
+   - не трактовать prose как GO на implementation.
+3. **Запрещённый обход OPSX** (без активной PRIMARY, которая это разрешает):
+   - прямой запуск `pytest`, `ruff`, `pyright` / `pyright-strict`;
+   - `git commit` / `git push` product-изменений;
+   - правки под `app/**` (и связанные product paths, которые PRIMARY не открыл).
+   Исключение: шаги, которые **явно** предписаны телом загруженной PRIMARY
+   (например `/opsx-test`, `/opsx-apply`, `/opsx-verify`, repair-команда из
+   pipeline).
+4. **Внешний architect / Web handoff — не authority на исполнение.** Координатор
+   (или Owner в feature-chat) обязан перевести intent в **одну** строку
+   `/opsx-<command> …` (+ `change=<id>` и args по контракту). Пересылка
+   prose-TASK worker'у как исполнения — запрещена.
+5. Если канонической команды для intent нет → `MISSING_OPSX_COMMAND: <intent>`,
+   фиксировать gap в meta-process; **не** «делать то же руками».
+
+## Формат hop (feature-chat)
+
+```text
+/opsx-<command> <args по контракту команды>
+change=<change-id>
+```
+
+Далее — только контекст, разрешённый **этой** командой (HEAD, read-only scope,
+GO boundaries). `MODE: implementation` без slash в начале — **не** исполнять.
+
+## Coordinator: intent → команда (краткая таблица)
+
+| Intent | Команда |
+|--------|---------|
+| Implement | `/opsx-apply change=<id>` |
+| Planning | `/opsx-continue change=<id>` или `/opsx-update change=<id>` |
+| Tests | `/opsx-test change=<id> …` |
+| DoD verify | `/opsx-verify mode=impl change=<id>` |
+| Archive verify | `/opsx-verify mode=archive change=<id>` |
+| Pyright coverage gate | `/opsx-pyright-strict-coverage change=<id> …` |
+| Bounded style repair | Только через pipeline (`/opsx-apply` или named repair command) |
+
+Полный маппинг и роли — Project contract `opsx-command-only-enforcement` (store/docs).
+
+## Примеры
+
+- User: `MODE: implementation\nTASK: fix handler` → отказ / planning-only;
+  нужно `/opsx-apply change=…`.
+- User: `/opsx-test change=foo` → PRIMARY загружена; pytest только как шаг
+  контракта `opsx-test`.
+- Architect: «merge and verify» без slash → coordinator отвечает одной строкой
+  `/opsx-verify mode=impl change=…`, не пересылает prose worker'у.
+
+## Ограничения
+
+- Не заменяет preflight / I/O budgets / ADR lookup из других alwaysApply rules.
+- Не запрещает read-only исследование **до** выбора команды, если turn не
+  начал product writes.
+- Research/planning в отдельном turn без product edits допустимы без `/opsx-*`,
+  пока агент не переходит к authorized execution.
